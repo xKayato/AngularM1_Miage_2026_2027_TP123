@@ -51,6 +51,13 @@ Ouvrir `http://localhost:4200`. Le compte de démonstration est
 - [RAPPORT_IA_MODELE.md](RAPPORT_IA_MODELE.md) : modèle de compte rendu.
 - [CONSEILS_POUR_UTIISER_ASSISTANT_AI.md](CONSEILS_POUR_UTIISER_ASSISTANT_AI.md) : utiliser correctement un assistant IA, quel que soit l’outil choisi.
 
+Le backend contient également ses propres consignes pour les assistants :
+[`backend/AGENTS.md`](backend/AGENTS.md), [`backend/CLAUDE.md`](backend/CLAUDE.md),
+[`backend/GEMINI.md`](backend/GEMINI.md) et
+[`backend/best-practices.md`](backend/best-practices.md). Elles couvrent
+Node.js, Express, Mongoose, MongoDB, l’authentification, Multer, les uploads,
+les logs et les tests.
+
 Les fichiers audio présents dans `frontend-starter/fichiers-audio-de-test/` sont
 des fixtures fournies pour les essais. Aucun fichier uploadé, dossier de
 dépendances (`node_modules`), fichier `.env` ou identifiant local n’est inclus.

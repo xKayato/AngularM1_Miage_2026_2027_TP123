@@ -120,6 +120,11 @@ frontend-starter/
 └── best-practices.md
 ```
 
+NOTE : j'ai demandé à mon propre assistant de générer ces fichiers dans le projet "Ajoute au projet les fichiers ./md nécessaires pour le développement logiciels à l'aide d'asssistants IA comme codex, claude ou gemini. Ajoute les bonnes pratiques pour du développement en Angular 22. Va chercher sur le web ces bonnes pratiques en donnant la priorité aux ressources provenant des ressources officielles fournies par les équipes ayant créé Angular. J'ajoute que quand du code est générée je voudrais qu'il soit commenté de manière détaillée à l'attention d'étudiants de 
+Master 1, parfois débutants en Angular et TypeScript."
+
+J'ai fait pareil pour le projet backend en demandant des bonnes pratiques pour le développement Node/Express/MongoDB/Mongoose.
+
 ### `AGENTS.md`
 
 Ce fichier contient les règles générales destinées aux agents de
