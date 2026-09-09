@@ -49,6 +49,7 @@ Ouvrir `http://localhost:4200`. Le compte de démonstration est
 - [SUJET_ETUDIANT.md](SUJET_ETUDIANT.md) : version complète de référence ;
 - [API_CONTRACT.md](API_CONTRACT.md) : endpoints, authentification et formats échangés ;
 - [RAPPORT_IA_MODELE.md](RAPPORT_IA_MODELE.md) : modèle de compte rendu.
+- [CONSEILS_POUR_UTIISER_ASSISTANT_AI.md](CONSEILS_POUR_UTIISER_ASSISTANT_AI.md) : utiliser correctement un assistant IA, quel que soit l’outil choisi.
 
 Les fichiers audio présents dans `frontend-starter/fichiers-audio-de-test/` sont
 des fixtures fournies pour les essais. Aucun fichier uploadé, dossier de
