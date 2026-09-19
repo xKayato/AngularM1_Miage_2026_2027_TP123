@@ -32,9 +32,15 @@
                     "defaultConfiguration": "development"
                 },
                 "test": {
-                    "builder": "@angular/build:unit-test"
+                    "builder": "@angular/build:unit-test",
+                    "options": {
+                        "buildTarget": "gpc:build"
+                    }
                 }
             }
         }
+    },
+    "cli": {
+      "analytics": false
     }
 }
