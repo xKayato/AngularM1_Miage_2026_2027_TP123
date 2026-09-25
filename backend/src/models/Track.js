@@ -19,6 +19,12 @@ const schema = new mongoose.Schema(
     storedName: { type: String, required: true, select: false },
     mimeType: { type: String, required: true },
     size: { type: Number, required: true, min: 0 },
+    cover: {
+      storedName: { type: String, select: false },
+      originalName: { type: String },
+      mimeType: { type: String },
+      size: { type: Number },
+    },
   },
   { timestamps: true },
 );
@@ -35,6 +41,7 @@ schema.plugin(aggregatePaginate);
  */
 schema.methods.toPublic = function () {
   console.debug(`[track-model] Préparation de la piste publique ${this.id}`);
+  const hasCover = Boolean(this.cover?.storedName || this.cover?.originalName);
   return {
     id: this.id,
     ownerId: String(this.ownerId),
@@ -42,6 +49,8 @@ schema.methods.toPublic = function () {
     originalName: this.originalName,
     mimeType: this.mimeType,
     size: this.size,
+    hasCover,
+    coverUrl: hasCover ? `/api/tracks/${this.id}/cover` : null,
     createdAt: this.createdAt,
   };
 };

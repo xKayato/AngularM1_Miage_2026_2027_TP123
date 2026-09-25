@@ -17,6 +17,14 @@ export const ALLOWED_AUDIO_MIMES: readonly string[] = [
 
 export const MAX_AUDIO_FILE_SIZE = 25 * 1024 * 1024; // 25 Mo
 
+export const ALLOWED_COVER_MIMES: readonly string[] = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+];
+
+export const MAX_COVER_FILE_SIZE = 2 * 1024 * 1024; // 2 Mo
+
 export function getFrenchPaginatorIntl(): MatPaginatorIntl {
   const intl = new MatPaginatorIntl();
   intl.itemsPerPageLabel = 'Pistes par page :';
@@ -47,8 +55,10 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   private playSubscription?: Subscription;
   private searchSubscription?: Subscription;
   private searchDebounceSubscription?: Subscription;
+  private coverSubscriptions: Subscription[] = [];
 
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('coverInput') coverInput?: ElementRef<HTMLInputElement>;
 
   readonly tracks = signal<Track[]>([]);
   readonly page = signal(1);
@@ -69,10 +79,13 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   readonly audioLoading = signal(false);
   readonly audioError = signal('');
   readonly audioUrl = signal('');
+  readonly coverPreviewUrl = signal<string | null>(null);
+  readonly coverUrls = signal<Record<string, string>>({});
   readonly title = new FormControl('', { nonNullable: true });
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly searchQuery = signal('');
   file?: File;
+  coverFile?: File;
 
   ngOnInit(): void {
     this.load();
@@ -94,11 +107,28 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     this.playSubscription?.unsubscribe();
     this.searchSubscription?.unsubscribe();
     this.searchDebounceSubscription?.unsubscribe();
+    this.revokeCoverUrls();
+    const preview = this.coverPreviewUrl();
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
     const currentUrl = this.audioUrl();
     if (currentUrl) {
       URL.revokeObjectURL(currentUrl);
       this.audioUrl.set('');
     }
+  }
+
+  private revokeCoverUrls(): void {
+    const current = this.coverUrls();
+    Object.values(current).forEach((url) => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    this.coverUrls.set({});
+    this.coverSubscriptions.forEach((sub) => sub.unsubscribe());
+    this.coverSubscriptions = [];
   }
 
   clearSearch(): void {
@@ -113,7 +143,86 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     this.uploadSuccess.set('');
     this.uploadProgress.set(null);
     this.uploadStatusText.set('');
-    console.debug('[TracksPage] Fichier sélectionné', this.file?.name);
+    console.debug('[TracksPage] Fichier audio sélectionné', this.file?.name);
+  }
+
+  chooseCover(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_COVER_MIMES.includes(file.type)) {
+      this.uploadError.set('Format d\'image non accepté. Formats autorisés : JPEG, PNG, WebP.');
+      input.value = '';
+      return;
+    }
+
+    if (file.size > MAX_COVER_FILE_SIZE) {
+      this.uploadError.set('L\'image de couverture ne doit pas dépasser 2 Mo.');
+      input.value = '';
+      return;
+    }
+
+    this.coverFile = file;
+    this.uploadError.set('');
+    const prev = this.coverPreviewUrl();
+    if (prev) {
+      URL.revokeObjectURL(prev);
+    }
+    this.coverPreviewUrl.set(URL.createObjectURL(file));
+  }
+
+  clearCover(): void {
+    this.coverFile = undefined;
+    const prev = this.coverPreviewUrl();
+    if (prev) {
+      URL.revokeObjectURL(prev);
+    }
+    this.coverPreviewUrl.set(null);
+    if (this.coverInput?.nativeElement) {
+      this.coverInput.nativeElement.value = '';
+    }
+  }
+
+  getCoverUrl(track: Track): string {
+    return this.coverUrls()[track.id] || '/default-cover.svg';
+  }
+
+  onCoverImgError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.src.endsWith('/default-cover.svg')) {
+      img.src = '/default-cover.svg';
+    }
+  }
+
+  deleteCover(track: Track): void {
+    const confirmed = window.confirm(`Voulez-vous supprimer la pochette de « ${track.title} » ?`);
+    if (!confirmed) return;
+
+    this.service.deleteCover(track.id).subscribe({
+      next: () => {
+        const currentUrl = this.coverUrls()[track.id];
+        if (currentUrl && currentUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(currentUrl);
+        }
+        this.coverUrls.update((map) => {
+          const copy = { ...map };
+          delete copy[track.id];
+          return copy;
+        });
+        track.hasCover = false;
+        track.coverUrl = null;
+        this.deleteSuccess.set(`La pochette de « ${track.title} » a été supprimée.`);
+      },
+      error: (err) => {
+        console.error('[TracksPage] Erreur suppression cover', err);
+        if (err instanceof HttpErrorResponse) {
+          this.deleteError.set(err.error?.message ?? 'Impossible de supprimer la couverture.');
+        } else {
+          this.deleteError.set('Erreur inattendue lors de la suppression de la couverture.');
+        }
+      },
+    });
   }
 
   load(): void {
@@ -139,10 +248,27 @@ export class TracksPageComponent implements OnInit, OnDestroy {
         }
 
         console.debug('[TracksPage] Pistes chargées', response.items.length);
+        this.revokeCoverUrls();
         this.tracks.set(response.items);
         this.pages.set(Math.max(1, response.pages));
         this.total.set(response.total);
         this.loading.set(false);
+
+        // Récupération des couvertures des pistes authentifiées
+        for (const track of response.items) {
+          if (track.hasCover) {
+            const sub = this.service.cover(track.id).subscribe({
+              next: (blob) => {
+                const blobUrl = URL.createObjectURL(blob);
+                this.coverUrls.update((map) => ({ ...map, [track.id]: blobUrl }));
+              },
+              error: (err) => {
+                console.warn(`[TracksPage] Couverture inaccessible pour ${track.id}`, err);
+              },
+            });
+            this.coverSubscriptions.push(sub);
+          }
+        }
       },
       error: (err: unknown) => {
         if (this.page() !== targetPage || this.searchControl.value.trim() !== targetTitle) {
@@ -206,7 +332,19 @@ export class TracksPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // 4. Validation du titre (pas d'espaces uniquement si renseigné)
+    // 4. Validation couverture si présente
+    if (this.coverFile) {
+      if (!ALLOWED_COVER_MIMES.includes(this.coverFile.type)) {
+        this.uploadError.set('Format d\'image non accepté. Formats autorisés : JPEG, PNG, WebP.');
+        return;
+      }
+      if (this.coverFile.size > MAX_COVER_FILE_SIZE) {
+        this.uploadError.set('L\'image de couverture ne doit pas dépasser 2 Mo.');
+        return;
+      }
+    }
+
+    // 5. Validation du titre (pas d'espaces uniquement si renseigné)
     const titleTrimmed = this.title.value.trim();
     if (this.title.value.length > 0 && titleTrimmed.length === 0) {
       this.uploadError.set("Le titre ne peut pas être composé uniquement d'espaces.");
@@ -219,7 +357,7 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     this.uploadProgress.set(null);
     this.uploadStatusText.set("Initialisation de l'envoi…");
 
-    this.service.upload(this.file, effectiveTitle).subscribe({
+    this.service.upload(this.file, effectiveTitle, this.coverFile).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress) {
           if (event.total && event.total > 0) {
@@ -245,6 +383,7 @@ export class TracksPageComponent implements OnInit, OnDestroy {
           this.uploadSuccess.set(`La piste « ${track?.title ?? effectiveTitle} » a été ajoutée avec succès.`);
           this.title.setValue('');
           this.file = undefined;
+          this.clearCover();
           if (this.fileInput?.nativeElement) {
             this.fileInput.nativeElement.value = '';
           }

@@ -15,6 +15,9 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
     upload: ReturnType<typeof vi.fn>;
     audio: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    cover: ReturnType<typeof vi.fn>;
+    updateCover: ReturnType<typeof vi.fn>;
+    deleteCover: ReturnType<typeof vi.fn>;
   };
 
   const mockTrack1: Track = {
@@ -57,6 +60,9 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       upload: vi.fn(),
       audio: vi.fn(),
       delete: vi.fn().mockReturnValue(of(undefined)),
+      cover: vi.fn().mockReturnValue(of(new Blob(['cover content'], { type: 'image/png' }))),
+      updateCover: vi.fn().mockReturnValue(of(mockTrack1)),
+      deleteCover: vi.fn().mockReturnValue(of(undefined)),
     };
 
     await TestBed.configureTestingModule({
@@ -884,6 +890,167 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       clearBtn.click();
       expect(component.searchControl.value).toBe('');
       expect(component.searchQuery()).toBe('');
+    });
+  });
+
+  describe('Option avancée — Image de couverture par piste', () => {
+    it('should validate selected cover file format and reject unsupported types', () => {
+      const invalidEvent = {
+        target: {
+          files: [new File(['text'], 'notes.txt', { type: 'text/plain' })],
+          value: 'notes.txt',
+        },
+      } as unknown as Event;
+
+      component.chooseCover(invalidEvent);
+
+      expect(component.uploadError()).toContain("Format d'image non accepté");
+      expect(component.coverFile).toBeUndefined();
+      expect(component.coverPreviewUrl()).toBeNull();
+    });
+
+    it('should validate selected cover file size and reject files larger than 2 Mo', () => {
+      const hugeCover = new File(['x'.repeat(100)], 'huge.png', { type: 'image/png' });
+      Object.defineProperty(hugeCover, 'size', { value: 3 * 1024 * 1024 });
+
+      const event = {
+        target: {
+          files: [hugeCover],
+          value: 'huge.png',
+        },
+      } as unknown as Event;
+
+      component.chooseCover(event);
+
+      expect(component.uploadError()).toContain('2 Mo');
+      expect(component.coverFile).toBeUndefined();
+      expect(component.coverPreviewUrl()).toBeNull();
+    });
+
+    it('should accept valid cover image and generate preview ObjectURL', () => {
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:http://localhost:4200/preview-123');
+
+      const validCover = new File(['valid image bytes'], 'artwork.png', { type: 'image/png' });
+      const event = {
+        target: {
+          files: [validCover],
+          value: 'artwork.png',
+        },
+      } as unknown as Event;
+
+      component.chooseCover(event);
+
+      expect(component.uploadError()).toBe('');
+      expect(component.coverFile).toBe(validCover);
+      expect(component.coverPreviewUrl()).toBe('blob:http://localhost:4200/preview-123');
+    });
+
+    it('should clear selected cover and revoke preview URL when clearCover() is called', () => {
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      component.coverFile = new File(['img'], 'cover.png', { type: 'image/png' });
+      component.coverPreviewUrl.set('blob:http://localhost:4200/preview-cover');
+
+      component.clearCover();
+
+      expect(component.coverFile).toBeUndefined();
+      expect(component.coverPreviewUrl()).toBeNull();
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/preview-cover');
+    });
+
+    it('should include coverFile when calling upload()', () => {
+      const audioFile = new File(['audio content'], 'song.mp3', { type: 'audio/mpeg' });
+      const coverFile = new File(['cover content'], 'art.webp', { type: 'image/webp' });
+
+      mockTrackService.upload.mockReturnValue(of(new HttpResponse<Track>({ status: 201, body: mockTrack1 })));
+
+      component.file = audioFile;
+      component.coverFile = coverFile;
+      component.title.setValue('Song with Artwork');
+
+      component.upload();
+
+      expect(mockTrackService.upload).toHaveBeenCalledWith(audioFile, 'Song with Artwork', coverFile);
+      expect(component.coverFile).toBeUndefined();
+      expect(component.coverPreviewUrl()).toBeNull();
+    });
+
+    it('should load cover blobs for tracks that have covers', () => {
+      vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => `blob:http://localhost:4200/cover-${Date.now()}`);
+
+      const trackWithCover: Track = {
+        ...mockTrack1,
+        id: 'track-with-cover',
+        hasCover: true,
+        coverUrl: '/api/tracks/track-with-cover/cover',
+      };
+      const pageWithCover: Page<Track> = {
+        items: [trackWithCover],
+        page: 1,
+        limit: 5,
+        total: 1,
+        pages: 1,
+      };
+
+      mockTrackService.list.mockReturnValue(of(pageWithCover));
+      mockTrackService.cover.mockReturnValue(of(new Blob(['cover img'], { type: 'image/png' })));
+
+      component.load();
+
+      expect(mockTrackService.cover).toHaveBeenCalledWith('track-with-cover');
+      expect(component.coverUrls()['track-with-cover']).toContain('blob:');
+      expect(component.getCoverUrl(trackWithCover)).toContain('blob:');
+    });
+
+    it('should return default cover fallback when track has no cover or on image error', () => {
+      const trackWithoutCover: Track = { ...mockTrack1, hasCover: false };
+      expect(component.getCoverUrl(trackWithoutCover)).toBe('/default-cover.svg');
+
+      // Si une erreur de chargement survient sur une image existante dans le DOM
+      const imgElement = document.createElement('img');
+      imgElement.src = 'blob:broken';
+      const errorEvent = { target: imgElement } as unknown as Event;
+      component.onCoverImgError(errorEvent);
+      expect(imgElement.src).toContain('/default-cover.svg');
+    });
+
+    it('should delete track cover after user confirmation, revoke ObjectURL and reset cover state', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+      const track: Track = {
+        ...mockTrack1,
+        id: 'track-del-cov',
+        hasCover: true,
+        coverUrl: '/api/tracks/track-del-cov/cover',
+      };
+      component.tracks.set([track]);
+      component.coverUrls.set({ 'track-del-cov': 'blob:http://localhost:4200/cov-to-del' });
+
+      mockTrackService.deleteCover.mockReturnValue(of(undefined));
+
+      component.deleteCover(track);
+
+      expect(mockTrackService.deleteCover).toHaveBeenCalledWith('track-del-cov');
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/cov-to-del');
+      expect(component.coverUrls()['track-del-cov']).toBeUndefined();
+      expect(track.hasCover).toBe(false);
+      expect(track.coverUrl).toBeNull();
+      expect(component.deleteSuccess()).toContain('La pochette de');
+    });
+
+    it('should revoke all cover ObjectURLs when destroying component', () => {
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      component.coverUrls.set({
+        'trk-1': 'blob:http://localhost:4200/cov1',
+        'trk-2': 'blob:http://localhost:4200/cov2',
+      });
+      component.coverPreviewUrl.set('blob:http://localhost:4200/preview-destroy');
+
+      component.ngOnDestroy();
+
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/cov1');
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/cov2');
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/preview-destroy');
     });
   });
 });

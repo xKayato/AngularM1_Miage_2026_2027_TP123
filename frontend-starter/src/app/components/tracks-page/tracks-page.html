@@ -10,6 +10,16 @@
       <h2>Importer</h2>
       <label>Titre<input [formControl]="title" placeholder="Titre de la piste (optionnel)" /></label>
       <label>Fichier audio<input #fileInput type="file" accept="audio/*" (change)="choose($event)" /></label>
+      <label>Pochette (optionnel, JPEG/PNG/WebP, max 2 Mo)
+        <input #coverInput type="file" accept="image/jpeg,image/png,image/webp" (change)="chooseCover($event)" />
+      </label>
+
+      @if (coverPreviewUrl()) {
+      <div class="cover-preview-wrapper">
+        <img [src]="coverPreviewUrl()" alt="Prévisualisation de la pochette" class="cover-preview-img" />
+        <button type="button" class="remove-cover-btn" (click)="clearCover()">Retirer la pochette</button>
+      </div>
+      }
 
       @if (uploadError()) {
       <p class="error upload-error" role="alert">{{ uploadError() }}</p>
@@ -98,39 +108,64 @@
       <div class="tracks-list" role="list">
         @for (track of tracks(); track track.id) {
         <article class="track-card" role="listitem" [class.playing]="currentTrack()?.id === track.id">
-          <div class="track-header">
-            <h3 class="track-title">{{ track.title }}</h3>
-            @if (currentTrack()?.id === track.id) {
-            <span class="now-playing-badge" aria-label="En cours de lecture">En écoute</span>
-            }
-          </div>
+          <div class="track-card-body">
+            <div class="track-cover-container">
+              <img
+                [src]="getCoverUrl(track)"
+                [alt]="'Pochette de ' + track.title"
+                class="track-cover-img"
+                (error)="onCoverImgError($event)"
+                loading="lazy"
+              />
+              @if (track.hasCover) {
+              <button
+                type="button"
+                class="delete-cover-btn"
+                (click)="deleteCover(track)"
+                [attr.aria-label]="'Supprimer la pochette de ' + track.title"
+                title="Supprimer la couverture"
+              >
+                ✕
+              </button>
+              }
+            </div>
 
-          <div class="track-meta" aria-label="Informations sur la piste">
-            <span class="meta-item" [attr.aria-label]="'Fichier d\'origine : ' + (track.originalName || 'Inconnu')">
-              <span aria-hidden="true">📁</span> {{ track.originalName || 'Nom de fichier inconnu' }}
-            </span>
-            <span class="meta-item" [attr.aria-label]="'Format audio : ' + formatMime(track.mimeType)">
-              <span aria-hidden="true">🎵</span> {{ formatMime(track.mimeType) }}
-            </span>
-            <span class="meta-item" [attr.aria-label]="'Taille : ' + formatSize(track.size)">
-              <span aria-hidden="true">⚖️</span> {{ formatSize(track.size) }}
-            </span>
-            <span class="meta-item" [attr.aria-label]="'Ajoutée le : ' + formatDate(track.createdAt)">
-              <span aria-hidden="true">📅</span> <time [attr.datetime]="track.createdAt">{{ formatDate(track.createdAt) }}</time>
-            </span>
-          </div>
+            <div class="track-info">
+              <div class="track-header">
+                <h3 class="track-title">{{ track.title }}</h3>
+                @if (currentTrack()?.id === track.id) {
+                <span class="now-playing-badge" aria-label="En cours de lecture">En écoute</span>
+                }
+              </div>
 
-          <div class="track-actions">
-            <button type="button" class="play-btn" (click)="play(track)"
-              [disabled]="(audioLoading() && currentTrack()?.id === track.id) || deletingTrackId() === track.id"
-              [attr.aria-label]="(currentTrack()?.id === track.id ? 'Rejouer ' : 'Écouter ') + track.title">
-              {{ currentTrack()?.id === track.id ? '▶ Rejouer' : '▶ Écouter' }}
-            </button>
-            <button type="button" class="delete-btn" (click)="deleteTrack(track)"
-              [disabled]="deletingTrackId() !== null"
-              [attr.aria-label]="'Supprimer la piste ' + track.title">
-              {{ deletingTrackId() === track.id ? 'Suppression…' : '🗑 Supprimer' }}
-            </button>
+              <div class="track-meta" aria-label="Informations sur la piste">
+                <span class="meta-item" [attr.aria-label]="'Fichier d\'origine : ' + (track.originalName || 'Inconnu')">
+                  <span aria-hidden="true">📁</span> {{ track.originalName || 'Nom de fichier inconnu' }}
+                </span>
+                <span class="meta-item" [attr.aria-label]="'Format audio : ' + formatMime(track.mimeType)">
+                  <span aria-hidden="true">🎵</span> {{ formatMime(track.mimeType) }}
+                </span>
+                <span class="meta-item" [attr.aria-label]="'Taille : ' + formatSize(track.size)">
+                  <span aria-hidden="true">⚖️</span> {{ formatSize(track.size) }}
+                </span>
+                <span class="meta-item" [attr.aria-label]="'Ajoutée le : ' + formatDate(track.createdAt)">
+                  <span aria-hidden="true">📅</span> <time [attr.datetime]="track.createdAt">{{ formatDate(track.createdAt) }}</time>
+                </span>
+              </div>
+
+              <div class="track-actions">
+                <button type="button" class="play-btn" (click)="play(track)"
+                  [disabled]="(audioLoading() && currentTrack()?.id === track.id) || deletingTrackId() === track.id"
+                  [attr.aria-label]="(currentTrack()?.id === track.id ? 'Rejouer ' : 'Écouter ') + track.title">
+                  {{ currentTrack()?.id === track.id ? '▶ Rejouer' : '▶ Écouter' }}
+                </button>
+                <button type="button" class="delete-btn" (click)="deleteTrack(track)"
+                  [disabled]="deletingTrackId() !== null"
+                  [attr.aria-label]="'Supprimer la piste ' + track.title">
+                  {{ deletingTrackId() === track.id ? 'Suppression…' : '🗑 Supprimer' }}
+                </button>
+              </div>
+            </div>
           </div>
         </article>
         } @empty {

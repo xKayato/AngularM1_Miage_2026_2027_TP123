@@ -447,3 +447,311 @@ test("GET /api/tracks garantit la compatibilité du format frontend (id, sans _i
     Track.aggregatePaginate = originalAggregatePaginate;
   }
 });
+
+// -------------------------------------------------------------
+// TESTS COUVERTURE D'IMAGE (APPROCHE A)
+// -------------------------------------------------------------
+
+import { detectRealImageMime } from "../src/utils/imageValidator.js";
+
+const VALID_PNG_BYTES = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+  0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+]);
+
+const VALID_JPEG_BYTES = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+  0x01, 0x01, 0x00, 0x60,
+]);
+
+const DUMMY_AUDIO_BYTES = Buffer.from([0xff, 0xfb, 0x90, 0x44, 0x00, 0x00, 0x00, 0x00]);
+
+test("detectRealImageMime valide les magic bytes réels et rejette les faux fichiers", async () => {
+  const fsPromises = (await import("node:fs/promises")).default;
+  const path = (await import("node:path")).default;
+  const os = (await import("node:os")).default;
+
+  const tempPng = path.join(os.tmpdir(), `test_valid_${Date.now()}.png`);
+  const tempFake = path.join(os.tmpdir(), `test_fake_${Date.now()}.png`);
+  const tempJpeg = path.join(os.tmpdir(), `test_valid_${Date.now()}.jpg`);
+
+  try {
+    await fsPromises.writeFile(tempPng, VALID_PNG_BYTES);
+    await fsPromises.writeFile(tempJpeg, VALID_JPEG_BYTES);
+    await fsPromises.writeFile(tempFake, Buffer.from("<html><script>alert(1)</script></html>"));
+
+    assert.equal(await detectRealImageMime(tempPng), "image/png");
+    assert.equal(await detectRealImageMime(tempJpeg), "image/jpeg");
+    assert.equal(await detectRealImageMime(tempFake), null, "Un faux PNG doit être rejeté");
+  } finally {
+    try { await fsPromises.unlink(tempPng); } catch {}
+    try { await fsPromises.unlink(tempJpeg); } catch {}
+    try { await fsPromises.unlink(tempFake); } catch {}
+  }
+});
+
+test("POST /api/tracks avec cover valide enregistre la couverture et expose hasCover/coverUrl", async () => {
+  const originalCreate = Track.create;
+  let createdData = null;
+
+  try {
+    Track.create = async (doc) => {
+      createdData = doc;
+      return {
+        id: "64b0f9f8e4b0a1a2b3c49999",
+        ownerId: doc.ownerId,
+        title: doc.title,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        size: doc.size,
+        cover: doc.cover,
+        toPublic() {
+          return {
+            id: this.id,
+            ownerId: String(this.ownerId),
+            title: this.title,
+            originalName: this.originalName,
+            mimeType: this.mimeType,
+            size: this.size,
+            hasCover: Boolean(this.cover?.storedName),
+            coverUrl: this.cover?.storedName ? `/api/tracks/${this.id}/cover` : null,
+            createdAt: new Date().toISOString(),
+          };
+        },
+      };
+    };
+
+    const form = new FormData();
+    form.append("audio", new Blob([DUMMY_AUDIO_BYTES], { type: "audio/mpeg" }), "song.mp3");
+    form.append("cover", new Blob([VALID_PNG_BYTES], { type: "image/png" }), "artwork.png");
+    form.append("title", "Song with Artwork");
+
+    const r = await fetch(base + "/api/tracks", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tokenUserA}` },
+      body: form,
+    });
+
+    assert.equal(r.status, 201);
+    const data = await r.json();
+    assert.equal(data.title, "Song with Artwork");
+    assert.equal(data.hasCover, true);
+    assert.equal(data.coverUrl, "/api/tracks/64b0f9f8e4b0a1a2b3c49999/cover");
+
+    assert.ok(createdData.cover);
+    assert.equal(createdData.cover.mimeType, "image/png");
+    assert.equal(createdData.cover.originalName, "artwork.png");
+  } finally {
+    Track.create = originalCreate;
+  }
+});
+
+test("POST /api/tracks refuse une cover avec contenu invalide (mauvais magic bytes) -> 400", async () => {
+  const form = new FormData();
+  form.append("audio", new Blob([DUMMY_AUDIO_BYTES], { type: "audio/mpeg" }), "song.mp3");
+  // Faux PNG : contenu textuel au lieu d'un binaire PNG
+  form.append("cover", new Blob([Buffer.from("ceci n'est pas une image")], { type: "image/png" }), "fake.png");
+  form.append("title", "Fake image test");
+
+  const r = await fetch(base + "/api/tracks", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${tokenUserA}` },
+    body: form,
+  });
+
+  assert.equal(r.status, 400);
+  const data = await r.json();
+  assert.match(data.message, /Contenu de l'image invalide/i);
+});
+
+test("GET /api/tracks/:id/cover renvoie 404 si la piste n'a pas de couverture", async () => {
+  const originalFindOne = Track.findOne;
+
+  try {
+    Track.findOne = () => ({
+      select: () => Promise.resolve({
+        _id: "64b0f9f8e4b0a1a2b3c49999",
+        ownerId: userA_id,
+        cover: null,
+      }),
+    });
+
+    const r = await fetch(base + "/api/tracks/64b0f9f8e4b0a1a2b3c49999/cover", {
+      headers: { Authorization: `Bearer ${tokenUserA}` },
+    });
+
+    assert.equal(r.status, 404);
+    const data = await r.json();
+    assert.match(data.message, /Aucune couverture/i);
+  } finally {
+    Track.findOne = originalFindOne;
+  }
+});
+
+test("GET /api/tracks/:id/cover renvoie 404 pour un utilisateur non propriétaire (isolation)", async () => {
+  const originalFindOne = Track.findOne;
+
+  try {
+    // Si User B demande la cover de User A, findOne filtre sur ownerId et ne trouve rien
+    Track.findOne = (filter) => {
+      if (filter.ownerId.toString() === userB_id.toString()) {
+        return { select: () => Promise.resolve(null) };
+      }
+      return {
+        select: () => Promise.resolve({
+          _id: "64b0f9f8e4b0a1a2b3c40001",
+          ownerId: userA_id,
+          cover: { storedName: "cover_a.png", mimeType: "image/png" },
+        }),
+      };
+    };
+
+    const r = await fetch(base + "/api/tracks/64b0f9f8e4b0a1a2b3c40001/cover", {
+      headers: { Authorization: `Bearer ${tokenUserB}` },
+    });
+
+    assert.equal(r.status, 404);
+    const data = await r.json();
+    assert.equal(data.message, "Piste inconnue");
+  } finally {
+    Track.findOne = originalFindOne;
+  }
+});
+
+test("PUT /api/tracks/:id/cover remplace la couverture et supprime l'ancien fichier sans orphelin", async () => {
+  const fsPromises = (await import("node:fs/promises")).default;
+  const path = (await import("node:path")).default;
+  const originalFindOne = Track.findOne;
+
+  // Création d'un faux ancien fichier de couverture
+  const oldCoverFile = `old_cover_${Date.now()}.png`;
+  const oldCoverPath = path.resolve("data/uploads/covers", oldCoverFile);
+  await fsPromises.writeFile(oldCoverPath, VALID_PNG_BYTES);
+
+  let updatedCover = null;
+
+  try {
+    Track.findOne = () => ({
+      select: () => Promise.resolve({
+        _id: "64b0f9f8e4b0a1a2b3c40001",
+        ownerId: userA_id,
+        cover: { storedName: oldCoverFile, originalName: "old.png", mimeType: "image/png" },
+        save: async function () {
+          updatedCover = this.cover;
+        },
+        toPublic: () => ({
+          id: "64b0f9f8e4b0a1a2b3c40001",
+          hasCover: true,
+          coverUrl: "/api/tracks/64b0f9f8e4b0a1a2b3c40001/cover",
+        }),
+      }),
+    });
+
+    const form = new FormData();
+    form.append("cover", new Blob([VALID_PNG_BYTES], { type: "image/png" }), "new_cover.png");
+
+    const r = await fetch(base + "/api/tracks/64b0f9f8e4b0a1a2b3c40001/cover", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${tokenUserA}` },
+      body: form,
+    });
+
+    assert.equal(r.status, 200);
+    assert.ok(updatedCover);
+    assert.notEqual(updatedCover.storedName, oldCoverFile, "Le nom stocké doit être renouvelé");
+
+    // Vérifier que l'ancien fichier a bien été supprimé du disque (aucun fichier orphelin)
+    await assert.rejects(async () => {
+      await fsPromises.stat(oldCoverPath);
+    }, "L'ancien fichier de couverture doit avoir été supprimé");
+  } finally {
+    Track.findOne = originalFindOne;
+    try { await fsPromises.unlink(oldCoverPath); } catch {}
+  }
+});
+
+test("DELETE /api/tracks/:id/cover supprime la couverture et son fichier physique (204)", async () => {
+  const fsPromises = (await import("node:fs/promises")).default;
+  const path = (await import("node:path")).default;
+  const originalFindOne = Track.findOne;
+
+  const coverFile = `temp_delete_cover_${Date.now()}.png`;
+  const coverPath = path.resolve("data/uploads/covers", coverFile);
+  await fsPromises.writeFile(coverPath, VALID_PNG_BYTES);
+
+  let coverUnset = false;
+
+  try {
+    Track.findOne = () => ({
+      select: () => Promise.resolve({
+        _id: "64b0f9f8e4b0a1a2b3c40001",
+        ownerId: userA_id,
+        cover: { storedName: coverFile, originalName: "artwork.png" },
+        save: async function () {
+          if (this.cover === undefined) coverUnset = true;
+        },
+      }),
+    });
+
+    const r = await fetch(base + "/api/tracks/64b0f9f8e4b0a1a2b3c40001/cover", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${tokenUserA}` },
+    });
+
+    assert.equal(r.status, 204);
+    assert.equal(coverUnset, true, "track.cover doit être réinitialisé");
+
+    // Vérifier suppression physique sur disque
+    await assert.rejects(async () => {
+      await fsPromises.stat(coverPath);
+    }, "Le fichier de couverture doit avoir été supprimé sur disque");
+  } finally {
+    Track.findOne = originalFindOne;
+    try { await fsPromises.unlink(coverPath); } catch {}
+  }
+});
+
+test("DELETE /api/tracks/:id nettoie à la fois le fichier audio ET la couverture sur disque (zéro orphelin)", async () => {
+  const fsPromises = (await import("node:fs/promises")).default;
+  const path = (await import("node:path")).default;
+  const originalFindOneAndDelete = Track.findOneAndDelete;
+
+  const audioFile = `temp_del_audio_${Date.now()}.mp3`;
+  const coverFile = `temp_del_cover_${Date.now()}.png`;
+  const audioPath = path.resolve("data/uploads", audioFile);
+  const coverPath = path.resolve("data/uploads/covers", coverFile);
+
+  await fsPromises.writeFile(audioPath, DUMMY_AUDIO_BYTES);
+  await fsPromises.writeFile(coverPath, VALID_PNG_BYTES);
+
+  try {
+    Track.findOneAndDelete = () => ({
+      select: () => Promise.resolve({
+        _id: "64b0f9f8e4b0a1a2b3c40001",
+        ownerId: userA_id,
+        storedName: audioFile,
+        cover: { storedName: coverFile },
+      }),
+    });
+
+    const r = await fetch(base + "/api/tracks/64b0f9f8e4b0a1a2b3c40001", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${tokenUserA}` },
+    });
+
+    assert.equal(r.status, 204);
+
+    // Les deux fichiers doivent être supprimés sur disque
+    await assert.rejects(async () => await fsPromises.stat(audioPath));
+    await assert.rejects(async () => await fsPromises.stat(coverPath));
+  } finally {
+    Track.findOneAndDelete = originalFindOneAndDelete;
+    try { await fsPromises.unlink(audioPath); } catch {}
+    try { await fsPromises.unlink(coverPath); } catch {}
+  }
+});
+

@@ -9,18 +9,21 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
+import { detectRealImageMime } from "./utils/imageValidator.js";
 
 // Les fichiers audio restent sur le disque du serveur dans ce TP.
 // MongoDB ne conserve que leurs métadonnées : titre, nom, taille, etc.
 const UPLOADS = path.resolve("data/uploads");
+const UPLOADS_COVERS = path.resolve("data/uploads/covers");
 
 try {
-  // mkdirSync est utilisé au démarrage : l'application doit disposer de ce
-  // dossier avant de pouvoir accepter le premier upload.
+  // mkdirSync est utilisé au démarrage : l'application doit disposer de ces
+  // dossiers avant de pouvoir accepter le premier upload.
   fs.mkdirSync(UPLOADS, { recursive: true });
-  console.log(`[startup] Dossier des uploads prêt : ${UPLOADS}`);
+  fs.mkdirSync(UPLOADS_COVERS, { recursive: true });
+  console.log(`[startup] Dossiers des uploads prêts : ${UPLOADS} et ${UPLOADS_COVERS}`);
 } catch (error) {
-  console.error("[startup] Impossible de créer le dossier des uploads", error);
+  console.error("[startup] Impossible de créer les dossiers des uploads", error);
   throw error;
 }
 
@@ -30,6 +33,12 @@ const SECRET = process.env.JWT_SECRET || "tp1-development-secret";
 // La taille maximale d'un fichier audio est de 25 Mo. Les fichiers plus gros
 // sont refusés par Multer avant d'être écrits sur le disque.
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
+// La taille maximale d'une couverture est de 2 Mo.
+const MAX_COVER_SIZE = 2 * 1024 * 1024;
+
+// Les formats d'image autorisés pour les couvertures
+const ALLOWED_COVER_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 // Les types MIME autorisés correspondent aux formats demandés dans le sujet.
 const allowed = new Set([
@@ -87,9 +96,14 @@ function auth(req, res, next) {
  * pas d'erreur. Le nom aléatoire évite les collisions entre utilisateurs.
  */
 const storage = multer.diskStorage({
-  destination: (_request, _file, callback) => {
-    console.debug(`[multer] Destination sélectionnée : ${UPLOADS}`);
-    callback(null, UPLOADS);
+  destination: (_request, file, callback) => {
+    if (file.fieldname === "cover") {
+      console.debug(`[multer] Destination sélectionnée pour cover : ${UPLOADS_COVERS}`);
+      callback(null, UPLOADS_COVERS);
+    } else {
+      console.debug(`[multer] Destination sélectionnée pour audio : ${UPLOADS}`);
+      callback(null, UPLOADS);
+    }
   },
   filename: (_request, file, callback) => {
     const filename =
@@ -108,14 +122,38 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_request, file, callback) => {
-    // Seuls les types MIME audio demandés dans le sujet sont acceptés.
-    if (allowed.has(file.mimetype)) {
-      console.log(`[multer] Type accepté : ${file.mimetype}`);
+    if (file.fieldname === "audio") {
+      if (allowed.has(file.mimetype)) {
+        console.log(`[multer] Type audio accepté : ${file.mimetype}`);
+        return callback(null, true);
+      }
+      const error = new Error("Format audio non accepté");
+      console.error(`[multer] Type audio refusé : ${file.mimetype}`, error);
+      return callback(error);
+    }
+    if (file.fieldname === "cover") {
+      if (ALLOWED_COVER_MIMES.has(file.mimetype)) {
+        console.log(`[multer] Type cover accepté : ${file.mimetype}`);
+        return callback(null, true);
+      }
+      const error = new Error("Format image non accepté");
+      console.error(`[multer] Type cover refusé : ${file.mimetype}`, error);
+      return callback(error);
+    }
+    callback(null, true);
+  },
+});
+
+const uploadCover = multer({
+  storage,
+  limits: { fileSize: MAX_COVER_SIZE },
+  fileFilter: (_request, file, callback) => {
+    if (ALLOWED_COVER_MIMES.has(file.mimetype)) {
+      console.log(`[multer] Type cover accepté : ${file.mimetype}`);
       return callback(null, true);
     }
-
-    const error = new Error("Format audio non accepté");
-    console.error(`[multer] Type refusé : ${file.mimetype}`, error);
+    const error = new Error("Format image non accepté");
+    console.error(`[multer] Type cover refusé : ${file.mimetype}`, error);
     return callback(error);
   },
 });
@@ -291,8 +329,23 @@ export function createApp() {
 
       const aggregate = Track.aggregate([
         { $match: matchStage },
-        { $addFields: { id: { $toString: "$_id" }, ownerId: { $toString: "$ownerId" } } },
-        { $project: { _id: 0, storedName: 0, __v: 0 } },
+        {
+          $addFields: {
+            id: { $toString: "$_id" },
+            ownerId: { $toString: "$ownerId" },
+            hasCover: {
+              $cond: [{ $ifNull: ["$cover.storedName", false] }, true, false],
+            },
+            coverUrl: {
+              $cond: [
+                { $ifNull: ["$cover.storedName", false] },
+                { $concat: ["/api/tracks/", { $toString: "$_id" }, "/cover"] },
+                null,
+              ],
+            },
+          },
+        },
+        { $project: { _id: 0, storedName: 0, "cover.storedName": 0, __v: 0 } },
       ]);
 
       const options = {
@@ -318,59 +371,211 @@ export function createApp() {
   });
 
   /**
-   * Reçoit le champ multipart audio et le champ texte title.
-   * upload.single("audio") traite un seul fichier et le place dans req.file,
-   * tandis que req.body.title contient le champ texte associé.
-   * C'est ici qu'est fait l'upload de fichiers sur le serveur. 
-   * Le middleware auth vérifie le JWT avant d'accepter l'upload.
-   * Le middleware upload.single("audio") traite le fichier audio envoyé dans le champ "audio" du formulaire
-   * ou de l'appel depuis le frontend avec un objet FormData.
-   * Si le fichier est accepté, il est stocké sur le disque et ses métadonnées sont enregistrées 
-   * dans MongoDB.
+   * Reçoit le champ multipart audio, le champ texte title et le champ optionnel cover.
+   * Valide le type MIME réel (magic numbers) de la couverture et sa taille maximale (2 Mo).
    */
   app.post(
     "/api/tracks",
     auth,
-    upload.single("audio"),
+    upload.fields([
+      { name: "audio", maxCount: 1 },
+      { name: "cover", maxCount: 1 },
+    ]),
     async (req, res, next) => {
+      const audioFile = req.files?.["audio"]?.[0] || (req.file?.fieldname === "audio" ? req.file : null);
+      const coverFile = req.files?.["cover"]?.[0];
+
       try {
-        if (!req.file) {
-          console.warn(`[tracks] Upload sans fichier par ${req.auth.sub}`);
+        if (!audioFile) {
+          if (coverFile) {
+            try { await fsPromises.unlink(coverFile.path); } catch {}
+          }
+          console.warn(`[tracks] Upload sans fichier audio par ${req.auth.sub}`);
           return res.status(400).json({ message: "Fichier audio requis" });
+        }
+
+        let coverData = undefined;
+        if (coverFile) {
+          if (coverFile.size > MAX_COVER_SIZE) {
+            try { await fsPromises.unlink(audioFile.path); } catch {}
+            try { await fsPromises.unlink(coverFile.path); } catch {}
+            return res.status(400).json({ message: "L'image de couverture ne doit pas dépasser 2 Mo" });
+          }
+
+          const realMime = await detectRealImageMime(coverFile.path);
+          if (!realMime) {
+            try { await fsPromises.unlink(audioFile.path); } catch {}
+            try { await fsPromises.unlink(coverFile.path); } catch {}
+            return res.status(400).json({ message: "Contenu de l'image invalide (JPEG, PNG, WebP uniquement)" });
+          }
+
+          coverData = {
+            storedName: coverFile.filename,
+            originalName: coverFile.originalname,
+            mimeType: realMime,
+            size: coverFile.size,
+          };
         }
 
         const track = await Track.create({
           ownerId: req.auth.sub,
-          title: req.body.title || req.file.originalname,
-          originalName: req.file.originalname,
-          storedName: req.file.filename,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+          title: req.body.title || audioFile.originalname,
+          originalName: audioFile.originalname,
+          storedName: audioFile.filename,
+          mimeType: audioFile.mimetype,
+          size: audioFile.size,
+          cover: coverData,
         });
 
-        console.log(`[tracks] Upload enregistré : ${track.id}`);
+        console.log(`[tracks] Upload enregistré : ${track.id}${coverData ? " (avec cover)" : ""}`);
         res.status(201).json(track.toPublic());
       } catch (error) {
         console.error("[tracks] Erreur après l'enregistrement du fichier", error);
 
-        // Si MongoDB échoue après l'écriture sur disque, on tente de nettoyer
-        // le fichier orphelin. L'erreur de nettoyage est elle aussi loguée.
-        if (req.file) {
-          const uploadedPath = path.join(UPLOADS, req.file.filename);
+        if (audioFile) {
           try {
-            await fsPromises.unlink(uploadedPath);
-            console.log(`[tracks] Fichier temporaire supprimé : ${uploadedPath}`);
+            await fsPromises.unlink(path.join(UPLOADS, audioFile.filename));
           } catch (cleanupError) {
-            console.error(
-              `[tracks] Impossible de supprimer le fichier temporaire ${uploadedPath}`,
-              cleanupError,
-            );
+            console.error(`[tracks] Impossible de supprimer le fichier audio temporaire`, cleanupError);
+          }
+        }
+        if (coverFile) {
+          try {
+            await fsPromises.unlink(path.join(UPLOADS_COVERS, coverFile.filename));
+          } catch (cleanupError) {
+            console.error(`[tracks] Impossible de supprimer l'image temporaire`, cleanupError);
           }
         }
         next(error);
       }
     },
   );
+
+  /** Envoie le flux binaire de l'image de couverture si la piste appartient à l'utilisateur. */
+  app.get("/api/tracks/:id/cover", auth, async (req, res, next) => {
+    try {
+      const track = await Track.findOne({
+        _id: req.params.id,
+        ownerId: req.auth.sub,
+      }).select("+cover.storedName");
+
+      if (!track) {
+        return res.status(404).json({ message: "Piste inconnue" });
+      }
+
+      if (!track.cover?.storedName) {
+        return res.status(404).json({ message: "Aucune couverture pour cette piste" });
+      }
+
+      const coverPath = path.join(UPLOADS_COVERS, track.cover.storedName);
+      res.type(track.cover.mimeType);
+      res.sendFile(coverPath, (error) => {
+        if (error) {
+          console.error(`[tracks] Erreur envoi cover ${track.id}`, error);
+          if (!res.headersSent) next(error);
+        }
+      });
+    } catch (error) {
+      console.error("[tracks] Erreur de lecture cover", error);
+      next(error);
+    }
+  });
+
+  /** Ajoute ou remplace la couverture d'une piste existante en supprimant l'ancien fichier sur disque. */
+  app.put(
+    "/api/tracks/:id/cover",
+    auth,
+    uploadCover.single("cover"),
+    async (req, res, next) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "Fichier image requis" });
+        }
+
+        if (req.file.size > MAX_COVER_SIZE) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(400).json({ message: "L'image de couverture ne doit pas dépasser 2 Mo" });
+        }
+
+        const realMime = await detectRealImageMime(req.file.path);
+        if (!realMime) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(400).json({ message: "Contenu de l'image invalide (JPEG, PNG, WebP uniquement)" });
+        }
+
+        const track = await Track.findOne({
+          _id: req.params.id,
+          ownerId: req.auth.sub,
+        }).select("+cover.storedName");
+
+        if (!track) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(404).json({ message: "Piste inconnue" });
+        }
+
+        const previousCover = track.cover?.storedName;
+
+        track.cover = {
+          storedName: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: realMime,
+          size: req.file.size,
+        };
+
+        await track.save();
+
+        if (previousCover) {
+          try {
+            await fsPromises.unlink(path.join(UPLOADS_COVERS, previousCover));
+            console.log(`[cover] Ancienne couverture supprimée : ${previousCover}`);
+          } catch (cleanupError) {
+            console.error(`[cover] Impossible de supprimer l'ancienne couverture : ${previousCover}`, cleanupError);
+          }
+        }
+
+        res.json(track.toPublic());
+      } catch (error) {
+        if (req.file) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+        }
+        next(error);
+      }
+    },
+  );
+
+  /** Supprime la couverture d'une piste et son fichier physique sans laisser d'orphelin. */
+  app.delete("/api/tracks/:id/cover", auth, async (req, res, next) => {
+    try {
+      const track = await Track.findOne({
+        _id: req.params.id,
+        ownerId: req.auth.sub,
+      }).select("+cover.storedName");
+
+      if (!track) {
+        return res.status(404).json({ message: "Piste inconnue" });
+      }
+
+      if (!track.cover?.storedName) {
+        return res.status(404).json({ message: "Aucune couverture pour cette piste" });
+      }
+
+      const coverFileName = track.cover.storedName;
+      track.cover = undefined;
+      await track.save();
+
+      try {
+        await fsPromises.unlink(path.join(UPLOADS_COVERS, coverFileName));
+        console.log(`[cover] Couverture supprimée sur disque : ${coverFileName}`);
+      } catch (cleanupError) {
+        console.error(`[cover] Erreur suppression couverture disque : ${coverFileName}`, cleanupError);
+      }
+
+      res.status(204).end();
+    } catch (error) {
+      console.error("[cover] Erreur suppression cover", error);
+      next(error);
+    }
+  });
 
   /** Envoie le contenu binaire d'une piste après vérification de sa propriété. */
   app.get("/api/tracks/:id/audio", auth, async (req, res, next) => {
@@ -402,13 +607,13 @@ export function createApp() {
     }
   });
 
-  /** Supprime la métadonnée et le fichier physique correspondant. */
+  /** Supprime la métadonnée, le fichier audio ET le fichier de couverture associé (aucun orphelin). */
   app.delete("/api/tracks/:id", auth, async (req, res, next) => {
     try {
       const track = await Track.findOneAndDelete({
         _id: req.params.id,
         ownerId: req.auth.sub,
-      }).select("+storedName");
+      }).select("+storedName +cover.storedName");
 
       if (!track) {
         console.warn(`[tracks] Suppression impossible : ${req.params.id}`);
@@ -428,6 +633,17 @@ export function createApp() {
         });
       }
 
+      // Nettoyage de la couverture sur disque si existante
+      if (track.cover?.storedName) {
+        const coverPath = path.join(UPLOADS_COVERS, track.cover.storedName);
+        try {
+          await fsPromises.unlink(coverPath);
+          console.log(`[tracks] Fichier cover supprimé : ${coverPath}`);
+        } catch (coverError) {
+          console.error(`[tracks] Fichier cover non supprimé : ${coverPath}`, coverError);
+        }
+      }
+
       res.status(204).end();
     } catch (error) {
       console.error("[tracks] Erreur de suppression", error);
@@ -441,7 +657,8 @@ export function createApp() {
 
     if (
       error instanceof multer.MulterError ||
-      error?.message === "Format audio non accepté"
+      error?.message === "Format audio non accepté" ||
+      error?.message === "Format image non accepté"
     ) {
       return res.status(400).json({ message: error.message });
     }
