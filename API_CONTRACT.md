@@ -11,11 +11,11 @@ Le contrat HTTP ne dépend pas du choix de persistance : le backend fourni utili
 | POST | `/auth/login` | `{email,password}` | `200 {token,user}` |
 | GET | `/users/me` | JWT | `200 User` |
 | PUT | `/users/me` | `{name}` + JWT | `200 User` |
-| GET | `/tracks?page=1&limit=5` | JWT | `Page<Track>` |
+| GET | `/tracks?page=1&limit=5&title=blues` | JWT | `Page<Track>` (paramètre `title` optionnel, filtre insensible à la casse) |
 | POST | `/tracks` | multipart : `audio`, `title` | `201 Track` |
 | GET | `/tracks/:id/audio` | JWT | flux audio |
 | DELETE | `/tracks/:id` | JWT | `204` (bonus) |
 
-`Page<Track>` contient `items`, `page`, `limit`, `total` et `pages`. Formats acceptés : MP3, WAV, OGG et M4A, 25 Mo maximum.
+`Page<Track>` contient `items`, `page`, `limit`, `total` et `pages`. Formats acceptés : MP3, WAV, OGG et M4A, 25 Mo maximum. Le filtre `title` (recherche partielle insensible à la casse) adapte `total` et `pages`.
 
 Erreurs courantes : `400` validation, `401` authentification, `404` ressource, `409` email déjà utilisé.

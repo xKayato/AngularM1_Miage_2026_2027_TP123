@@ -11,3 +11,5 @@ This is an Angular 22 standalone application. Read `best-practices.md` before ch
 - Do not put passwords or JWT secrets in frontend code.
 - Keep explicit `subscribe({ next, error })` blocks at user-action/HTTP boundaries so behavior can be traced in the console.
 - After a change, run `npm run build` and manually verify the browser Network panel.
+- Systematic rule: Update `../RAPPORT_IA_MODELE.md` after each mission or significant code change with student-style concise explanations and question answers.
+
