@@ -280,6 +280,80 @@
   - **Pourquoi le filtrage local sur la page courante est une faute architecturale :** Si la bibliothèque contient 50 morceaux répartis sur 10 pages et qu'on applique `.filter()` sur le tableau local de la page 1 (5 morceaux), l'utilisateur ne verra jamais les morceaux correspondants situés sur les pages 2 à 10. De plus, les compteurs de pagination (`MatPaginator`) afficheraient des métadonnées fausses. Le filtre doit impérativement interroger le backend pour compter (`countDocuments`) et découper (`skip`/`limit`) l'ensemble de la bibliothèque.
   - **Rôle du Debounce et des requêtes concurrentes :** Sans `debounceTime(300)`, taper un mot de 5 lettres déclenche 5 requêtes HTTP consécutives en quelques millisecondes, surchargeant le réseau et la base de données. L'association de `debounceTime`, de `distinctUntilChanged` et de `loadSubscription?.unsubscribe()` garantit qu'une seule requête utile part à la fin de la frappe, et qu'aucune réponse lente précédente ne peut écraser un résultat plus récent.
 
+---
+
+### Option avancée — Pagination Mongoose avec mongoose-aggregate-paginate-v2 (Variante [A])
+
+- **Objectif :** Remplacer la pagination Mongoose standard (`Track.find().skip().limit()` et `Track.countDocuments()`) par le plugin d'agrégation `mongoose-aggregate-paginate-v2` selon la **Variante [A]** (contrat rétro-compatible enrichi), en garantissant un comptage cohérent, des paramètres bornés, un tri déterministe, et une isolation stricte des données et totaux de chaque utilisateur.
+- **Audit préalable du backend et dépendances :**
+  - **Dépendances :** `mongoose@^9.0.0` et `mongoose-aggregate-paginate-v2@^1.1.5` installés dans `backend/package.json`.
+  - **Schéma `Track` :** Intégration du plugin via `schema.plugin(aggregatePaginate)` sur le schéma Mongoose.
+  - **Comparatif architectural :**
+    - *Pagination classique (`skip`/`limit`) :* Nécessite deux requêtes indépendantes vers MongoDB (`countDocuments` puis `find`), non atomiques en cas d'insertion/suppression concurrente, et limitée aux curseurs de base.
+    - *Pagination par agrégation (`aggregatePaginate`) :* Exécute un pipeline d'agrégation MongoDB `$facet` en un seul aller-retour réseau vers la base, combinant comptage (`$count`) et découpage (`$skip`, `$limit`) avec transformations de projection avancées (`$addFields`, `$project`).
+- **Prompt principal :** « GO pagination Mongoose, variante [A]. Implémente uniquement la variante approuvée. Applique le plugin correctement au schéma et assure une pagination sur les pistes du propriétaire authentifié, avec comptage cohérent, paramètres bornés et tri déterministe. Mets à jour API_CONTRACT.md, le frontend et les tests si le contrat change. Ajoute des tests backend avec plusieurs utilisateurs et plusieurs pages : aucun morceau ni total d’un autre utilisateur ne doit apparaître. Teste aussi page/limit invalides, page vide, tri et compatibilité du frontend. Exécute les tests pertinents et résume les changements observables dans Network. »
+- **Fichiers modifiés :**
+  - `backend/package.json` & `backend/package-lock.json` : ajout de la dépendance `mongoose-aggregate-paginate-v2`.
+  - `backend/src/models/Track.js` : import et application du plugin `schema.plugin(aggregatePaginate)`.
+  - `backend/src/app.js` :
+    - Route `GET /api/tracks` réécrite pour utiliser `Track.aggregatePaginate(aggregate, options)`.
+    - Stage `$match` avec conversion sécurisée de `req.auth.sub` en `mongoose.Types.ObjectId` pour garantir la correspondance BSON exacte lors de l'agrégation.
+    - Ajout du filtre de recherche textuelle assaini (`$regex: escaped, $options: "i"`).
+    - Pipeline avec `$addFields: { id: { $toString: "$_id" }, ownerId: { $toString: "$ownerId" } }` et `$project: { _id: 0, storedName: 0, __v: 0 }`.
+    - Paramètres bornés : `page = Math.max(1, parseInt(req.query.page, 10) || 1)`, `limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 5))`.
+    - Tri déterministe : `sort: { createdAt: -1, _id: -1 }`.
+    - Personnalisation des labels via `customLabels: { docs: "items", totalDocs: "total", totalPages: "pages" }`.
+  - `backend/test/api.test.js` :
+    - 12 tests backend complets avec simulation multi-utilisateurs et exécution du pipeline d'agrégation.
+    - Validation de l'isolation stricte : aucun morceau ni total d'un autre utilisateur n'est retourné (User A = 7 pistes, User B = 5 pistes, base = 12 pistes).
+    - Validation de la pagination multi-pages (`hasPrevPage`, `hasNextPage`, `prevPage`, `nextPage`, `pagingCounter`, continuité des IDs).
+    - Validation du bornage des paramètres invalides (`page=-3&limit=999` -> `page=1, limit=20` ; `page=abc&limit=xyz` -> `page=1, limit=5`).
+    - Validation de la page vide/hors bornes (`page=99` -> `items: [], total=7, pages=2, hasNextPage: false`).
+    - Validation du tri composite déterministe (`createdAt: -1, _id: -1`).
+    - Validation du filtre `title` avec insensibilité à la casse, échappement Regex et isolation multi-utilisateurs.
+    - Validation de la compatibilité frontend (`id` présent, masquage strict de `_id`, `storedName`, `__v`).
+  - `API_CONTRACT.md` : documentation enrichie des propriétés de navigation retournées par `Page<Track>` (`hasPrevPage`, `hasNextPage`, `prevPage`, `nextPage`, `pagingCounter`).
+  - `frontend-starter/src/app/shared/models/page.model.ts` : typage de `Page<T>` étendu avec les propriétés de navigation optionnelles.
+- **Preuves de fonctionnement :**
+  - **Tests Backend :** 12 tests sur 12 réussis avec succès (`node --test`), 0 échec (durée : 1,7 s).
+  - **Tests Frontend :** 86 tests sur 86 réussis avec succès (`npm test`), 0 échec.
+  - **Build Frontend :** Compilation de production réussie (`npm run build`, bundle : 579.51 kB).
+- **Changements observables dans Network (DevTools) :**
+  - Requête : `GET /api/tracks?page=1&limit=5`
+  - Réponse HTTP 200 JSON :
+    ```json
+    {
+      "items": [
+        {
+          "id": "64b0f9f8e4b0a1a2b3c40007",
+          "ownerId": "64b0f9f8e4b0a1a2b3c4d5e6",
+          "title": "Blues Rock",
+          "originalName": "blues.mp3",
+          "mimeType": "audio/mpeg",
+          "size": 7000,
+          "createdAt": "2026-01-07T10:00:00.000Z"
+        }
+      ],
+      "total": 7,
+      "limit": 5,
+      "page": 1,
+      "pages": 2,
+      "hasPrevPage": false,
+      "hasNextPage": true,
+      "prevPage": null,
+      "nextPage": 2,
+      "pagingCounter": 1
+    }
+    ```
+  - **Observation :** Les champs préexistants (`items`, `total`, `limit`, `page`, `pages`) restent inchangés et alimentent directement `MatPaginator`. S'y ajoutent désormais les booléens et indices de navigation directe (`hasPrevPage`, `hasNextPage`, `prevPage`, `nextPage`, `pagingCounter`). Aucune donnée sensible interne (`storedName`, `_id`, `__v`) n'est envoyée sur le réseau.
+- **Ce qu'on sait expliquer sans l'agent :**
+  - **Avantages de `aggregate-paginate-v2` ($facet) vs `skip`/`limit` :**
+    La méthode traditionnelle `skip/limit` impose d'exécuter deux requêtes séparées sur le réseau : `Track.countDocuments()` puis `Track.find().skip().limit()`. Si un document est inséré ou supprimé entre les deux requêtes, le total et la liste deviennent désynchronisés. Avec `aggregatePaginate`, MongoDB utilise l'opérateur `$facet` pour calculer en une seule opération atomique le comptage total des documents filtrés et la fenêtre paginée demandée. De plus, le pipeline d'agrégation permet de projeter et normaliser directement les champs (`id` depuis `$_id`) dans le moteur de base de données.
+  - **Garantie de l'étanchéité multi-utilisateurs dans le pipeline :**
+    Dans une agrégation MongoDB, le filtrage de sécurité doit impérativement constituer la première étape du pipeline : `{ $match: { ownerId: ownerObjectId } }`. Contrairement aux méthodes de requêtage Mongoose simples qui réalisent parfois du cast automatique, MongoDB Aggregation compare strictement les types BSON : `ownerObjectId` est converti en `ObjectId` valide avant d'entrer dans le pipeline. Ainsi, MongoDB élimine immédiatement tous les enregistrements appartenant à d'autres utilisateurs avant d'exécuter le `$facet` de pagination et de comptage.
+  - **Pourquoi le tri composite `{ createdAt: -1, _id: -1 }` est indispensable :**
+    Lorsque plusieurs pistes sont créées au même instant (même horodatage `createdAt`), un simple tri sur `{ createdAt: -1 }` est non déterministe dans MongoDB. Lors du passage de la page 1 à la page 2, certains éléments pourraient apparaître deux fois ou être omis selon l'ordre de lecture des blocs disque. L'ajout de `_id: -1` en second critère de tri garantit un ordre d'ordonnancement strictement unique et stable d'une page à l'autre.
+
 
 
 
