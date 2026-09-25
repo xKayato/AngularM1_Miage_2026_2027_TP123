@@ -141,4 +141,60 @@ describe('TrackService', () => {
     req.flush(mockTrack);
     expect(responseBody).toEqual(mockTrack);
   });
+
+  it('should post multipart FormData with optional cover when provided', () => {
+    const mockAudio = new File(['dummy audio'], 'funk.mp3', { type: 'audio/mpeg' });
+    const mockCover = new File(['dummy cover'], 'cover.png', { type: 'image/png' });
+    const title = 'Funk with Cover';
+
+    service.upload(mockAudio, title, mockCover).subscribe();
+
+    const req = httpTesting.expectOne('/api/tracks');
+    expect(req.request.method).toBe('POST');
+    const formData = req.request.body as FormData;
+    expect(formData.get('audio')).toBeDefined();
+    expect(formData.get('title')).toBe(title);
+    expect(formData.get('cover')).toBeDefined();
+
+    req.flush(mockTrack);
+  });
+
+  it('should fetch cover blob for a track', () => {
+    const mockBlob = new Blob(['mock image binary'], { type: 'image/png' });
+
+    service.cover('track-1').subscribe((blob) => {
+      expect(blob).toEqual(mockBlob);
+    });
+
+    const req = httpTesting.expectOne('/api/tracks/track-1/cover');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+
+    req.flush(mockBlob);
+  });
+
+  it('should update cover for a track via PUT /api/tracks/:id/cover', () => {
+    const mockCover = new File(['new image binary'], 'new_cover.png', { type: 'image/png' });
+    const updatedTrack: Track = { ...mockTrack, hasCover: true, coverUrl: '/api/tracks/track-1/cover' };
+
+    service.updateCover('track-1', mockCover).subscribe((track) => {
+      expect(track.hasCover).toBe(true);
+    });
+
+    const req = httpTesting.expectOne('/api/tracks/track-1/cover');
+    expect(req.request.method).toBe('PUT');
+    const formData = req.request.body as FormData;
+    expect(formData.get('cover')).toBeDefined();
+
+    req.flush(updatedTrack);
+  });
+
+  it('should delete cover for a track via DELETE /api/tracks/:id/cover', () => {
+    service.deleteCover('track-1').subscribe();
+
+    const req = httpTesting.expectOne('/api/tracks/track-1/cover');
+    expect(req.request.method).toBe('DELETE');
+
+    req.flush(null, { status: 204, statusText: 'No Content' });
+  });
 });

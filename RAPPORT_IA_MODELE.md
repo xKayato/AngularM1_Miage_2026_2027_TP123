@@ -354,6 +354,68 @@
   - **Pourquoi le tri composite `{ createdAt: -1, _id: -1 }` est indispensable :**
     Lorsque plusieurs pistes sont créées au même instant (même horodatage `createdAt`), un simple tri sur `{ createdAt: -1 }` est non déterministe dans MongoDB. Lors du passage de la page 1 à la page 2, certains éléments pourraient apparaître deux fois ou être omis selon l'ordre de lecture des blocs disque. L'ajout de `_id: -1` en second critère de tri garantit un ordre d'ordonnancement strictement unique et stable d'une page à l'autre.
 
+---
+
+### Option avancée — Image de couverture par piste (Approche A : image uploadée par l'utilisateur)
+
+- **Objectif :** Implémenter l’image de couverture facultative par piste selon l’Approche A validée (upload direct par l'utilisateur). Définir des limites strictes de format (JPEG, PNG, WebP) et de taille (2 Mo max) côté frontend et backend. Valider le contenu réel du fichier côté serveur par analyse des magic bytes binaires (et non la simple extension ou le type MIME déclaré par le client). Stocker les images dans un répertoire dédié (`backend/data/uploads/covers/`) et restreindre l’accès exclusivement au propriétaire authentifié via un endpoint protégé (`GET /api/tracks/:id/cover` avec JWT Bearer). Fournir une image par défaut (vinyle SVG vectoriel sombre), gérer le remplacement (`PUT`) et la suppression (`DELETE`) sans laisser aucun fichier orphelin sur disque, tout en préservant intact le flux de streaming audio existant.
+- **Audit préalable et contrat d'architecture :**
+  - **Sécurité et validation :** Rejet immédiat de toute couverture dépassant 2 Mo ou dont la signature binaire ne correspond pas à `image/jpeg` (`FF D8 FF`), `image/png` (`89 50 4E 47 0D 0A 1A 0A`) ou `image/webp` (`RIFF....WEBP`).
+  - **Protection des données privées :** L'endpoint `GET /api/tracks/:id/cover` exige le token JWT et vérifie que la piste appartient bien à `req.auth.sub`. Un utilisateur tiers reçoit un code `404 Not Found` (masquage de l'existence de la piste d'autrui).
+  - **Affichage sécurisé sans fuite de token :** Les balises `<img src="...">` natives du navigateur ne pouvant pas envoyer l'en-tête HTTP `Authorization: Bearer <jwt>`, l'image est récupérée via `TrackService.cover(id)` (`HttpClient` avec `responseType: 'blob'`) bénéficiant automatiquement de l'`authInterceptor`, puis convertie en URL mémoire locale `URL.createObjectURL(blob)`.
+  - **Nettoyage des fichiers sans orphelins :** Suppression physique immédiate sur disque lors du remplacement (`PUT /api/tracks/:id/cover`), de la suppression de couverture (`DELETE /api/tracks/:id/cover`), de la suppression de piste (`DELETE /api/tracks/:id` nettoyant à la fois l'audio et la couverture), et lors de tout échec de validation ou d'insertion en base lors du `POST /api/tracks`.
+- **Prompt principal :** « GO couverture — approche A : image uploadée par l’utilisateur. Implémente le contrat validé après l’étude 7A. Autorise une image facultative par piste, avec un format et une taille maximale clairement définis côté frontend et backend. Valide le contenu réel du fichier côté serveur plutôt que de te fier uniquement à son extension ou au type MIME déclaré. Stocke l’image selon l’architecture retenue et ne l’expose qu’aux utilisateurs autorisés si les pistes sont privées. Prévois une image par défaut, le remplacement et la suppression sans fichiers orphelins. Mets à jour API_CONTRACT.md et teste validation, accès propriétaire, absence de couverture et nettoyage des fichiers. Ne change pas le flux audio existant. »
+- **Fichiers modifiés et créés :**
+  - `API_CONTRACT.md` : documentation complète des propriétés `hasCover` / `coverUrl`, et des endpoints `GET /api/tracks/:id/cover`, `PUT /api/tracks/:id/cover`, et `DELETE /api/tracks/:id/cover`.
+  - `backend/src/utils/imageValidator.js` : module utilitaire analysant les premiers octets du fichier (`fsPromises.open` et lecture des magic numbers) pour détecter le type MIME réel (`image/jpeg`, `image/png`, `image/webp`).
+  - `backend/src/models/Track.js` : sous-document `cover` avec `storedName` (`select: false`), `originalName`, `mimeType`, `size`. Méthode `toPublic()` projetant `hasCover` et `coverUrl` en masquant rigoureusement le nom de stockage interne.
+  - `backend/src/app.js` :
+    - Initialisation du dossier `data/uploads/covers`.
+    - Configuration de Multer pour aiguiller les champs `audio` vers `data/uploads/` et `cover` vers `data/uploads/covers/`.
+    - `POST /api/tracks` avec `upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'cover', maxCount: 1 }])`, validation binaire de la couverture et nettoyage immédiat des fichiers temporaires en cas d'erreur.
+    - Projection de `hasCover` et `coverUrl` dans le pipeline d'agrégation `GET /api/tracks`.
+    - Route sécurisée `GET /api/tracks/:id/cover` avec vérification de propriétaire et streaming de l'image.
+    - Route `PUT /api/tracks/:id/cover` pour le remplacement de couverture avec suppression physique de l'ancien fichier.
+    - Route `DELETE /api/tracks/:id/cover` pour la suppression de la couverture seule.
+    - Route `DELETE /api/tracks/:id` mise à jour pour supprimer atomiquement sur disque le fichier audio ET le fichier de couverture associé.
+  - `backend/test/api.test.js` : 8 nouveaux tests backend validant les magic bytes, l'enregistrement avec cover, le rejet des fausses images (400), l'accès 404 si absence de cover ou utilisateur non propriétaire, le remplacement propre (`PUT`), et les suppressions physiques sans orphelin (`DELETE`).
+  - `frontend-starter/public/default-cover.svg` : image vectorielle SVG stylisée (disque vinyle avec rainures et centre violet) servant d'illustration par défaut.
+  - `frontend-starter/src/app/shared/models/track.model.ts` : ajout des champs optionnels `hasCover?: boolean; coverUrl?: string | null;`.
+  - `frontend-starter/src/app/shared/services/track.service.ts` : ajout des méthodes `cover(id)`, `upload(file, title, cover?)`, `updateCover(id, coverFile)`, et `deleteCover(id)`.
+  - `frontend-starter/src/app/shared/services/track.service.spec.ts` : tests unitaires pour l'envoi multipart avec cover, la récupération du blob de couverture, et les appels PUT/DELETE.
+  - `frontend-starter/src/app/components/tracks-page/tracks-page.ts` :
+    - Constantes de validation frontend (`ALLOWED_COVER_MIMES`, `MAX_COVER_FILE_SIZE = 2 Mo`).
+    - Signaux `coverPreviewUrl`, `coverUrls` (dictionnaire `id -> blobUrl`), `coverFile`.
+    - Méthodes `chooseCover()`, `clearCover()`, `deleteCover()`, `getCoverUrl()`, `onCoverImgError()`.
+    - Chargement asynchrone des couvertures sous forme de Blob à chaque chargement de page et révocation propre des ObjectURLs (`revokeCoverUrls()`, `ngOnDestroy()`).
+  - `frontend-starter/src/app/components/tracks-page/tracks-page.html` :
+    - Sélecteur de couverture dans le formulaire d'upload avec miniature de prévisualisation et bouton d'annulation.
+    - Vignette de couverture 80x80 px sur chaque card avec gestion du fallback d'erreur `(error)="onCoverImgError($event)"`.
+    - Bouton contextuel de suppression de la couverture lorsque celle-ci existe.
+  - `frontend-starter/src/app/components/tracks-page/tracks-page.css` : styles pour `.cover-picker`, `.cover-preview-wrapper`, `.track-cover-container`, `.track-cover-img`, `.cover-actions`.
+  - `frontend-starter/src/app/components/tracks-page/tracks-page.spec.ts` : 10 tests unitaires vérifiant le rejet des types invalides, le rejet des fichiers > 2 Mo, la génération et la suppression de prévisualisation, l'envoi multipart avec cover, le chargement des blobs de couverture, le fallback vinyle sur erreur, la suppression avec confirmation et la révocation des ObjectURLs.
+- **Preuves de fonctionnement :**
+  - **Tests unitaires Backend :** 20 tests sur 20 passants avec succès (`node --test`), 0 échec (durée : 1,07 s).
+  - **Tests unitaires Frontend :** 99 tests sur 99 passants avec succès (`npm test`), 0 échec (durée : 8,14 s).
+  - **Build Frontend de production :** Compilation réussie sans erreur ni warning (`npm run build`, bundle initial : 585.11 kB).
+- **Changements observables dans Network (DevTools) :**
+  - **Upload :** Requête `POST /api/tracks` avec en-tête `Content-Type: multipart/form-data; boundary=...` contenant `title`, `audio` et `cover`. Réponse HTTP 201 avec JSON `{ id: "...", title: "...", hasCover: true, coverUrl: "/api/tracks/.../cover" }`.
+  - **Listing :** Requête `GET /api/tracks?page=1&limit=5` renvoyant chaque piste avec `hasCover: true/false` et `coverUrl: string | null`. Le champ sensible interne `cover.storedName` n'apparaît jamais sur le réseau.
+  - **Affichage image :** Pour chaque piste ayant `hasCover === true`, une requête `GET /api/tracks/:id/cover` est émise avec l'en-tête `Authorization: Bearer <token>`. Le serveur répond HTTP 200 avec `Content-Type: image/png` (ou `image/jpeg`, `image/webp`). Le frontend transforme ce binaire en `blob:http://localhost:4200/<uuid>` injecté dans `<img src="...">`.
+  - **Piste d'un autre utilisateur :** Un appel `GET /api/tracks/:id/cover` avec le token d'un tiers renvoie immédiatement `404 Not Found`.
+- **Ce qu'on sait expliquer sans l'agent :**
+  - **Pourquoi la validation par Magic Bytes est indispensable par rapport au type MIME déclaré :**
+    Le type MIME transmis dans la requête HTTP (`Content-Type: image/png`) et l'extension du fichier (`.png`) sont fournis par le client et peuvent être falsifiés trivialement par un attaquant (ex : renommer un script malveillant ou un fichier exécutable en `image.png`). L'inspection des premiers octets du fichier physique (les « magic numbers » : `0xFF, 0xD8, 0xFF` pour JPEG, `0x89, 0x50, 0x4E, 0x47` pour PNG, `RIFF...WEBP` pour WebP) vérifie la signature binaire réelle de la donnée avant tout traitement en base de données.
+  - **Garantie zéro orphelin (gestion du cycle de vie des fichiers disque) :**
+    Si une application stocke des fichiers sur disque sans synchronisation stricte avec la base de données, des fichiers orphelins s'accumulent (espace disque gaspillé, incohérence de sauvegarde). L'implémentation garantit l'absence totale d'orphelins via 4 verrous :
+    1. *Échec d'insertion :* En cas d'erreur de validation ou de base lors du `POST`, un bloc `catch` appelle systématiquement `fsPromises.unlink()` sur tous les fichiers temporaires déjà écrits par Multer.
+    2. *Remplacement (`PUT`) :* Lors du téléversement d'une nouvelle couverture, le backend ne remplace la référence en base que si l'ancienne image est supprimée du disque.
+    3. *Suppression de couverture (`DELETE /cover`) :* Supprime le fichier physique dans `data/uploads/covers/` avant d'effacer le sous-document Mongoose.
+    4. *Suppression de piste (`DELETE /tracks/:id`) :* Nettoie simultanément le fichier audio principal et le fichier de couverture s'il existe.
+  - **Affichage d'images privées sous JWT via Blob et ObjectURL :**
+    Les navigateurs web ne permettent pas de spécifier des en-têtes d'autorisation HTTP (tels que `Authorization: Bearer <jwt>`) directement dans les balises HTML `<img src="...">`. Si l'endpoint de l'image est privé, une balise `<img src="/api/tracks/:id/cover">` recevra une erreur `401 Unauthorized`. Pour contourner cette limite sans exposer publiquement les images sur un dossier statique non protégé, le composant Angular utilise `TrackService.cover(id)` qui passe par `HttpClient` (et injecte automatiquement le token grâce à `authInterceptor`). Le flux binaire retourné (`Blob`) est converti en URI locale mémoire via `URL.createObjectURL(blob)`, permettant au navigateur d'afficher l'image de manière totalement sécurisée. La méthode `ngOnDestroy()` et la navigation entre pages appellent `URL.revokeObjectURL()` pour libérer immédiatement la mémoire vive du navigateur.
+
+
 
 
 

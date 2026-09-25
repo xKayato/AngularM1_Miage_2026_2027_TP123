@@ -25,10 +25,13 @@ export class TrackService {
     });
   }
 
-  upload(file: File, title: string): Observable<HttpEvent<Track>> {
+  upload(file: File, title: string, cover?: File): Observable<HttpEvent<Track>> {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
+    if (cover) {
+      body.append('cover', cover);
+    }
     return this.http.post<Track>('/api/tracks', body, {
       reportProgress: true,
       observe: 'events',
@@ -39,6 +42,22 @@ export class TrackService {
     return this.http.get(`/api/tracks/${id}/audio`, {
       responseType: 'blob',
     });
+  }
+
+  cover(id: string): Observable<Blob> {
+    return this.http.get(`/api/tracks/${id}/cover`, {
+      responseType: 'blob',
+    });
+  }
+
+  updateCover(id: string, cover: File): Observable<Track> {
+    const body = new FormData();
+    body.append('cover', cover);
+    return this.http.put<Track>(`/api/tracks/${id}/cover`, body);
+  }
+
+  deleteCover(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/tracks/${id}/cover`);
   }
 
   delete(id: string): Observable<void> {

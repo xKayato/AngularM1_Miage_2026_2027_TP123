@@ -5,5 +5,7 @@ export interface Track {
   originalName: string;
   mimeType: string;
   size: number;
+  hasCover?: boolean;
+  coverUrl?: string | null;
   createdAt: string;
 }

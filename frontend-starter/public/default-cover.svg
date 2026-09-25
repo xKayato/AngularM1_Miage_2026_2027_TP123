@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Couverture par défaut">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="16" fill="url(#bgGrad)"/>
+  <!-- Vinyl disc outer -->
+  <circle cx="100" cy="100" r="70" fill="#182234" stroke="#334155" stroke-width="3"/>
+  <!-- Grooves -->
+  <circle cx="100" cy="100" r="58" fill="none" stroke="#223049" stroke-width="1.5" stroke-dasharray="8 4"/>
+  <circle cx="100" cy="100" r="46" fill="none" stroke="#223049" stroke-width="1.5"/>
+  <circle cx="100" cy="100" r="34" fill="none" stroke="#223049" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <!-- Center label -->
+  <circle cx="100" cy="100" r="24" fill="url(#accentGrad)"/>
+  <!-- Center hole -->
+  <circle cx="100" cy="100" r="6" fill="#0f172a"/>
+  <!-- Music note icon -->
+  <path d="M96 90 v16 a6 6 0 1 1 -5 -6 h5 v-10 h14 v6 a6 6 0 1 1 -5 -6 h5 v-10 z" fill="#ffffff" opacity="0.95"/>
+</svg>
