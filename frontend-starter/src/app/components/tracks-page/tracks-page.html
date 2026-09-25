@@ -10,14 +10,28 @@
       <h2>Importer</h2>
       <label>Titre<input [formControl]="title" placeholder="Titre de la piste (optionnel)" /></label>
       <label>Fichier audio<input #fileInput type="file" accept="audio/*" (change)="choose($event)" /></label>
-      <label>Pochette (optionnel, JPEG/PNG/WebP, max 2 Mo)
-        <input #coverInput type="file" accept="image/jpeg,image/png,image/webp" (change)="chooseCover($event)" />
-      </label>
+      <div class="cover-input-group">
+        <label for="cover-file-input" class="cover-input-label">
+          <span>Pochette d'album / image (optionnel)</span>
+          <span class="cover-input-badge">JPEG, PNG, WebP • max 2 Mo</span>
+        </label>
+        <input
+          #coverInput
+          id="cover-file-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          (change)="chooseCover($event)"
+          class="cover-file-input"
+        />
+      </div>
 
       @if (coverPreviewUrl()) {
       <div class="cover-preview-wrapper">
         <img [src]="coverPreviewUrl()" alt="Prévisualisation de la pochette" class="cover-preview-img" />
-        <button type="button" class="remove-cover-btn" (click)="clearCover()">Retirer la pochette</button>
+        <div class="cover-preview-info">
+          <span class="cover-preview-text">Pochette sélectionnée pour l'envoi</span>
+          <button type="button" class="remove-cover-btn" (click)="clearCover()">✕ Retirer la pochette</button>
+        </div>
       </div>
       }
 
@@ -117,6 +131,15 @@
                 (error)="onCoverImgError($event)"
                 loading="lazy"
               />
+              <label class="cover-change-overlay" [attr.aria-label]="'Changer la pochette de ' + track.title" title="Changer la pochette">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  (change)="changeCover(track, $event)"
+                  class="visually-hidden"
+                />
+                <span class="cover-overlay-icon" aria-hidden="true">📷</span>
+              </label>
               @if (track.hasCover) {
               <button
                 type="button"
@@ -154,6 +177,15 @@
               </div>
 
               <div class="track-actions">
+                <label class="action-btn change-cover-action-btn" [attr.aria-label]="'Changer la pochette de ' + track.title" title="Ajouter ou remplacer la pochette">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    (change)="changeCover(track, $event)"
+                    class="visually-hidden"
+                  />
+                  🖼 Pochette
+                </label>
                 <button type="button" class="play-btn" (click)="play(track)"
                   [disabled]="(audioLoading() && currentTrack()?.id === track.id) || deletingTrackId() === track.id"
                   [attr.aria-label]="(currentTrack()?.id === track.id ? 'Rejouer ' : 'Écouter ') + track.title">

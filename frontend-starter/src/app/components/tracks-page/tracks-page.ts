@@ -225,6 +225,56 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  changeCover(track: Track, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_COVER_MIMES.includes(file.type)) {
+      this.deleteError.set("Format d'image non accepté. Formats autorisés : JPEG, PNG, WebP.");
+      input.value = '';
+      return;
+    }
+
+    if (file.size > MAX_COVER_FILE_SIZE) {
+      this.deleteError.set("L'image de couverture ne doit pas dépasser 2 Mo.");
+      input.value = '';
+      return;
+    }
+
+    this.service.updateCover(track.id, file).subscribe({
+      next: (updatedTrack) => {
+        const previousUrl = this.coverUrls()[track.id];
+        if (previousUrl && previousUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previousUrl);
+        }
+
+        this.service.cover(track.id).subscribe({
+          next: (blob) => {
+            const newUrl = URL.createObjectURL(blob);
+            this.coverUrls.update((map) => ({ ...map, [track.id]: newUrl }));
+          },
+          error: (err) => console.error('[TracksPage] Erreur rechargement cover blob', err),
+        });
+
+        track.hasCover = true;
+        track.coverUrl = updatedTrack.coverUrl ?? `/api/tracks/${track.id}/cover`;
+        this.deleteSuccess.set(`Pochette de « ${track.title} » mise à jour avec succès.`);
+        this.deleteError.set('');
+        input.value = '';
+      },
+      error: (err) => {
+        console.error('[TracksPage] Erreur modification couverture', err);
+        input.value = '';
+        if (err instanceof HttpErrorResponse) {
+          this.deleteError.set(err.error?.message ?? 'Impossible de modifier la couverture.');
+        } else {
+          this.deleteError.set('Erreur inattendue lors de la modification de la couverture.');
+        }
+      },
+    });
+  }
+
   load(): void {
     // Annuler la requête en cours pour éviter les collisions de réponses
     this.loadSubscription?.unsubscribe();

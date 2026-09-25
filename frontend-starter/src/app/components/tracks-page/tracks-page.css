@@ -335,4 +335,105 @@
   min-width: 0;
 }
 
+/* Formulaire d'upload : groupe de sélection de la couverture */
+.cover-input-group {
+  margin: 0.8rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cover-input-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #17312a;
+}
+
+.cover-input-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #4b6b61;
+  background: #eef5f2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid #d4e3dc;
+}
+
+.cover-file-input {
+  border: 1px dashed #b8cbc5;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  background: #fbfdfc;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.cover-file-input:hover {
+  border-color: #1d755e;
+  background: #f3f8f5;
+}
+
+.cover-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.cover-preview-text {
+  font-size: 0.8rem;
+  color: #1d755e;
+  font-weight: 500;
+}
+
+/* Carte de morceau : Overlay sur la miniature de couverture */
+.cover-change-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.track-cover-container:hover .cover-change-overlay,
+.cover-change-overlay:focus-within {
+  opacity: 1;
+}
+
+.cover-overlay-icon {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Bouton Pochette dans les actions de la carte */
+.change-cover-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  padding: 0.42rem 0.75rem;
+  background: #ffffff;
+  color: #1d755e;
+  border: 1px solid #c2dbd1;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  user-select: none;
+}
+
+.change-cover-action-btn:hover {
+  background: #f0f7f4;
+  border-color: #1d755e;
+  color: #134e3f;
+}
+
 
