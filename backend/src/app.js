@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
@@ -267,60 +268,49 @@ export function createApp() {
     }
   });
 
-  /** Retourne une page des pistes appartenant exclusivement à l'utilisateur. */
+  /** Retourne une page des pistes appartenant exclusivement à l'utilisateur via mongoose-aggregate-paginate-v2. */
   app.get("/api/tracks", auth, async (req, res, next) => {
     try {
-      const page = Math.max(1, Number(req.query.page) || 1);
-      const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 5));
-      const filter = { ownerId: req.auth.sub };
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 5));
+
+      const ownerObjectId = mongoose.Types.ObjectId.isValid(req.auth.sub)
+        ? new mongoose.Types.ObjectId(req.auth.sub)
+        : req.auth.sub;
+
+      const matchStage = { ownerId: ownerObjectId };
 
       const rawTitle = req.query.title ?? req.query.query;
       const titleQuery = typeof rawTitle === "string" ? rawTitle.trim() : "";
       if (titleQuery) {
         const escaped = titleQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        filter.title = { $regex: escaped, $options: "i" };
+        matchStage.title = { $regex: escaped, $options: "i" };
       }
 
-      console.log(`[tracks] Lecture page=${page}, limit=${limit}, user=${req.auth.sub}${titleQuery ? `, title="${titleQuery}"` : ""}`);
+      console.log(`[tracks] Lecture aggregate page=${page}, limit=${limit}, user=${req.auth.sub}${titleQuery ? `, title="${titleQuery}"` : ""}`);
 
-      // La lecture des pistes et le comptage total sont parallélisés pour réduire la latence.
-      // on utilise Promise.all pour exécuter les deux opérations en parallèle. 
-      // Track.find() récupère les pistes de l'utilisateur avec pagination, 
-      // tandis que Track.countDocuments() compte le nombre total de pistes pour cet utilisateur.
-      // Promise.all attend que les deux opérations soient terminées avant de continuer et les résultats
-        // sont stockés dans les variables items et total.
-      const [items, total] = await Promise.all([
-        Track.find(filter)
-          .sort({ createdAt: -1 })
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .select("-storedName")
-          .lean(),
-        Track.countDocuments(filter),
+      const aggregate = Track.aggregate([
+        { $match: matchStage },
+        { $addFields: { id: { $toString: "$_id" }, ownerId: { $toString: "$ownerId" } } },
+        { $project: { _id: 0, storedName: 0, __v: 0 } },
       ]);
 
-      // items.map(track) crée un nouveau tableau publicItems en transformant chaque piste pour inclure 
-      // uniquement les champs nécessaires à l'API.
-      // L'identifiant MongoDB (_id) est converti en chaîne de caractères (id) pour être plus lisible 
-      // côté frontend.
-      // Le champ _id (généré par MongoDB) est supprimé pour éviter de l'exposer dans la réponse JSON.
-      const publicItems = items.map((track) => ({
-        ...track,
-        id: String(track._id),
-        _id: undefined,
-      }));
-
-      console.log(`[tracks] ${publicItems.length} piste(s) envoyée(s) sur ${total}`);
-
-      // envoi de la réponse JSON avec les pistes publiques, la page actuelle, la limite par page, 
-      // le nombre total de pistes et le nombre total de pages.
-      res.json({
-        items: publicItems,
+      const options = {
         page,
         limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      });
+        sort: { createdAt: -1, _id: -1 },
+        customLabels: {
+          docs: "items",
+          totalDocs: "total",
+          totalPages: "pages",
+        },
+      };
+
+      const result = await Track.aggregatePaginate(aggregate, options);
+
+      console.log(`[tracks] ${result.items.length} piste(s) envoyée(s) sur ${result.total}`);
+
+      res.json(result);
     } catch (error) {
       console.error("[tracks] Erreur de pagination", error);
       next(error);

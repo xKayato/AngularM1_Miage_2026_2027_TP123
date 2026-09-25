@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import aggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 /*
  * Ce schéma conserve les métadonnées d'une piste. Le fichier audio lui-même
@@ -24,6 +25,9 @@ const schema = new mongoose.Schema(
 
 // Cet index accélère la liste des pistes d'un utilisateur triées par date.
 schema.index({ ownerId: 1, createdAt: -1 });
+
+// Plugin de pagination via agrégation MongoDB ($facet)
+schema.plugin(aggregatePaginate);
 
 /**
  * Convertit un document Mongoose en objet sûr pour le frontend.
