@@ -1038,6 +1038,37 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       expect(component.deleteSuccess()).toContain('La pochette de');
     });
 
+    it('should update track cover via changeCover(), revoke previous ObjectURL and reload blob', () => {
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:http://localhost:4200/new-cover-blob');
+
+      const track: Track = {
+        ...mockTrack1,
+        id: 'track-update-cov',
+        hasCover: true,
+        coverUrl: '/api/tracks/track-update-cov/cover',
+      };
+      component.coverUrls.set({ 'track-update-cov': 'blob:http://localhost:4200/old-cover-blob' });
+
+      const newCoverFile = new File(['new image bytes'], 'fresh.png', { type: 'image/png' });
+      const event = {
+        target: {
+          files: [newCoverFile],
+          value: 'fresh.png',
+        },
+      } as unknown as Event;
+
+      mockTrackService.updateCover.mockReturnValue(of({ ...track, hasCover: true, coverUrl: '/api/tracks/track-update-cov/cover' }));
+      mockTrackService.cover.mockReturnValue(of(new Blob(['fresh binary'], { type: 'image/png' })));
+
+      component.changeCover(track, event);
+
+      expect(mockTrackService.updateCover).toHaveBeenCalledWith('track-update-cov', newCoverFile);
+      expect(revokeSpy).toHaveBeenCalledWith('blob:http://localhost:4200/old-cover-blob');
+      expect(mockTrackService.cover).toHaveBeenCalledWith('track-update-cov');
+      expect(component.deleteSuccess()).toContain('mise à jour avec succès');
+    });
+
     it('should revoke all cover ObjectURLs when destroying component', () => {
       const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
       component.coverUrls.set({
