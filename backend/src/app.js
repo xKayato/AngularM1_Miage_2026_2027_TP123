@@ -274,7 +274,14 @@ export function createApp() {
       const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 5));
       const filter = { ownerId: req.auth.sub };
 
-      console.log(`[tracks] Lecture page=${page}, limit=${limit}, user=${req.auth.sub}`);
+      const rawTitle = req.query.title ?? req.query.query;
+      const titleQuery = typeof rawTitle === "string" ? rawTitle.trim() : "";
+      if (titleQuery) {
+        const escaped = titleQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        filter.title = { $regex: escaped, $options: "i" };
+      }
+
+      console.log(`[tracks] Lecture page=${page}, limit=${limit}, user=${req.auth.sub}${titleQuery ? `, title="${titleQuery}"` : ""}`);
 
       // La lecture des pistes et le comptage total sont parallélisés pour réduire la latence.
       // on utilise Promise.all pour exécuter les deux opérations en parallèle. 

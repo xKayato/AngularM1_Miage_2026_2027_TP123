@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { Page } from '../models/page.model';
 import { Track } from '../models/track.model';
 
@@ -8,22 +9,39 @@ import { Track } from '../models/track.model';
 export class TrackService {
   private readonly http = inject(HttpClient);
 
-  list(page = 1, limit = 5) {
+  /**
+   * Fetches a paginated list of tracks for the authenticated user.
+   * @param page Target page number (1-indexed).
+   * @param limit Maximum number of tracks per page.
+   * @param title Optional title filter string.
+   */
+  list(page = 1, limit = 5, title?: string): Observable<Page<Track>> {
+    const params: Record<string, string | number> = { page, limit };
+    if (title && title.trim()) {
+      params['title'] = title.trim();
+    }
     return this.http.get<Page<Track>>('/api/tracks', {
-      params: { page, limit },
+      params,
     });
   }
 
-  upload(file: File, title: string) {
+  upload(file: File, title: string): Observable<HttpEvent<Track>> {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
-    return this.http.post<Track>('/api/tracks', body);
+    return this.http.post<Track>('/api/tracks', body, {
+      reportProgress: true,
+      observe: 'events',
+    });
   }
 
-  audio(id: string) {
+  audio(id: string): Observable<Blob> {
     return this.http.get(`/api/tracks/${id}/audio`, {
       responseType: 'blob',
     });
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/tracks/${id}`);
   }
 }
