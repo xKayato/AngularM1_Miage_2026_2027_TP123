@@ -2,6 +2,7 @@ import { Component, ElementRef, inject, OnDestroy, OnInit, signal, ViewChild } f
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse, HttpEventType, HttpResponse } from '@angular/common/http';
 import { MatPaginator, MatPaginatorIntl, PageEvent } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged, Subscription } from 'rxjs';
 import { Track } from '../../shared/models/track.model';
 import { TrackService } from '../../shared/services/track.service';
@@ -51,6 +52,7 @@ export function getFrenchPaginatorIntl(): MatPaginatorIntl {
 })
 export class TracksPageComponent implements OnInit, OnDestroy {
   private readonly service = inject(TrackService);
+  private readonly snackBar = inject(MatSnackBar);
   private loadSubscription?: Subscription;
   private playSubscription?: Subscription;
   private searchSubscription?: Subscription;
@@ -430,7 +432,9 @@ export class TracksPageComponent implements OnInit, OnDestroy {
           this.uploading.set(false);
           this.uploadProgress.set(null);
           this.uploadStatusText.set('');
-          this.uploadSuccess.set(`La piste « ${track?.title ?? effectiveTitle} » a été ajoutée avec succès.`);
+          const successMsg = `La piste « ${track?.title ?? effectiveTitle} » a été ajoutée avec succès.`;
+          this.uploadSuccess.set(successMsg);
+          this.snackBar.open(successMsg, 'Fermer', { duration: 4000 });
           this.title.setValue('');
           this.file = undefined;
           this.clearCover();
@@ -446,11 +450,12 @@ export class TracksPageComponent implements OnInit, OnDestroy {
         this.uploadProgress.set(null);
         this.uploadStatusText.set('');
         console.error('[TracksPage] Envoi impossible', err);
-        if (err instanceof HttpErrorResponse) {
-          this.uploadError.set(err.error?.message ?? "Échec de l'envoi du fichier.");
-        } else {
-          this.uploadError.set("Erreur inattendue lors de l'envoi.");
-        }
+        const errorMsg =
+          err instanceof HttpErrorResponse
+            ? (err.error?.message ?? "Échec de l'envoi du fichier.")
+            : "Erreur inattendue lors de l'envoi.";
+        this.uploadError.set(errorMsg);
+        this.snackBar.open(errorMsg, 'Fermer', { duration: 5000 });
       },
     });
   }
@@ -475,7 +480,9 @@ export class TracksPageComponent implements OnInit, OnDestroy {
       next: () => {
         console.debug('[TracksPage] Piste supprimée avec succès', track.id);
         this.deletingTrackId.set(null);
-        this.deleteSuccess.set(`La piste « ${track.title} » a été supprimée.`);
+        const successMsg = `La piste « ${track.title} » a été supprimée.`;
+        this.deleteSuccess.set(successMsg);
+        this.snackBar.open(successMsg, 'Fermer', { duration: 4000 });
 
         // Si la piste supprimée était en cours d'écoute, stopper le lecteur et révoquer l'ObjectURL
         if (this.currentTrack()?.id === track.id) {
@@ -497,11 +504,12 @@ export class TracksPageComponent implements OnInit, OnDestroy {
       error: (err: unknown) => {
         this.deletingTrackId.set(null);
         console.error('[TracksPage] Erreur de suppression', err);
-        if (err instanceof HttpErrorResponse) {
-          this.deleteError.set(err.error?.message ?? 'Impossible de supprimer la piste.');
-        } else {
-          this.deleteError.set('Erreur inattendue lors de la suppression.');
-        }
+        const errorMsg =
+          err instanceof HttpErrorResponse
+            ? (err.error?.message ?? 'Impossible de supprimer la piste.')
+            : 'Erreur inattendue lors de la suppression.';
+        this.deleteError.set(errorMsg);
+        this.snackBar.open(errorMsg, 'Fermer', { duration: 5000 });
       },
     });
   }

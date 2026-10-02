@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse, HttpEvent, HttpEventType, HttpResponse } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError, Subject } from 'rxjs';
 import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { getFrenchPaginatorIntl, TracksPageComponent } from './tracks-page';
@@ -10,6 +11,9 @@ import { Track } from '../../shared/models/track.model';
 describe('TracksPageComponent (Mission 2 — Pagination)', () => {
   let component: TracksPageComponent;
   let fixture: ComponentFixture<TracksPageComponent>;
+  let mockSnackBar: {
+    open: ReturnType<typeof vi.fn>;
+  };
   let mockTrackService: {
     list: ReturnType<typeof vi.fn>;
     upload: ReturnType<typeof vi.fn>;
@@ -65,9 +69,16 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       deleteCover: vi.fn().mockReturnValue(of(undefined)),
     };
 
+    mockSnackBar = {
+      open: vi.fn(),
+    };
+
     await TestBed.configureTestingModule({
       imports: [TracksPageComponent],
-      providers: [{ provide: TrackService, useValue: mockTrackService }],
+      providers: [
+        { provide: TrackService, useValue: mockTrackService },
+        { provide: MatSnackBar, useValue: mockSnackBar },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(TracksPageComponent);
@@ -511,6 +522,11 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       expect(component.uploadProgress()).toBeNull();
       expect(component.uploadStatusText()).toBe('');
       expect(component.uploadSuccess()).toContain('Groovy Track');
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        expect.stringContaining('Groovy Track'),
+        'Fermer',
+        expect.objectContaining({ duration: 4000 }),
+      );
       expect(mockTrackService.list).toHaveBeenCalledWith(1, 5);
     });
 
@@ -558,6 +574,11 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       expect(component.uploadProgress()).toBeNull();
       expect(component.uploadStatusText()).toBe('');
       expect(component.uploadError()).toBe('Erreur disque serveur');
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        'Erreur disque serveur',
+        'Fermer',
+        expect.objectContaining({ duration: 5000 }),
+      );
     });
 
     it('should render progress bar element and accessibility attributes in template', () => {
@@ -600,6 +621,11 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
 
       expect(mockTrackService.delete).toHaveBeenCalledWith('track-1');
       expect(component.deleteSuccess()).toContain('Rock Backing in D');
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        expect.stringContaining('Rock Backing in D'),
+        'Fermer',
+        expect.objectContaining({ duration: 4000 }),
+      );
       expect(component.deleteError()).toBe('');
       expect(component.deletingTrackId()).toBeNull();
       // Rechargement depuis le serveur de la page 1
@@ -636,6 +662,11 @@ describe('TracksPageComponent (Mission 2 — Pagination)', () => {
       component.deleteTrack(mockTrack1);
 
       expect(component.deleteError()).toBe('Piste inconnue');
+      expect(mockSnackBar.open).toHaveBeenCalledWith(
+        'Piste inconnue',
+        'Fermer',
+        expect.objectContaining({ duration: 5000 }),
+      );
       expect(component.tracks().length).toBe(2);
       expect(component.tracks()[0].id).toBe('track-1');
       expect(component.deletingTrackId()).toBeNull();
