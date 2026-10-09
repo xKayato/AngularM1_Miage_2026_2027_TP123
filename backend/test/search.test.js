@@ -1,0 +1,353 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import { MongoMemoryServer } from "mongodb-memory-server";
+import { createApp } from "../src/app.js";
+import { User } from "../src/models/User.js";
+import { Post } from "../src/models/Post.js";
+import { Like } from "../src/models/Like.js";
+import { Follow } from "../src/models/Follow.js";
+import { Subscription } from "../src/models/Subscription.js";
+
+let mongod;
+let server, base;
+const JWT_SECRET = "tp1-development-secret";
+
+test.before(async () => {
+  mongod = await MongoMemoryServer.create();
+  await mongoose.connect(mongod.getUri());
+  await User.syncIndexes();
+  await Post.syncIndexes();
+  await Like.syncIndexes();
+  await Follow.syncIndexes();
+  await Subscription.syncIndexes();
+
+  server = createApp().listen(0);
+  await new Promise((r) => server.once("listening", r));
+  base = `http://127.0.0.1:${server.address().port}`;
+});
+
+test.after(async () => {
+  if (server) server.close();
+  await mongoose.disconnect();
+  if (mongod) await mongod.stop();
+});
+
+let userSeq = 0;
+async function createUser(role = "user", status = "active") {
+  userSeq++;
+  const user = await User.create({
+    name: `Search User ${userSeq}`,
+    email: `search_${userSeq}_${Date.now()}@test.com`,
+    passwordHash: "hash123",
+    role,
+    status,
+  });
+  const token = jwt.sign({ sub: String(user._id), email: user.email }, JWT_SECRET);
+  return { user, token };
+}
+
+async function createPost(authorId, options = {}) {
+  return await Post.create({
+    author: authorId,
+    title: options.title || "Titre de test pour recherche",
+    shortDescription: options.shortDescription || "Description courte de test pour recherche",
+    content: options.content || "Contenu confidentiel du post qui ne doit jamais fuiter",
+    category: options.category || "Lego",
+    tags: options.tags || ["test"],
+    visibility: options.visibility || "public",
+    status: options.status || "published",
+    publishedAt: options.publishedAt || new Date(),
+    attachments: options.attachments || [],
+  });
+}
+
+test("Mission 7 — Validation stricte des paramètres invalides (400 Bad Request)", async (t) => {
+  await t.test("Rejette page < 1 (400)", async () => {
+    const res = await fetch(`${base}/api/posts?page=0`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /page/i);
+  });
+
+  await t.test("Rejette page non numérique (400)", async () => {
+    const res = await fetch(`${base}/api/posts?page=invalid`);
+    assert.equal(res.status, 400);
+  });
+
+  await t.test("Rejette limit < 1 ou limit > 50 (400)", async () => {
+    const resLow = await fetch(`${base}/api/posts?limit=0`);
+    assert.equal(resLow.status, 400);
+
+    const resHigh = await fetch(`${base}/api/posts?limit=51`);
+    assert.equal(resHigh.status, 400);
+  });
+
+  await t.test("Rejette une catégorie invalide (400)", async () => {
+    const res = await fetch(`${base}/api/posts?category=Cuisine`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /catégorie/i);
+  });
+
+  await t.test("Rejette des tags contenant des caractères interdits (400)", async () => {
+    const res = await fetch(`${base}/api/posts?tags=Tag%20Invalide!`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /tag/i);
+  });
+
+  await t.test("Rejette une requête textuelle supérieure à 150 caractères (400)", async () => {
+    const longQuery = "a".repeat(151);
+    const res = await fetch(`${base}/api/posts?query=${longQuery}`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /150/i);
+  });
+});
+
+test("Mission 7 — Pagination et calcul totalDocs via pipeline $facet", async () => {
+  const { user: author } = await createUser();
+
+  // Création de 5 posts publiés
+  for (let i = 1; i <= 5; i++) {
+    await createPost(author._id, {
+      title: `Projet Pagination Maker ${i}`,
+      category: "Lego",
+      tags: ["pagination-test"],
+    });
+  }
+
+  // Page 1 avec limit=2
+  const res1 = await fetch(`${base}/api/posts?tags=pagination-test&page=1&limit=2`);
+  assert.equal(res1.status, 200);
+  const data1 = await res1.json();
+  assert.equal(data1.docs.length, 2);
+  assert.equal(data1.totalDocs, 5);
+  assert.equal(data1.totalPages, 3);
+  assert.equal(data1.page, 1);
+  assert.equal(data1.hasPrevPage, false);
+  assert.equal(data1.hasNextPage, true);
+  assert.equal(data1.prevPage, null);
+  assert.equal(data1.nextPage, 2);
+
+  // Page 2 avec limit=2
+  const res2 = await fetch(`${base}/api/posts?tags=pagination-test&page=2&limit=2`);
+  assert.equal(res2.status, 200);
+  const data2 = await res2.json();
+  assert.equal(data2.docs.length, 2);
+  assert.equal(data2.page, 2);
+  assert.equal(data2.hasPrevPage, true);
+  assert.equal(data2.hasNextPage, true);
+  assert.equal(data2.prevPage, 1);
+  assert.equal(data2.nextPage, 3);
+
+  // Page 3 avec limit=2 (dernière page)
+  const res3 = await fetch(`${base}/api/posts?tags=pagination-test&page=3&limit=2`);
+  assert.equal(res3.status, 200);
+  const data3 = await res3.json();
+  assert.equal(data3.docs.length, 1);
+  assert.equal(data3.page, 3);
+  assert.equal(data3.hasPrevPage, true);
+  assert.equal(data3.hasNextPage, false);
+  assert.equal(data3.nextPage, null);
+});
+
+test("Mission 7 — Règle « tous les tags demandés » ($all) et normalisation", async () => {
+  const { user: author } = await createUser();
+
+  await createPost(author._id, {
+    title: "Avion en papier pliable",
+    category: "Papercraft",
+    tags: ["avion", "papercraft", "volant"],
+  });
+
+  await createPost(author._id, {
+    title: "Grue traditionnelle japonaise",
+    category: "Origami",
+    tags: ["origami", "japon", "volant"],
+  });
+
+  await createPost(author._id, {
+    title: "Bateau en papier",
+    category: "Papercraft",
+    tags: ["papercraft", "marin"],
+  });
+
+  // 1. Tag unique
+  const resSingle = await fetch(`${base}/api/posts?tags=avion`);
+  const dataSingle = await resSingle.json();
+  assert.equal(dataSingle.totalDocs, 1);
+  assert.equal(dataSingle.docs[0].title, "Avion en papier pliable");
+
+  // 2. Deux tags demandés avec virgule : ["avion", "papercraft"]
+  const resAllComma = await fetch(`${base}/api/posts?tags=avion,papercraft`);
+  const dataAllComma = await resAllComma.json();
+  assert.equal(dataAllComma.totalDocs, 1);
+  assert.equal(dataAllComma.docs[0].title, "Avion en papier pliable");
+
+  // 3. Deux tags demandés avec paramètres multiples : ?tags=avion&tags=papercraft
+  const resAllMulti = await fetch(`${base}/api/posts?tags=avion&tags=papercraft`);
+  const dataAllMulti = await resAllMulti.json();
+  assert.equal(dataAllMulti.totalDocs, 1);
+  assert.equal(dataAllMulti.docs[0].title, "Avion en papier pliable");
+
+  // 4. Deux tags sans correspondance commune : avion ET marin -> 0 résultat
+  const resNoMatch = await fetch(`${base}/api/posts?tags=avion,marin`);
+  const dataNoMatch = await resNoMatch.json();
+  assert.equal(dataNoMatch.totalDocs, 0);
+  assert.equal(dataNoMatch.docs.length, 0);
+
+  // 5. Tag avec majuscules et espaces (normalisation)
+  const resNorm = await fetch(`${base}/api/posts?tags=+AVION+`);
+  const dataNorm = await resNorm.json();
+  assert.equal(dataNorm.totalDocs, 1);
+});
+
+test("Mission 7 — Combinaisons texte, catégorie et tags", async () => {
+  const { user: author } = await createUser();
+
+  await createPost(author._id, {
+    title: "Faucon Millenium Lego Star Wars",
+    shortDescription: "Vaisseau spatial avec tourelles laser",
+    category: "Lego",
+    tags: ["star-wars", "vaisseau", "spatial"],
+  });
+
+  await createPost(author._id, {
+    title: "X-Wing Lego Star Wars",
+    shortDescription: "Chasseur stellaire avec ailes déployables",
+    category: "Lego",
+    tags: ["star-wars", "chasseur"],
+  });
+
+  await createPost(author._id, {
+    title: "Vaisseau Papercraft Star Wars",
+    shortDescription: "Maquette en papier du chasseur spatial",
+    category: "Papercraft",
+    tags: ["star-wars", "vaisseau"],
+  });
+
+  // Filtre combiné : query="faucon" + category="Lego" + tags="star-wars,vaisseau"
+  const res = await fetch(
+    `${base}/api/posts?query=faucon&category=Lego&tags=star-wars,vaisseau`
+  );
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.totalDocs, 1);
+  assert.equal(data.docs[0].title, "Faucon Millenium Lego Star Wars");
+  assert.equal(data.docs[0].category, "Lego");
+});
+
+test("Mission 7 — Sécurité : Exclusion absolue des drafts, link, archivés et auteurs suspendus", async () => {
+  const { user: activeAuthor } = await createUser("user", "active");
+  const { user: suspendedAuthor } = await createUser("user", "suspended");
+
+  const filterTag = `sec-${Date.now()}`;
+
+  // 1. Post publié normal (doit être visible)
+  await createPost(activeAuthor._id, {
+    title: "Post Publié Valide",
+    category: "Lego",
+    tags: [filterTag],
+    status: "published",
+    visibility: "public",
+  });
+
+  // 2. Post brouillon (doit être exclu)
+  await createPost(activeAuthor._id, {
+    title: "Post Brouillon Secret",
+    category: "Lego",
+    tags: [filterTag],
+    status: "draft",
+    visibility: "public",
+  });
+
+  // 3. Post avec visibilité 'link' (doit être exclu du catalogue)
+  await createPost(activeAuthor._id, {
+    title: "Post Visibilité Link Non Répertorié",
+    category: "Lego",
+    tags: [filterTag],
+    status: "published",
+    visibility: "link",
+  });
+
+  // 4. Post archivé (doit être exclu du catalogue)
+  await createPost(activeAuthor._id, {
+    title: "Post Archivé Retiré",
+    category: "Lego",
+    tags: [filterTag],
+    status: "archived",
+    visibility: "public",
+  });
+
+  // 5. Post d'un auteur suspendu (doit être exclu du catalogue)
+  await createPost(suspendedAuthor._id, {
+    title: "Post d'un Auteur Suspendu",
+    category: "Lego",
+    tags: [filterTag],
+    status: "published",
+    visibility: "public",
+  });
+
+  const res = await fetch(`${base}/api/posts?tags=${filterTag}`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+
+  // Seul le post 1 doit être retourné
+  assert.equal(data.totalDocs, 1);
+  assert.equal(data.docs.length, 1);
+  assert.equal(data.docs[0].title, "Post Publié Valide");
+});
+
+test("Mission 7 — Projection stricte PostPreview sans fuite de contenu ou secret", async () => {
+  const { user: author } = await createUser();
+
+  const secretContent = "Contenu ultra confidentiel, code source secret";
+  const post = await createPost(author._id, {
+    title: "Post pour Contrôle de Projection",
+    shortDescription: "Description publique",
+    content: secretContent,
+    category: "Musique",
+    tags: ["projection-test"],
+    attachments: [
+      {
+        originalName: "cover.jpg",
+        storedName: "secret_file_on_disk.jpg",
+        mimeType: "image/jpeg",
+        size: 1024,
+        family: "image",
+        isCover: true,
+      },
+    ],
+  });
+
+  // Like du post pour tester le compteur dynamique
+  const { user: liker } = await createUser();
+  await Like.create({ userId: liker._id, postId: post._id });
+
+  const res = await fetch(`${base}/api/posts?tags=projection-test`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.docs.length, 1);
+
+  const preview = data.docs[0];
+  // 1. Champs sensibles absents
+  assert.equal(preview.content, undefined);
+  assert.equal(preview.storedName, undefined);
+  assert.equal(preview.attachments, undefined);
+
+  // 2. Champs conformes PostPreview
+  assert.equal(preview.id, String(post._id));
+  assert.equal(preview.title, "Post pour Contrôle de Projection");
+  assert.equal(preview.shortDescription, "Description publique");
+  assert.equal(preview.category, "Musique");
+  assert.deepEqual(preview.tags, ["projection-test"]);
+  assert.equal(preview.visibility, "public");
+  assert.equal(preview.isLocked, false);
+  assert.equal(preview.likesCount, 1);
+  assert.equal(preview.attachmentsCount, 1);
+  assert.equal(preview.author.name, author.name);
+  assert.match(preview.coverUrl, new RegExp(`/api/posts/${post._id}/attachments/`));
+});

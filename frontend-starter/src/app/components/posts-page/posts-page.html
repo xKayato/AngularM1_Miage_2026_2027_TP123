@@ -31,6 +31,20 @@
           </button>
         }
       </div>
+
+      @if (selectedTag()) {
+        <div class="active-tag-filter" role="status">
+          <span>Filtré par tag : <strong>#{{ selectedTag() }}</strong></span>
+          <button
+            type="button"
+            class="btn-clear-tag"
+            (click)="clearTag()"
+            aria-label="Effacer le filtre par tag"
+          >
+            ✕ Retirer
+          </button>
+        </div>
+      }
     </div>
   </div>
 
@@ -78,7 +92,15 @@
 
             <div class="tags-row">
               @for (tag of post.tags; track tag) {
-                <span class="tag">#{{ tag }}</span>
+                <button
+                  type="button"
+                  class="tag"
+                  [class.tag-active]="selectedTag() === tag.toLowerCase()"
+                  (click)="selectTag(tag)"
+                  [title]="'Filtrer par #' + tag"
+                >
+                  #{{ tag }}
+                </button>
               }
             </div>
 

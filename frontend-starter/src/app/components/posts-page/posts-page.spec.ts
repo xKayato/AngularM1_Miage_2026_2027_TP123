@@ -71,6 +71,7 @@ describe('PostsPageComponent', () => {
       limit: 9,
       category: undefined,
       query: undefined,
+      tags: undefined,
     });
     expect(component.posts().length).toBe(1);
     expect(component.posts()[0].title).toBe('Guitare Lego Custom');
@@ -86,6 +87,7 @@ describe('PostsPageComponent', () => {
       limit: 9,
       category: 'Lego',
       query: undefined,
+      tags: undefined,
     });
   });
 
@@ -98,6 +100,61 @@ describe('PostsPageComponent', () => {
       limit: 9,
       category: undefined,
       query: 'custom',
+      tags: undefined,
+    });
+  });
+
+  it('applique un filtre par tag via selectTag et permet de le retirer', () => {
+    component.selectTag('lego');
+
+    expect(component.selectedTag()).toBe('lego');
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 9,
+      category: undefined,
+      query: undefined,
+      tags: 'lego',
+    });
+
+    // Clic à nouveau sur le même tag -> désélectionne le tag
+    component.selectTag('lego');
+    expect(component.selectedTag()).toBe('');
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 9,
+      category: undefined,
+      query: undefined,
+      tags: undefined,
+    });
+  });
+
+  it('efface le filtre par tag via clearTag', () => {
+    component.selectTag('papercraft');
+    expect(component.selectedTag()).toBe('papercraft');
+
+    component.clearTag();
+    expect(component.selectedTag()).toBe('');
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 9,
+      category: undefined,
+      query: undefined,
+      tags: undefined,
+    });
+  });
+
+  it('combine recherche textuelle, catégorie et tag', () => {
+    component.searchQuery.set('vaisseau');
+    component.selectedCategory.set('Lego');
+    component.selectedTag.set('star-wars');
+    component.onFilterChange();
+
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 9,
+      category: 'Lego',
+      query: 'vaisseau',
+      tags: 'star-wars',
     });
   });
 
@@ -109,6 +166,7 @@ describe('PostsPageComponent', () => {
       limit: 9,
       category: undefined,
       query: undefined,
+      tags: undefined,
     });
   });
 

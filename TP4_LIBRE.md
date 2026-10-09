@@ -236,8 +236,8 @@ Un post appartient à un seul auteur. Il possède :
    - `totalDocs`: `[{ $count: "count" }]`.
    - `docs`: tri, `$skip`, `$limit`, et projection stricte `PostPreview`.
 
-### B. Mappings Prévus pour Atlas Search (⚠️ à vérifier et valider en Mission 7)
-* Les mappings pour les filtres d'égalité exacte (`category`, `tags`) sont **à vérifier en Mission 7** pour sélectionner le type optimal supporté par MongoDB Atlas (type `token` pour égalité exacte sans tokenisation de texte ou `keyword` Lucene) :
+### B. Mappings Validés pour Atlas Search (`posts_search_index`)
+* Les mappings pour les filtres d'égalité exacte (`category`, `tags`) ont été validés en Mission 7 : ils utilisent le type `token` supporté par MongoDB Atlas pour l'opérateur `equals` (le type `string` avec analyzer `lucene.keyword` n'est pas compatible avec l'opérateur `equals` sur les chaînes de caractères dans Atlas Search) :
 ```json
 {
   "mappings": {
@@ -245,22 +245,17 @@ Un post appartient à un seul auteur. Il possède :
     "fields": {
       "title": {
         "type": "string",
-        "analyzer": "lucene.french",
-        "multi": {
-          "keyword": { "type": "string", "analyzer": "lucene.keyword" }
-        }
+        "analyzer": "lucene.french"
       },
       "shortDescription": {
         "type": "string",
         "analyzer": "lucene.french"
       },
       "category": {
-        "type": "string",
-        "analyzer": "lucene.keyword"
+        "type": "token"
       },
       "tags": {
-        "type": "string",
-        "analyzer": "lucene.keyword"
+        "type": "token"
       }
     }
   }

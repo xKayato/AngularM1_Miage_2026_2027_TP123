@@ -24,6 +24,7 @@ export class PostsPageComponent implements OnInit {
   readonly totalDocs = signal<number>(0);
 
   readonly selectedCategory = signal<string>('');
+  readonly selectedTag = signal<string>('');
   readonly searchQuery = signal<string>('');
 
   readonly categories = [
@@ -46,6 +47,7 @@ export class PostsPageComponent implements OnInit {
 
     const category = this.selectedCategory() === 'Toutes' ? '' : this.selectedCategory();
     const query = this.searchQuery().trim();
+    const tag = this.selectedTag().trim();
 
     this.postService
       .getPosts({
@@ -53,6 +55,7 @@ export class PostsPageComponent implements OnInit {
         limit: 9,
         category: category || undefined,
         query: query || undefined,
+        tags: tag || undefined,
       })
       .subscribe({
         next: (pageData) => {
@@ -72,6 +75,21 @@ export class PostsPageComponent implements OnInit {
   }
 
   onFilterChange(): void {
+    this.loadPosts(1);
+  }
+
+  selectTag(tag: string): void {
+    const trimmed = tag.trim().toLowerCase();
+    if (this.selectedTag() === trimmed) {
+      this.selectedTag.set('');
+    } else {
+      this.selectedTag.set(trimmed);
+    }
+    this.loadPosts(1);
+  }
+
+  clearTag(): void {
+    this.selectedTag.set('');
     this.loadPosts(1);
   }
 

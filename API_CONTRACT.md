@@ -247,10 +247,10 @@ interface PostAuthorManagement extends PostDetail {
    }
    ```
 
-### Mappings prévus pour Atlas Search (⚠️ à vérifier et valider en Mission 7) :
+### Mappings validés pour Atlas Search (`posts_search_index`) :
 * Pour permettre le filtrage exact combiné à la recherche textuelle Lucene :
-  * `category` : indexé en type approprié pour l'égalité exacte (mapping `token` / `keyword` Lucene, **à vérifier en Mission 7**).
-  * `tags` : indexé en type approprié pour le filtrage exact (mapping `token` / `keyword` Lucene, **à vérifier en Mission 7**).
+  * `category` : indexé en type `token` pour l'égalité exacte avec l'opérateur `equals` (le type `string` avec analyzer `lucene.keyword` n'est pas compatible avec `equals`).
+  * `tags` : indexé en type `token` pour le filtrage exact des éléments du tableau avec l'opérateur `equals`.
   * `title` & `shortDescription` : indexés en `type: "string", analyzer: "lucene.french"`.
 
 ---

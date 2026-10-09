@@ -1,4 +1,4 @@
-const VALID_CATEGORIES = new Set([
+export const VALID_CATEGORIES = new Set([
   "Lego",
   "Papercraft",
   "Origami",
@@ -7,9 +7,9 @@ const VALID_CATEGORIES = new Set([
   "Autre",
 ]);
 
-const VALID_VISIBILITIES = new Set(["public", "link", "followers", "subscribers"]);
+export const VALID_VISIBILITIES = new Set(["public", "link", "followers", "subscribers"]);
 
-const TAG_REGEX = /^[a-z0-9-]+$/;
+export const TAG_REGEX = /^[a-z0-9-]+$/;
 
 const FORBIDDEN_CLIENT_FIELDS = [
   "author",

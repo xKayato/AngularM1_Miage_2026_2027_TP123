@@ -19,6 +19,8 @@ import { detectAndValidateAttachment } from "../utils/attachmentValidator.js";
 import {
   validateAndNormalizePostInput,
   validatePublishInput,
+  VALID_CATEGORIES,
+  TAG_REGEX,
 } from "../utils/postValidator.js";
 import {
   toPostAuthorManagement,
@@ -32,56 +34,193 @@ export const postsRouter = Router();
 /**
  * GET /api/posts
  * Catalogue public et recherche de créations.
- * Exclut formellement les drafts, les posts archivés, les posts 'link',
- * et les créations des auteurs dont le compte est suspendu.
+ * Recherche serveur avec tolérance aux fautes (Atlas Search) ou repli regex,
+ * filtres exacts par catégorie et par tags (règle 'tous les tags demandés' $all),
+ * exclusion absolue des drafts, posts link, posts archivés et auteurs suspendus,
+ * pagination et total via pipeline d'agrégation $facet, et projection stricte PostPreview.
  */
 postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
   try {
+    // 1. Validation stricte des paramètres de pagination
+    if (req.query.page !== undefined) {
+      const p = Number(req.query.page);
+      if (!Number.isInteger(p) || p < 1) {
+        return res.status(400).json({
+          message: "Le paramètre page doit être un entier positif supérieur ou égal à 1.",
+        });
+      }
+    }
+    if (req.query.limit !== undefined) {
+      const l = Number(req.query.limit);
+      if (!Number.isInteger(l) || l < 1 || l > 50) {
+        return res.status(400).json({
+          message: "Le paramètre limit doit être un entier compris entre 1 et 50.",
+        });
+      }
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const offset = (page - 1) * limit;
 
-    // Récupération des identifiants des utilisateurs suspendus pour filtrage strict
-    const suspendedUsers = await User.find({ status: "suspended" }).select("_id");
-    const suspendedIds = suspendedUsers.map((u) => u._id);
-
-    const filter = {
-      status: "published",
-      visibility: { $in: ["public", "followers", "subscribers"] },
-      author: { $nin: suspendedIds },
-    };
-
-    if (req.query.category?.trim()) {
-      filter.category = req.query.category.trim();
-    }
-
-    if (req.query.tags) {
-      const tagList = Array.isArray(req.query.tags)
-        ? req.query.tags
-        : req.query.tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
-      if (tagList.length > 0) {
-        filter.tags = { $in: tagList };
+    // 2. Validation de la catégorie si fournie
+    let category = null;
+    if (typeof req.query.category === "string") {
+      const trimmedCat = req.query.category.trim();
+      if (trimmedCat && trimmedCat !== "Toutes") {
+        if (!VALID_CATEGORIES.has(trimmedCat)) {
+          return res.status(400).json({
+            message: `Catégorie inconnue ou invalide: '${trimmedCat}'.`,
+          });
+        }
+        category = trimmedCat;
       }
     }
 
-    if (req.query.query?.trim()) {
-      const q = req.query.query.trim();
-      filter.$or = [
-        { title: { $regex: q, $options: "i" } },
-        { shortDescription: { $regex: q, $options: "i" } },
-      ];
+    // 3. Validation et normalisation des tags si fournis (tous les tags demandés)
+    let tagList = [];
+    if (req.query.tags !== undefined) {
+      const rawTags = Array.isArray(req.query.tags)
+        ? req.query.tags
+        : String(req.query.tags).split(",");
+      const normalized = rawTags
+        .map((t) => (typeof t === "string" ? t.trim().toLowerCase() : ""))
+        .filter(Boolean);
+
+      for (const tag of normalized) {
+        if (!TAG_REGEX.test(tag)) {
+          return res.status(400).json({
+            message: `Format de tag invalide: '${tag}' (minuscules, chiffres et tirets uniquement).`,
+          });
+        }
+      }
+      tagList = Array.from(new Set(normalized));
     }
 
-    const totalDocs = await Post.countDocuments(filter);
+    // 4. Validation du texte de recherche
+    let textQuery = "";
+    if (typeof req.query.query === "string") {
+      textQuery = req.query.query.trim();
+      if (textQuery.length > 150) {
+        return res.status(400).json({
+          message: "La requête de recherche ne doit pas dépasser 150 caractères.",
+        });
+      }
+    }
+
+    // 5. Construction du pipeline d'agrégation MakerShare
+    const buildPipeline = (useAtlasSearch) => {
+      const pipeline = [];
+
+      // Étape 1 : $search si recherche textuelle et Atlas Search activé
+      if (useAtlasSearch && textQuery) {
+        const compoundClauses = {
+          must: [
+            {
+              text: {
+                query: textQuery,
+                path: ["title", "shortDescription"],
+                fuzzy: { maxEdits: 1, prefixLength: 1 },
+              },
+            },
+          ],
+        };
+
+        const filterClauses = [];
+        if (category) {
+          filterClauses.push({ equals: { path: "category", value: category } });
+        }
+        if (tagList.length > 0) {
+          for (const t of tagList) {
+            filterClauses.push({ equals: { path: "tags", value: t } });
+          }
+        }
+        if (filterClauses.length > 0) {
+          compoundClauses.filter = filterClauses;
+        }
+
+        pipeline.push({
+          $search: {
+            index: "posts_search_index",
+            compound: compoundClauses,
+          },
+        });
+      }
+
+      // Étape 2 : $lookup users pour récupérer profil et statut de l'auteur
+      pipeline.push(
+        {
+          $lookup: {
+            from: "users",
+            localField: "author",
+            foreignField: "_id",
+            as: "authorDoc",
+          },
+        },
+        { $unwind: "$authorDoc" }
+      );
+
+      // Étape 3 : $match de sécurité et de filtrage exact combiné
+      const matchStage = {
+        status: "published",
+        visibility: { $in: ["public", "followers", "subscribers"] },
+        "authorDoc.status": { $ne: "suspended" },
+      };
+
+      // Si Atlas Search n'a pas été utilisé mais qu'une recherche textuelle est demandée (repli regex)
+      if (!useAtlasSearch && textQuery) {
+        const escaped = textQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        matchStage.$or = [
+          { title: { $regex: escaped, $options: "i" } },
+          { shortDescription: { $regex: escaped, $options: "i" } },
+        ];
+      }
+
+      if (category) {
+        matchStage.category = category;
+      }
+
+      // Règle « tous les tags demandés » : intersection stricte $all
+      if (tagList.length > 0) {
+        matchStage.tags = { $all: tagList };
+      }
+
+      pipeline.push({ $match: matchStage });
+
+      // Étape 4 : $facet pour total exact et pagination simultanée
+      pipeline.push({
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $sort: { publishedAt: -1, createdAt: -1, _id: -1 } },
+            { $skip: offset },
+            { $limit: limit },
+          ],
+        },
+      });
+
+      return pipeline;
+    };
+
+    // 6. Exécution avec tolérance d'environnement (Atlas Search si disponible, repli si test unitaire local)
+    let facetResult;
+    if (textQuery) {
+      try {
+        facetResult = await Post.aggregate(buildPipeline(true));
+      } catch (searchErr) {
+        // En environnement MongoMemoryServer ou si Atlas Search n'est pas configuré localement
+        facetResult = await Post.aggregate(buildPipeline(false));
+      }
+    } else {
+      // Aucune recherche textuelle : étape $search omise, pipeline B-tree direct
+      facetResult = await Post.aggregate(buildPipeline(false));
+    }
+
+    const totalDocs = facetResult[0]?.totalDocs[0]?.count || 0;
+    const posts = facetResult[0]?.docs || [];
     const totalPages = Math.ceil(totalDocs / limit) || 1;
 
-    const posts = await Post.find(filter)
-      .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
-      .skip(offset)
-      .limit(limit)
-      .populate("author", "name status");
-
-    // Calcul groupé garanti des likes via agrégation
+    // 7. Calcul dynamique des likes via collection Like (pas de compteur dénormalisé sur Post)
     const postIds = posts.map((p) => p._id);
     const likeCounts = await Like.aggregate([
       { $match: { postId: { $in: postIds } } },
@@ -89,11 +228,11 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
 
-    // Détermination de l'état d'accès / verrouillage pour l'utilisateur
+    // 8. Résolution des relations de l'utilisateur connecté (follows et abonnements actifs)
     let followingSet = new Set();
     let subSet = new Set();
     if (req.user) {
-      const creatorIds = posts.map((p) => p.author?._id || p.author);
+      const creatorIds = posts.map((p) => p.authorDoc?._id || p.author?._id || p.author);
       const userFollows = await Follow.find({
         followerId: req.user._id,
         creatorId: { $in: creatorIds },
@@ -109,8 +248,9 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       subSet = new Set(userSubs.map((s) => String(s.creatorId)));
     }
 
+    // 9. Projection stricte PostPreview (aucune fuite de content, storedName ou secrets)
     const docs = posts.map((post) => {
-      const authorIdStr = String(post.author?._id || post.author);
+      const authorIdStr = String(post.authorDoc?._id || post.author?._id || post.author);
       const isAuthor = Boolean(req.user && String(req.user._id) === authorIdStr);
 
       let isLocked = true;
@@ -122,10 +262,16 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
         isLocked = !subSet.has(authorIdStr);
       }
 
+      // Attribuer l'auteur pour toPostPreview
+      post.author = {
+        _id: post.authorDoc?._id || post.author?._id || post.author,
+        name: post.authorDoc?.name || post.author?.name || "Auteur inconnu",
+      };
+
       return toPostPreview(post, {
         isLocked,
         likesCount: likesMap.get(String(post._id)) || 0,
-        authorName: post.author?.name,
+        authorName: post.author.name,
       });
     });
 

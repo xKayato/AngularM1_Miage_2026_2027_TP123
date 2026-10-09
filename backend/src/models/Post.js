@@ -51,7 +51,6 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ["Lego", "Papercraft", "Origami", "Musique", "Modèles 3D", "Autre"],
-      index: true,
     },
     tags: {
       type: [
