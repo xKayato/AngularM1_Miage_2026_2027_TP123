@@ -512,4 +512,53 @@
   - **Construction RFC 5987 / 6266 de Content-Disposition :** L'en-tête associe un fallback ASCII assaini (`filename="..."`) et la version complète encodée en UTF-8 (`filename*=UTF-8''...`), préservant accents et caractères spéciaux sans risque d'injection d'en-tête HTTP.
   - **Politique Referrer-Policy et logs de jetons :** La page HTML initiale impose `no-referrer` via `<meta name="referrer" content="no-referrer">` (à doubler d'un en-tête HTTP en production Nginx). Les logs applicatifs masquent les jetons par regex (`[REDACTED_SHARE_TOKEN]`) pour éviter toute fuite de secret dans les traces serveur.
 
+---
+
+## Mission 5 — Follows et Abonnements Simulés
+
+- **Objectif :** Implémenter la gestion des follows gratuits et des abonnements simulés de 30 jours (sans carte bancaire ni paiement réel), avec protection stricte contre les clics répétés, la concurrence simultanée, l'auto-souscription et la prolongation illégitime. Débloquer instantanément les projets restreints dans l'interface Angular 22.
+- **Prompt principal :**
+  > « GO pour la Mission 5 — Follows et abonnements simulés.
+  > Avant de coder : vérifie git status et distingue les modifications de la Mission 4 de celles de la Mission 5. Crée un commit dédié à la Mission 4 si ce n'est pas fait. Vérifie que RAPPORT_IA_LIBRE.md reste dans .gitignore.
+  > Implémente uniquement la Mission 5 :
+  > - Routes et interface de follow/unfollow et abonnement simulé de 30 jours, sans toucher à /api/tracks*.
+  > - Droits côté serveur : compte actif, créateur existant et actif, interdiction de s'auto-suivre ou s'auto-abonner (400). Un abonnement n'implique pas automatiquement un follow.
+  > - Clics répétés et requêtes concurrentes : abonnement actif renvoie 409 avec sa date d'expiration sans prolongation. Après expiration, permettre une nouvelle activation en respectant l'index unique { subscriberId, creatorId }.
+  > - Afficher clairement « Simulation — aucun paiement », l'échéance et désactiver les boutons pendant le chargement.
+  > - Teste les transitions, expiration, renouvellement et deux souscriptions concurrentes sur base MongoDB isolée. Ajoute les tests frontend. Build et commits dédiés. »
+- **Plan proposé et points clés :**
+  1. Contrôleur `backend/src/routes/creators.js` monté sur `/api/creators` :
+     - `POST /:id/follow` & `DELETE /:id/follow` : validation ObjectId, interdiction d'auto-follow (400), créateur actif (404), gestion d'idempotence via code 11000 capté $\rightarrow$ 200.
+     - `POST /:id/subscribe` : validation ObjectId, interdiction d'auto-abonnement (400), créateur actif (404), durée 30 jours.
+     - Si abonnement actif : renvoi direct `409 Conflict` avec `expiresAt`, interdisant toute prolongation.
+     - Si expiré : mise à jour atomique `findOneAndUpdate` avec condition d'antériorité pour sérialiser les appels concurrents.
+     - Si nouveau : `Subscription.create` captant l'erreur `11000 DuplicateKey` sur l'index composé `{ subscriberId: 1, creatorId: 1 }` pour renvoyer `409 Conflict`.
+     - `GET /:id/status` : retourne `{ isFollowing, isSubscribed, expiresAt }`.
+  2. Indépendance formelle : un abonnement n'entraîne pas de follow (modèles et collections distincts).
+  3. Frontend Angular 22 (`post-detail-page`) :
+     - Utilisation de `CreatorService` (`follow`, `unfollow`, `subscribe`, `getStatus`).
+     - Affichage explicite du badge « Simulation — aucun paiement » et de l'échéance `expiresAt`.
+     - Désactivation native des boutons pendant les requêtes (`isFollowLoading`, `isSubscribeLoading`) évitant les doubles clics.
+     - Masquage des actions pour l'auteur lui-même (`isSelfAuthor`).
+     - Déverrouillage réactif instantané : dès qu'un follow ou abonnement réussit sur un projet verrouillé, rechargement automatique du détail sans rafraîchissement manuel de la page.
+- **Fichiers modifiés :**
+  - Backend : `backend/src/routes/creators.js`, `backend/src/app.js`, `backend/test/creators.test.js`.
+  - Frontend : `post-detail-page.ts`, `post-detail-page.html`, `post-detail-page.css`, `post-detail-page.spec.ts`.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **136 passants sur 136 (100% de succès)** (`node --test`), incluant 22 tests dédiés dans `creators.test.js` :
+    - Rejet auto-follow et auto-abonnement (`400`).
+    - Rejet créateur introuvable ou suspendu (`404`).
+    - Transitions de droits Follow (403 $\rightarrow$ 200 $\rightarrow$ 403) et idempotence vérifiée.
+    - Souscription 30 jours (201), non-implication de follow (`isFollowing: false`), déblocage du post réservé (200).
+    - Clic répété alors qu'actif $\rightarrow$ `409 Conflict` sans prolongation de la date d'échéance.
+    - Expiration de l'abonnement $\rightarrow$ reblocage immédiat (403).
+    - Renouvellement post-expiration $\rightarrow$ accordé (201) avec nouvelle échéance à J+30 et 1 seul document conservé en base.
+    - **Test de concurrence simultanée (`Promise.all`) sur base isolée :** deux souscriptions concurrentes exécutées simultanément $\rightarrow$ exactement un statut `201` et un statut `409`, et exactement 1 document dans la collection `subscriptions`.
+  - Tests Frontend : **172 passants sur 172 (13 suites)** (`ng test --watch=false`), dont 11 tests sur `post-detail-page.spec.ts`.
+  - Build Frontend : **Compilation réussie sans erreur** en 8.34s (`ng build`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Gestion de la concurrence MongoDB :** Un simple contrôle `findOne` en mémoire n'est pas atomique et ne protège pas contre deux requêtes simultanées. Seule la contrainte d'index composé `{ subscriberId: 1, creatorId: 1 }` au niveau du moteur de stockage MongoDB garantit l'atomicité et lève une erreur `11000 DuplicateKey` qu'Express traduit en `409 Conflict`.
+  - **Principe de non-prolongation :** Un abonnement actif ne peut pas être réactivé avant son terme. Le serveur renvoie `409 Conflict` en rappelant l'échéance actuelle. Après expiration, une nouvelle période de 30 jours peut être activée via une mise à jour atomique conditionnelle.
+  - **Indépendance Follow / Abonnement :** Suivre un créateur relève d'un flux d'actualité consenti gratuit, alors que s'abonner donne accès aux projets payants/privés. Les deux droits sont découplés techniquement et fonctionnellement.
+
 

@@ -1,9 +1,11 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PostService } from '../../shared/services/post.service';
+import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
 import { AttachmentInfo, PostDetail, PostPreview } from '../../shared/models/post.model';
+import { CreatorStatusResponse } from '../../shared/models/creator.model';
 
 @Component({
   selector: 'app-post-detail-page',
@@ -15,6 +17,7 @@ import { AttachmentInfo, PostDetail, PostPreview } from '../../shared/models/pos
 export class PostDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly postService = inject(PostService);
+  private readonly creatorService = inject(CreatorService);
   readonly auth = inject(AuthService);
 
   readonly postId = signal<string>('');
@@ -23,6 +26,19 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   readonly isLocked = signal<boolean>(false);
   readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
+
+  // Gestion des interactions créateur (Mission 5)
+  readonly creatorStatus = signal<CreatorStatusResponse | null>(null);
+  readonly isFollowLoading = signal<boolean>(false);
+  readonly isSubscribeLoading = signal<boolean>(false);
+  readonly actionMessage = signal<string | null>(null);
+  readonly actionError = signal<string | null>(null);
+
+  readonly isSelfAuthor = computed(() => {
+    const myId = this.auth.currentUser()?.id;
+    const authorId = this.postDetail()?.author.id || this.postPreview()?.author.id;
+    return Boolean(myId && authorId && myId === authorId);
+  });
 
   // Gestion des pièces jointes sécurisées
   readonly currentAudioUrl = signal<string | null>(null);
@@ -59,6 +75,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
         this.isLocked.set(false);
         this.loading.set(false);
         this.preloadImages(detail);
+        this.loadCreatorStatus(detail.author.id);
       },
       error: (err) => {
         // En cas de 401 ou 403, on tente de récupérer l'aperçu PostPreview
@@ -68,6 +85,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
               this.postPreview.set(preview);
               this.isLocked.set(true);
               this.loading.set(false);
+              this.loadCreatorStatus(preview.author.id);
             },
             error: (previewErr) => {
               this.loading.set(false);
@@ -77,6 +95,107 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
         } else {
           this.loading.set(false);
           this.handleErrorResponse(err);
+        }
+      },
+    });
+  }
+
+  loadCreatorStatus(creatorId: string): void {
+    if (!this.auth.isAuthenticated() || this.isSelfAuthor()) return;
+    this.creatorService.getStatus(creatorId).subscribe({
+      next: (status) => this.creatorStatus.set(status),
+      error: () => this.creatorStatus.set(null),
+    });
+  }
+
+  followAuthor(): void {
+    const authorId = this.postDetail()?.author.id || this.postPreview()?.author.id;
+    if (!authorId || this.isFollowLoading() || this.isSelfAuthor()) return;
+
+    this.isFollowLoading.set(true);
+    this.actionMessage.set(null);
+    this.actionError.set(null);
+
+    this.creatorService.follow(authorId).subscribe({
+      next: (res) => {
+        this.isFollowLoading.set(false);
+        this.creatorStatus.update((current) =>
+          current ? { ...current, isFollowing: res.following } : { isFollowing: res.following, isSubscribed: false, expiresAt: null }
+        );
+        this.actionMessage.set('Vous suivez maintenant ce créateur.');
+        if (this.isLocked()) {
+          this.loadPost(this.postId());
+        }
+      },
+      error: (err) => {
+        this.isFollowLoading.set(false);
+        this.actionError.set(err.error?.message || 'Erreur lors du suivi de ce créateur.');
+      },
+    });
+  }
+
+  unfollowAuthor(): void {
+    const authorId = this.postDetail()?.author.id || this.postPreview()?.author.id;
+    if (!authorId || this.isFollowLoading() || this.isSelfAuthor()) return;
+
+    this.isFollowLoading.set(true);
+    this.actionMessage.set(null);
+    this.actionError.set(null);
+
+    this.creatorService.unfollow(authorId).subscribe({
+      next: (res) => {
+        this.isFollowLoading.set(false);
+        this.creatorStatus.update((current) =>
+          current ? { ...current, isFollowing: res.following } : null
+        );
+        this.actionMessage.set('Vous ne suivez plus ce créateur.');
+        if (this.postDetail()?.visibility === 'followers') {
+          this.loadPost(this.postId());
+        }
+      },
+      error: (err) => {
+        this.isFollowLoading.set(false);
+        this.actionError.set(err.error?.message || 'Erreur lors de la désactivation du suivi.');
+      },
+    });
+  }
+
+  subscribeAuthor(): void {
+    const authorId = this.postDetail()?.author.id || this.postPreview()?.author.id;
+    if (!authorId || this.isSubscribeLoading() || this.isSelfAuthor()) return;
+
+    this.isSubscribeLoading.set(true);
+    this.actionMessage.set(null);
+    this.actionError.set(null);
+
+    this.creatorService.subscribe(authorId).subscribe({
+      next: (res) => {
+        this.isSubscribeLoading.set(false);
+        this.creatorStatus.update((current) => ({
+          isFollowing: current?.isFollowing ?? false,
+          isSubscribed: true,
+          expiresAt: res.expiresAt,
+        }));
+        this.actionMessage.set(
+          `Abonnement simulé de 30 jours activé (Simulation — aucun paiement). Échéance : ${new Date(res.expiresAt).toLocaleDateString('fr-FR')}.`
+        );
+        if (this.isLocked()) {
+          this.loadPost(this.postId());
+        }
+      },
+      error: (err) => {
+        this.isSubscribeLoading.set(false);
+        if (err.status === 409) {
+          if (err.error?.expiresAt) {
+            this.creatorStatus.update((current) => ({
+              isFollowing: current?.isFollowing ?? false,
+              isSubscribed: true,
+              expiresAt: err.error.expiresAt,
+            }));
+          }
+          this.actionError.set(err.error?.message || 'Abonnement déjà actif.');
+        } else {
+          this.actionError.set(err.error?.message || 'Erreur lors de la souscription.');
         }
       },
     });

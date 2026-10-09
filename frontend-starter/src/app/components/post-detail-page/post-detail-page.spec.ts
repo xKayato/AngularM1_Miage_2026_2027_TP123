@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { PostDetailPageComponent } from './post-detail-page';
 import { PostService } from '../../shared/services/post.service';
+import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { PostDetail, PostPreview } from '../../shared/models/post.model';
@@ -14,6 +15,12 @@ describe('PostDetailPageComponent', () => {
     getPostDetail: ReturnType<typeof vi.fn>;
     getPostPreview: ReturnType<typeof vi.fn>;
     getAttachmentBlob: ReturnType<typeof vi.fn>;
+  };
+  let creatorServiceMock: {
+    getStatus: ReturnType<typeof vi.fn>;
+    follow: ReturnType<typeof vi.fn>;
+    unfollow: ReturnType<typeof vi.fn>;
+    subscribe: ReturnType<typeof vi.fn>;
   };
   let authServiceMock: {
     isAuthenticated: ReturnType<typeof vi.fn>;
@@ -89,6 +96,13 @@ describe('PostDetailPageComponent', () => {
       getAttachmentBlob: vi.fn().mockReturnValue(of(new Blob(['dummy'], { type: 'text/plain' }))),
     };
 
+    creatorServiceMock = {
+      getStatus: vi.fn().mockReturnValue(of({ isFollowing: false, isSubscribed: false, expiresAt: null })),
+      follow: vi.fn().mockReturnValue(of({ following: true })),
+      unfollow: vi.fn().mockReturnValue(of({ following: false })),
+      subscribe: vi.fn().mockReturnValue(of({ subscribed: true, expiresAt: '2026-11-08T12:00:00.000Z' })),
+    };
+
     authServiceMock = {
       isAuthenticated: vi.fn().mockReturnValue(true),
       currentUser: vi.fn().mockReturnValue({ id: 'u1', name: 'User 1' }),
@@ -99,6 +113,7 @@ describe('PostDetailPageComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PostService, useValue: postServiceMock },
+        { provide: CreatorService, useValue: creatorServiceMock },
         { provide: AuthService, useValue: authServiceMock },
         {
           provide: ActivatedRoute,
@@ -128,6 +143,7 @@ describe('PostDetailPageComponent', () => {
     // Doit avoir préchargé l'image
     expect(postServiceMock.getAttachmentBlob).toHaveBeenCalledWith('post-1', 'att-img');
     expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(creatorServiceMock.getStatus).toHaveBeenCalledWith('author-1');
   });
 
   it('bascule sur PostPreview verrouillé en cas de 403 sur getPostDetail', () => {
@@ -141,6 +157,7 @@ describe('PostDetailPageComponent', () => {
     expect(component.postPreview()).toEqual(mockPreview);
     expect(component.postDetail()).toBeNull();
     expect(component.loading()).toBe(false);
+    expect(creatorServiceMock.getStatus).toHaveBeenCalledWith('author-1');
   });
 
   it('gère l’erreur 410 pour un post archivé', () => {
@@ -190,5 +207,76 @@ describe('PostDetailPageComponent', () => {
     component.ngOnDestroy();
 
     expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it('permet de suivre un créateur et met à jour le statut', () => {
+    fixture.detectChanges();
+
+    component.followAuthor();
+
+    expect(creatorServiceMock.follow).toHaveBeenCalledWith('author-1');
+    expect(component.creatorStatus()?.isFollowing).toBe(true);
+    expect(component.actionMessage()).toContain('suivez');
+  });
+
+  it('permet de ne plus suivre un créateur et met à jour le statut', () => {
+    creatorServiceMock.getStatus.mockReturnValue(
+      of({ isFollowing: true, isSubscribed: false, expiresAt: null })
+    );
+    fixture.detectChanges();
+
+    creatorServiceMock.getStatus.mockReturnValue(
+      of({ isFollowing: false, isSubscribed: false, expiresAt: null })
+    );
+
+    component.unfollowAuthor();
+
+    expect(creatorServiceMock.unfollow).toHaveBeenCalledWith('author-1');
+    expect(component.creatorStatus()?.isFollowing).toBe(false);
+    expect(component.actionMessage()).toContain('ne suivez plus');
+  });
+
+  it('active un abonnement simulé de 30 jours avec affichage de l’échéance', () => {
+    fixture.detectChanges();
+
+    component.subscribeAuthor();
+
+    expect(creatorServiceMock.subscribe).toHaveBeenCalledWith('author-1');
+    expect(component.creatorStatus()?.isSubscribed).toBe(true);
+    expect(component.creatorStatus()?.expiresAt).toBe('2026-11-08T12:00:00.000Z');
+    expect(component.actionMessage()).toContain('Simulation — aucun paiement');
+  });
+
+  it('gère l’erreur 409 (abonnement déjà actif) sans bloquer', () => {
+    creatorServiceMock.subscribe.mockReturnValue(
+      throwError(() => ({
+        status: 409,
+        error: {
+          message: 'Abonnement déjà actif jusqu’au 08/11/2026',
+          expiresAt: '2026-11-08T12:00:00.000Z',
+        },
+      }))
+    );
+    fixture.detectChanges();
+
+    component.subscribeAuthor();
+
+    expect(component.actionError()).toContain('déjà actif');
+    expect(component.creatorStatus()?.isSubscribed).toBe(true);
+    expect(component.creatorStatus()?.expiresAt).toBe('2026-11-08T12:00:00.000Z');
+    expect(component.isSubscribeLoading()).toBe(false);
+  });
+
+  it('interdit toute action de suivi ou abonnement si l’utilisateur est l’auteur lui-même', () => {
+    authServiceMock.currentUser.mockReturnValue({ id: 'author-1', name: 'HendrixMaker' });
+    fixture.detectChanges();
+
+    expect(component.isSelfAuthor()).toBe(true);
+
+    component.followAuthor();
+    expect(creatorServiceMock.follow).not.toHaveBeenCalled();
+
+    component.subscribeAuthor();
+    expect(creatorServiceMock.subscribe).not.toHaveBeenCalled();
   });
 });

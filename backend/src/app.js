@@ -11,6 +11,7 @@ import { User } from "./models/User.js";
 import { Track } from "./models/Track.js";
 import { detectRealImageMime } from "./utils/imageValidator.js";
 import { postsRouter } from "./routes/posts.js";
+import { creatorsRouter } from "./routes/creators.js";
 
 // Les fichiers audio restent sur le disque du serveur dans ce TP.
 // MongoDB ne conserve que leurs métadonnées : titre, nom, taille, etc.
@@ -314,6 +315,7 @@ export function createApp() {
 
   // Routes MakerShare (TP4) — Gestion des posts, brouillons et publication
   app.use("/api/posts", postsRouter);
+  app.use("/api/creators", creatorsRouter);
 
   /** Retourne une page des pistes appartenant exclusivement à l'utilisateur via mongoose-aggregate-paginate-v2. */
   app.get("/api/tracks", auth, async (req, res, next) => {

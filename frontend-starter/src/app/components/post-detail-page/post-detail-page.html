@@ -44,9 +44,56 @@
             <a routerLink="/login" class="btn-primary">Se connecter</a>
             <a routerLink="/register" class="btn-secondary">Créer un compte</a>
           </div>
-        } @else {
+        } @else if (isSelfAuthor()) {
           <div class="actions-prompt">
-            <p class="info-note">Vous devez suivre ou vous abonner à ce créateur pour déverrouiller ce projet.</p>
+            <p class="self-creator-note">Vous êtes l'auteur de ce projet.</p>
+          </div>
+        } @else {
+          <!-- Actions de déverrouillage directes (Mission 5) -->
+          <div class="creator-unlock-box">
+            <div class="simulation-banner">
+              <span class="simulation-tag">Simulation — aucun paiement</span>
+              <span class="simulation-desc">Abonnement simulé de 30 jours sans carte bancaire</span>
+            </div>
+
+            <div class="creator-btns-group">
+              @if (preview.visibility === 'followers') {
+                @if (creatorStatus()?.isFollowing) {
+                  <span class="status-already">Vous êtes déjà follower (chargement des accès...)</span>
+                } @else {
+                  <button
+                    type="button"
+                    class="btn-creator btn-follow"
+                    (click)="followAuthor()"
+                    [disabled]="isFollowLoading() || isSubscribeLoading()"
+                  >
+                    {{ isFollowLoading() ? 'Traitement en cours...' : '+ Suivre ' + preview.author.name + ' pour déverrouiller' }}
+                  </button>
+                }
+              } @else {
+                @if (creatorStatus()?.isSubscribed) {
+                  <div class="sub-active-badge">
+                    <span>👑 Abonné jusqu'au {{ creatorStatus()?.expiresAt | date:'mediumDate' }}</span>
+                  </div>
+                } @else {
+                  <button
+                    type="button"
+                    class="btn-creator btn-subscribe"
+                    (click)="subscribeAuthor()"
+                    [disabled]="isSubscribeLoading() || isFollowLoading()"
+                  >
+                    {{ isSubscribeLoading() ? 'Activation en cours...' : '⭐ S’abonner 30 jours (Simulation) pour déverrouiller' }}
+                  </button>
+                }
+              }
+            </div>
+
+            @if (actionMessage()) {
+              <div class="action-alert success" role="status">✓ {{ actionMessage() }}</div>
+            }
+            @if (actionError()) {
+              <div class="action-alert error" role="alert">⚠️ {{ actionError() }}</div>
+            }
           </div>
         }
       </div>
@@ -71,6 +118,83 @@
           }
         </div>
       </header>
+
+      <!-- CARTE CRÉATEUR & INTERACTIONS (MISSION 5) -->
+      <section class="creator-card" aria-label="Informations sur le créateur">
+        <div class="creator-card-header">
+          <div class="creator-profile-info">
+            <span class="creator-avatar-badge">👤</span>
+            <div>
+              <span class="creator-title">Créateur</span>
+              <h3 class="creator-name">{{ detail.author.name }}</h3>
+            </div>
+          </div>
+          <div class="simulation-badge-pill" title="Cette plateforme est un bac à sable sans carte bancaire ni paiement réel">
+            Simulation — aucun paiement
+          </div>
+        </div>
+
+        @if (auth.isAuthenticated()) {
+          @if (isSelfAuthor()) {
+            <p class="self-creator-note">Vous êtes l'auteur de ce projet.</p>
+          } @else {
+            <div class="creator-actions-row">
+              <!-- Follow / Unfollow -->
+              @if (creatorStatus()?.isFollowing) {
+                <button
+                  type="button"
+                  class="btn-creator btn-unfollow"
+                  (click)="unfollowAuthor()"
+                  [disabled]="isFollowLoading() || isSubscribeLoading()"
+                >
+                  {{ isFollowLoading() ? 'Patientez...' : '✓ Suivi (Cesser de suivre)' }}
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn-creator btn-follow"
+                  (click)="followAuthor()"
+                  [disabled]="isFollowLoading() || isSubscribeLoading()"
+                >
+                  {{ isFollowLoading() ? 'Chargement...' : '+ Suivre le créateur' }}
+                </button>
+              }
+
+              <!-- Abonnement 30 jours -->
+              @if (creatorStatus()?.isSubscribed) {
+                <div class="sub-active-info">
+                  <span class="sub-badge-icon">👑</span>
+                  <span>Abonné actif (échéance : {{ creatorStatus()?.expiresAt | date:'mediumDate' }})</span>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="btn-creator btn-subscribe"
+                  (click)="subscribeAuthor()"
+                  [disabled]="isSubscribeLoading() || isFollowLoading()"
+                >
+                  {{ isSubscribeLoading() ? 'Souscription...' : '⭐ S’abonner 30 jours (Simulation)' }}
+                </button>
+              }
+            </div>
+          }
+        } @else {
+          <div class="creator-guest-msg">
+            <p>Connectez-vous pour suivre ou vous abonner à {{ detail.author.name }}.</p>
+            <div class="guest-auth-links">
+              <a routerLink="/login" class="btn-sm-primary">Se connecter</a>
+              <a routerLink="/register" class="btn-sm-secondary">Créer un compte</a>
+            </div>
+          </div>
+        }
+
+        @if (actionMessage()) {
+          <div class="action-alert success" role="status">✓ {{ actionMessage() }}</div>
+        }
+        @if (actionError()) {
+          <div class="action-alert error" role="alert">⚠️ {{ actionError() }}</div>
+        }
+      </section>
 
       <section class="content-body">
         <h2>Description et instructions du projet</h2>
