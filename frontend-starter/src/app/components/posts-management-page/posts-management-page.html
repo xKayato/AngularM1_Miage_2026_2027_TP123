@@ -1,0 +1,474 @@
+<section class="posts-management">
+  <div class="header-bar">
+    <div>
+      <h2>Mes Projets & Brouillons MakerShare</h2>
+      <p class="subtitle">Créez, éditez et gérez le cycle de vie de vos créations DIY.</p>
+    </div>
+
+    @if (currentView() === 'list') {
+      <button type="button" class="btn btn-primary" (click)="startCreate()">
+        + Nouveau brouillon
+      </button>
+    } @else {
+      <button type="button" class="btn btn-secondary" (click)="cancelEditor()">
+        ← Retour à la liste
+      </button>
+    }
+  </div>
+
+  @if (error(); as err) {
+    <div class="alert alert-error" role="alert">
+      {{ err }}
+    </div>
+  }
+
+  @if (successMessage(); as msg) {
+    <div class="alert alert-success" role="status">
+      {{ msg }}
+    </div>
+  }
+
+  <!-- VUE 1 : LISTE DES POSTS / BROUILLONS -->
+  @if (currentView() === 'list') {
+    <div class="filters-bar">
+      <div class="tabs">
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeFilter() === 'all'"
+          (click)="setFilter('all')"
+        >
+          Tous ({{ totalDocs() }})
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeFilter() === 'draft'"
+          (click)="setFilter('draft')"
+        >
+          Brouillons
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeFilter() === 'published'"
+          (click)="setFilter('published')"
+        >
+          Publiés
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeFilter() === 'archived'"
+          (click)="setFilter('archived')"
+        >
+          Archivés
+        </button>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="loading-state">
+        <p>Chargement de vos projets...</p>
+      </div>
+    } @else {
+      <div class="posts-list">
+        @for (post of posts(); track post.id) {
+          <article class="post-card" [class.archived]="post.status === 'archived'">
+            <div class="card-header">
+              <div class="title-meta">
+                <span class="badge category-badge">{{ post.category }}</span>
+                <span class="badge status-badge" [class]="'status-' + post.status">
+                  @switch (post.status) {
+                    @case ('draft') { Brouillon }
+                    @case ('published') { Publié ({{ post.visibility }}) }
+                    @case ('archived') { Archivé }
+                  }
+                </span>
+                <span class="likes-count">❤️ {{ post.likesCount }}</span>
+              </div>
+              <h3 class="post-title">{{ post.title }}</h3>
+            </div>
+
+            <p class="post-description">{{ post.shortDescription }}</p>
+
+            <div class="tags-container">
+              @for (tag of post.tags; track tag) {
+                <span class="tag-chip">#{{ tag }}</span>
+              }
+            </div>
+
+            <div class="card-footer">
+              <div class="date-info">
+                Dernière modification : {{ post.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+              </div>
+
+              <div class="actions">
+                @if (post.status !== 'archived') {
+                  <button
+                    type="button"
+                    class="btn btn-outline"
+                    (click)="startEdit(post)"
+                  >
+                    Modifier
+                  </button>
+
+                  <button
+                    type="button"
+                    class="btn btn-outline"
+                    (click)="openAttachmentsModal(post)"
+                  >
+                    📎 Pièces jointes ({{ post.attachments.length }}/10)
+                  </button>
+
+                  @if (post.status === 'draft') {
+                    <button
+                      type="button"
+                      class="btn btn-publish"
+                      (click)="openPublishModal(post)"
+                    >
+                      Publier...
+                    </button>
+                  } @else if (post.status === 'published') {
+                    <button
+                      type="button"
+                      class="btn btn-outline-warning"
+                      (click)="openPublishModal(post)"
+                    >
+                      Changer visibilité
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-unpublish"
+                      (click)="unpublishPost(post)"
+                    >
+                      Repasser en brouillon
+                    </button>
+                  }
+                } @else {
+                  <span class="archived-notice">Modéré par un administrateur</span>
+                }
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-state">
+            <p>Aucun projet ne correspond au filtre sélectionné.</p>
+            <button type="button" class="btn btn-primary" (click)="startCreate()">
+              Créer mon premier brouillon
+            </button>
+          </div>
+        }
+      </div>
+
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button
+            type="button"
+            class="btn btn-outline"
+            [disabled]="currentPage() <= 1"
+            (click)="loadPosts(currentPage() - 1)"
+          >
+            Précédent
+          </button>
+          <span>Page {{ currentPage() }} sur {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-outline"
+            [disabled]="currentPage() >= totalPages()"
+            (click)="loadPosts(currentPage() + 1)"
+          >
+            Suivant
+          </button>
+        </div>
+      }
+    }
+  }
+
+  <!-- VUE 2 : ÉDITEUR DE BROUILLON (CRÉATION OU MODIFICATION) -->
+  @if (currentView() === 'editor') {
+    <div class="editor-container">
+      <h3>
+        @if (editingPostId()) {
+          Modifier le projet
+        } @else {
+          Nouveau brouillon MakerShare
+        }
+      </h3>
+
+      <form [formGroup]="postForm" (ngSubmit)="onSubmit()" novalidate>
+        <!-- Titre -->
+        <div class="form-group">
+          <label for="post-title">Titre du tutoriel / création *</label>
+          <input
+            id="post-title"
+            type="text"
+            formControlName="title"
+            placeholder="Ex : Support mural pour guitare en bois de palette"
+            class="form-control"
+            [class.is-invalid]="postForm.get('title')?.invalid && postForm.get('title')?.touched"
+          />
+          @if (postForm.get('title')?.invalid && postForm.get('title')?.touched) {
+            <small class="field-error">
+              Le titre est requis et doit comporter entre 3 et 120 caractères.
+            </small>
+          }
+        </div>
+
+        <!-- Catégorie -->
+        <div class="form-group">
+          <label for="post-category">Catégorie *</label>
+          <select
+            id="post-category"
+            formControlName="category"
+            class="form-control"
+          >
+            @for (cat of categories; track cat) {
+              <option [value]="cat">{{ cat }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Description courte -->
+        <div class="form-group">
+          <label for="post-short-desc">Description courte (aperçu) *</label>
+          <textarea
+            id="post-short-desc"
+            formControlName="shortDescription"
+            rows="2"
+            placeholder="Ex : Un tutoriel pas à pas pour fabriquer un support mural solide et design..."
+            class="form-control"
+            [class.is-invalid]="postForm.get('shortDescription')?.invalid && postForm.get('shortDescription')?.touched"
+          ></textarea>
+          @if (postForm.get('shortDescription')?.invalid && postForm.get('shortDescription')?.touched) {
+            <small class="field-error">
+              La description courte est requise (entre 10 et 300 caractères).
+            </small>
+          }
+        </div>
+
+        <!-- Contenu complet -->
+        <div class="form-group">
+          <label for="post-content">Instructions complètes et tutoriel *</label>
+          <textarea
+            id="post-content"
+            formControlName="content"
+            rows="8"
+            placeholder="Ex : ## Matériel nécessaire&#10;- Briques Lego Technic...&#10;&#10;## Étape 1 : Assemblage de la base..."
+            class="form-control"
+            [class.is-invalid]="postForm.get('content')?.invalid && postForm.get('content')?.touched"
+          ></textarea>
+          @if (postForm.get('content')?.invalid && postForm.get('content')?.touched) {
+            <small class="field-error">
+              Le contenu complet est requis (au moins 10 caractères).
+            </small>
+          }
+        </div>
+
+        <!-- Tags -->
+        <div class="form-group">
+          <label for="post-tags">Tags (séparés par des virgules, entre 1 et 10) *</label>
+          <input
+            id="post-tags"
+            type="text"
+            formControlName="tagsInput"
+            placeholder="Ex : lego, bois, diy-mural, tutoriel"
+            class="form-control"
+            [class.is-invalid]="postForm.get('tagsInput')?.invalid && postForm.get('tagsInput')?.touched"
+          />
+          <small class="field-help">
+            Les tags sont automatiquement normalisés en minuscules. Caractères autorisés : lettres minuscules, chiffres et tirets.
+          </small>
+
+          <!-- Aperçu en temps réel de la normalisation -->
+          @if (postForm.get('tagsInput')?.value; as rawInput) {
+            @let preview = parseAndNormalizeTags(rawInput);
+            <div class="tags-preview-container">
+              @if (preview.valid) {
+                <span class="preview-label">Aperçu normalisé :</span>
+                @for (t of preview.tags; track t) {
+                  <span class="tag-chip tag-chip-valid">#{{ t }}</span>
+                }
+              } @else if (preview.error) {
+                <span class="field-error">{{ preview.error }}</span>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="cancelEditor()"
+            [disabled]="loading()"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="postForm.invalid || loading()"
+          >
+            @if (editingPostId()) {
+              Enregistrer les modifications
+            } @else {
+              Créer le brouillon
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <!-- MODAL / DIALOGUE DE PUBLICATION EXPLICITE -->
+  @if (publishingPost(); as postToPublish) {
+    <div class="modal-backdrop" (click)="closePublishModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <h3>Publier « {{ postToPublish.title }} »</h3>
+        <p>Sélectionnez la visibilité souhaitée pour votre création :</p>
+
+        <div class="visibility-options">
+          @for (vis of visibilities; track vis.value) {
+            <label class="visibility-option">
+              <input
+                type="radio"
+                name="visibility"
+                [value]="vis.value"
+                [checked]="selectedVisibility() === vis.value"
+                (change)="selectedVisibility.set(vis.value)"
+              />
+              <span>{{ vis.label }}</span>
+            </label>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="closePublishModal()"
+            [disabled]="loading()"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            class="btn btn-publish"
+            (click)="confirmPublish()"
+            [disabled]="loading()"
+          >
+            Confirmer la publication
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL / GESTION DES PIÈCES JOINTES (MISSION 3) -->
+  @if (attachmentsModalPost(); as attPost) {
+    <div class="modal-backdrop" (click)="closeAttachmentsModal()">
+      <div class="modal-content modal-attachments" (click)="$event.stopPropagation()">
+        <h3>Pièces jointes — {{ attPost.title }}</h3>
+        <p class="subtitle">
+          Quotas par post : max 10 fichiers et 50 Mo cumulés (Images $\le$ 5 Mo, PDF $\le$ 10 Mo, Audio $\le$ 25 Mo).
+        </p>
+
+        @if (attachmentsError(); as attErr) {
+          <div class="alert alert-error" role="alert">
+            {{ attErr }}
+          </div>
+        }
+
+        <!-- Liste des pièces jointes actuelles -->
+        <div class="existing-attachments-section">
+          <h4>Fichiers actuels ({{ attPost.attachments.length }}/10)</h4>
+          @if (attPost.attachments.length > 0) {
+            <ul class="attachments-list">
+              @for (att of attPost.attachments; track att.id) {
+                <li class="attachment-item">
+                  <span class="attachment-family-icon">
+                    @switch (att.family) {
+                      @case ('image') { 🖼️ }
+                      @case ('pdf') { 📄 }
+                      @case ('audio') { 🎵 }
+                    }
+                  </span>
+                  <div class="attachment-meta">
+                    <span class="attachment-name">{{ att.originalName }}</span>
+                    <span class="attachment-details">{{ formatBytes(att.size) }} • {{ att.mimeType }}</span>
+                  </div>
+                  @if (att.isCover) {
+                    <span class="badge badge-cover">Couverture</span>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="empty-notice">Aucune pièce jointe sur ce projet pour le moment.</p>
+          }
+        </div>
+
+        <!-- Section Ajout de nouveaux fichiers -->
+        @if (attPost.attachments.length < 10 && attPost.status !== 'archived') {
+          <div class="upload-section">
+            <h4>Ajouter des fichiers</h4>
+            <div class="form-group">
+              <input
+                type="file"
+                multiple
+                (change)="onFilesSelected($event)"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,.mp3,.wav,.ogg,.m4a"
+                [disabled]="uploadingAttachments()"
+                class="form-control"
+              />
+              <small class="field-help">
+                Sélectionnez jusqu'à {{ 10 - attPost.attachments.length }} fichier(s) supplémentaire(s).
+              </small>
+            </div>
+
+            @if (selectedFiles().length > 0) {
+              <div class="selected-summary">
+                <b>{{ selectedFiles().length }} fichier(s) prêt(s) à l'envoi :</b>
+                <ul>
+                  @for (f of selectedFiles(); track f.name) {
+                    <li>{{ f.name }} ({{ formatBytes(f.size) }})</li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        } @else if (attPost.attachments.length >= 10) {
+          <div class="alert alert-warning">
+            Quota maximal de 10 pièces jointes atteint pour ce post.
+          </div>
+        }
+
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="closeAttachmentsModal()"
+            [disabled]="uploadingAttachments()"
+          >
+            Fermer
+          </button>
+          @if (selectedFiles().length > 0 && attPost.attachments.length < 10) {
+            <button
+              type="button"
+              class="btn btn-publish"
+              (click)="uploadSelectedFiles()"
+              [disabled]="uploadingAttachments() || selectedFiles().length === 0"
+            >
+              @if (uploadingAttachments()) {
+                Téléversement en cours...
+              } @else {
+                Téléverser {{ selectedFiles().length }} fichier(s)
+              }
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</section>

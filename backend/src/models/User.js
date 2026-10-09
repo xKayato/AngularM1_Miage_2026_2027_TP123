@@ -17,6 +17,20 @@ const schema = new mongoose.Schema(
     },
     // select:false empêche de renvoyer le hash par défaut dans les requêtes.
     passwordHash: { type: String, required: true, select: false },
+    // Rôle applicatif (rétrocompatible avec les anciens comptes via default: "user")
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+      index: true,
+    },
+    // Statut de modération (rétrocompatible avec les anciens comptes via default: "active")
+    status: {
+      type: String,
+      enum: ["active", "suspended"],
+      default: "active",
+      index: true,
+    },
   },
   { timestamps: true },
 );
@@ -54,6 +68,8 @@ schema.methods.toPublic = function () {
     id: this.id,
     name: this.name,
     email: this.email,
+    role: this.role || "user",
+    status: this.status || "active",
     createdAt: this.createdAt,
   };
 };

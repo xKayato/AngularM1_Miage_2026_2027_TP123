@@ -5,6 +5,9 @@ export interface Page<T> {
   limit: number;
   total: number;
   pages: number;
+  docs?: T[];
+  totalDocs?: number;
+  totalPages?: number;
   hasPrevPage?: boolean;
   hasNextPage?: boolean;
   prevPage?: number | null;

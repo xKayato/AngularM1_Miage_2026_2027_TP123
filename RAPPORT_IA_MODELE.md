@@ -441,3 +441,75 @@
   - **Différence entre test unitaire et test d’intégration :**
     - *Test unitaire :* Teste une classe ou un composant isolé en remplaçant toutes ses dépendances par des simulations ou mocks (ex : tester `TracksPageComponent` avec un mock de `TrackService`).
     - *Test d'intégration :* Teste la collaboration réelle de plusieurs briques ensemble (composants, services, DOM) pour s'assurer que le flux global fonctionne sans rupture.
+
+---
+
+# TP4 Libre — MakerShare (Plateforme DIY)
+
+## Mission 0 — Cadrage, Sécurité et Contrat d'API
+- **Objectif :** Établir le contrat d'API, la matrice de sécurité et les règles de gestion (quotas, visibilités, abonnements) sans toucher au code des TPs 1-3.
+- **Fichiers modifiés :** `API_CONTRACT.md`, `TP4_LIBRE.md`.
+- **Preuves :** Matrice d'accès formalisée, pas de passe-droit admin pour les fichiers privés, quotas de fichiers (50 Mo cumulés, 10 fichiers max, audio 25 Mo, image 5 Mo, PDF 10 Mo).
+- **Ce que je sais expliquer sans l'agent :**
+  - Pourquoi le contrôle d'accès doit être strict par défaut : toute route sans politique explicite doit être refusée (401/403).
+  - Pourquoi l'admin n'a pas accès aux fichiers privés : la modération porte sur les contenus signalés et publics, pas sur l'espionnage des contenus privés payants.
+
+---
+
+## Mission 1A & 1B — Modèles MongoDB et Socle Frontend
+- **Objectif :** Créer les modèles Mongoose (`Post`, `Follow`, `Subscription`, `Like`, `ShareLink`) avec contraintes d'unicité, et les services Angular (`PostService`, `CreatorService`).
+- **Fichiers modifiés :** Modèles backend sous `backend/src/models/`, `postProjections.js`, services frontend `post.service.ts` et `creator.service.ts`.
+- **Preuves :** Tests unitaires des modèles (29 tests backend) et tests HTTP frontend (26 tests isolés).
+- **Ce que je sais expliquer sans l'agent :**
+  - Pourquoi `storedName` a `select: false` : pour empêcher toute fuite accidentelle du nom physique de fichier vers le client.
+  - Pourquoi une contrainte d'unicité MongoDB `{ subscriberId: 1, creatorId: 1 }` est nécessaire : seule la base garantit l'anti-collision en cas de requêtes concurrentes.
+
+---
+
+## Mission 2 — Brouillons, Catégories, Tags et Publication
+- **Objectif :** Implémenter le cycle de vie des tutoriels (création brouillon, modification par l'auteur, normalisation déterministe des tags, publication avec choix de visibilité, retour en brouillon).
+- **Fichiers modifiés :** `backend/src/routes/posts.js`, `frontend-starter/src/app/components/posts-management-page/`.
+- **Preuves :** 20 tests d'API backend et 25 tests frontend dans `posts-management-page.spec.ts`.
+- **Ce que je sais expliquer sans l'agent :**
+  - Pourquoi normaliser les tags côté serveur : pour éviter les incohérences de recherche dues aux majuscules, espaces superflus ou doublons.
+  - Pourquoi interdire les modifications d'un post archivé : un contenu archivé par la modération est figé (410 ou 400).
+
+---
+
+## Mission 3 — Pièces Jointes et Upload Sécurisé
+- **Objectif :** Permettre l'upload multipart sécurisé de pièces jointes par lot pour l'auteur actif, avec quotas stricts et validation par signature binaire.
+- **Revue et clarifications :**
+  - Stockage effectif dans `backend/data/uploads/attachments/`.
+  - Nettoyage automatique des fichiers partiels par Multer avant contrôleur via `fsPromises.unlink()` (vérifié par test disque).
+  - Réconciliation périodique des orphelins : marquée comme **non implémentée** (recommandation future).
+  - Limite des signatures magiques : vérifie l'en-tête de fichier, mais pas l'intégrité de la totalité du flux ni les polyglottes.
+- **Fichiers modifiés :** `attachmentUpload.js`, `attachmentValidator.js`, `backend/src/routes/posts.js`, `posts-management-page.ts`.
+- **Preuves :** 14 tests backend avec test de concurrence `Promise.all` ($8+2+2 \rightarrow$ 10 fichiers finaux, 0 violation de quota).
+
+---
+
+## Mission 4 — Contrôle des Lectures, Visibilités et Partage par Lien
+- **Objectif :** Implémenter la décision d'accès centralisée (`postAccessControl.js`), le catalogue public, le détail avec lecteur audio Blob, le partage par lien secret (`ShareLink`) et le streaming/téléchargement sécurisé sans fuite de chemins disque.
+- **Prompt principal :**
+  > « GO Mission 4 — contrôle des lectures, visibilités et partage par lien. Revue courte Mission 3... Backend décision d'accès centralisée... Routes Express ordonnées (/my et /shared/:token avant /:id)... Secret 32 octets haché SHA-256 avec X-Share-Token... Téléchargement avec res.sendFile et Range... Frontend catalogue, détail et share avec Blob/ObjectURL et révocation... Matrice de tests complète... »
+  > « Revue corrective ciblée de la Mission 4 : compare le schéma réel Follow et toutes les requêtes Follow.exists(), vérifie les champs de Subscription (subscriberId, creatorId, expiresAt, active), montre quelle route permet à l'admin de lire un post archivé (reportée à Mission 8), revois Content-Disposition RFC 5987/6266, nosniff, Cache-Control, politique PDF, Referrer-Policy sur /share/:token, logs backend et proxy, inaccessibilité immédiate du fichier... »
+- **Plan proposé et points clés :**
+  1. `optionalAuthMakerShare.js` : accepte l'anonymat, rejette Bearer corrompu (401) et compte suspendu (403).
+  2. `postAccessControl.js` : contrôle centralisé (`public`, `followers` via `followerId`/`creatorId`, `subscribers` via `subscriberId`/`creatorId`/`expiresAt`/`active`, `link`, `draft`, `archived` 410 pour tous en Mission 4, auteur suspendu 404).
+  3. `posts.js` : ordonnancement Express strict, `GET /api/posts/shared/:token` avant `GET /:id`, route de téléchargement avec `.select("+attachments.storedName")`, `res.sendFile()`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-cache, no-store`, `Content-Disposition` avec nom original atypique (RFC 5987/6266) et politique PDF (`inline` par défaut, `attachment` avec `?download=1`).
+  4. Sécurité et logs : masquage des jetons secrets dans les logs Express (`[REDACTED_SHARE_TOKEN]`), proxy dev en `logLevel: "warn"`, et balise `<meta name="referrer" content="no-referrer">` dans `index.html`.
+  5. Frontend : correction de `authInterceptor` (pas de logout sur 401 anonyme), vues `PostsPageComponent` (`/posts`), `PostDetailPageComponent` (`/posts/:id`) et `SharedPostPageComponent` (`/share/:token`), lecteur audio avec Blob et libération mémoire `URL.revokeObjectURL()`.
+- **Fichiers modifiés :**
+  - Backend : `backend/src/middlewares/optionalAuthMakerShare.js`, `backend/src/utils/postAccessControl.js`, `backend/src/routes/posts.js`, `backend/src/app.js`, `backend/test/access_control.test.js`.
+  - Frontend : `auth.interceptor.ts`, `posts-page/`, `post-detail-page/`, `shared-post-page/`, `routes.ts`, `app.html`, `index.html`, `proxy.conf.json`.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **114 passants sur 114** (`node --test`), incluant 24 tests dédiés dans `access_control.test.js` (cycle complet Follow 403 $\rightarrow$ 200 $\rightarrow$ 403, cycle complet Subscription avec expiration et désactivation, inaccessibilité immédiate du fichier sur post archivé / auteur suspendu / lien révoqué, en-têtes de téléchargement et nom atypique).
+  - Tests Frontend : **167 passants sur 167** (`ng test --watch=false`), 100% succès.
+  - Build Frontend : **Compilation réussie sans erreur** en 6.90s (`ng build`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi vérifier `creatorId` et `followerId` selon le modèle :** Le schéma Mongoose `Follow` déclare `followerId` et `creatorId`. Utiliser des noms divergents invaliderait les requêtes `Follow.exists()`.
+  - **Pourquoi le statut administrateur ne permet pas de lire le texte d'un post archivé en Mission 4 :** Aucune route de modération n'existe encore dans l'API. Sur `GET /api/posts/:id`, un post archivé renvoie systématiquement `410 Gone`. La route spécifique d'inspection modératrice est reportée à la Mission 8, et n'accordera jamais d'accès implicite aux pièces jointes privées.
+  - **Construction RFC 5987 / 6266 de Content-Disposition :** L'en-tête associe un fallback ASCII assaini (`filename="..."`) et la version complète encodée en UTF-8 (`filename*=UTF-8''...`), préservant accents et caractères spéciaux sans risque d'injection d'en-tête HTTP.
+  - **Politique Referrer-Policy et logs de jetons :** La page HTML initiale impose `no-referrer` via `<meta name="referrer" content="no-referrer">` (à doubler d'un en-tête HTTP en production Nginx). Les logs applicatifs masquent les jetons par regex (`[REDACTED_SHARE_TOKEN]`) pour éviter toute fuite de secret dans les traces serveur.
+
+

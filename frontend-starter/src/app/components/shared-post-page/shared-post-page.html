@@ -1,0 +1,99 @@
+<div class="shared-container">
+  <div class="nav-back">
+    <a routerLink="/posts" class="btn-back" rel="noreferrer">← Découvrir d’autres créations</a>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state" aria-live="polite">
+      <div class="spinner"></div>
+      <p>Chargement du projet partagé...</p>
+    </div>
+  } @else if (error()) {
+    <div class="alert alert-error" role="alert">
+      <h2>Lien inaccessible</h2>
+      <p>{{ error() }}</p>
+      <a routerLink="/posts" class="btn-primary" rel="noreferrer">Explorer les créations publiques</a>
+    </div>
+  } @else if (postDetail(); as detail) {
+    <article class="post-full-detail">
+      <div class="shared-banner">
+        <span>🔗 Projet partagé via un lien direct sécurisé</span>
+      </div>
+
+      <header class="detail-header">
+        <div class="meta-line">
+          <span class="category-pill">{{ detail.category }}</span>
+          <span class="likes-badge">❤️ {{ detail.likesCount }} j'aime</span>
+        </div>
+
+        <h1>{{ detail.title }}</h1>
+        <p class="author-info">Par <b>{{ detail.author.name }}</b></p>
+        <p class="short-desc">{{ detail.shortDescription }}</p>
+
+        <div class="tags-list">
+          @for (tag of detail.tags; track tag) {
+            <span class="tag">#{{ tag }}</span>
+          }
+        </div>
+      </header>
+
+      <section class="content-body">
+        <h2>Description et instructions du projet</h2>
+        <div class="text-content">
+          {{ detail.content }}
+        </div>
+      </section>
+
+      @if (detail.attachments.length > 0) {
+        <section class="attachments-section">
+          <h2>Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
+
+          <div class="attachments-list">
+            @for (att of detail.attachments; track att.id) {
+              <div class="attachment-row" [attr.data-family]="att.family">
+                <div class="att-info">
+                  <span class="att-icon">
+                    {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                  </span>
+                  <div>
+                    <span class="att-name">{{ att.originalName }}</span>
+                    <span class="att-meta">{{ formatBytes(att.size) }} • {{ att.family }}</span>
+                  </div>
+                </div>
+
+                <div class="att-actions">
+                  @if (att.family === 'audio') {
+                    <button
+                      type="button"
+                      class="btn-action"
+                      (click)="playAudio(att)"
+                      [disabled]="activeAudioAttachmentId() === att.id && currentAudioUrl()"
+                    >
+                      {{ activeAudioAttachmentId() === att.id ? 'Lecture en cours...' : 'Écouter' }}
+                    </button>
+                  }
+                  <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
+                    Télécharger
+                  </button>
+                </div>
+              </div>
+
+              @if (att.family === 'image' && imageUrls()[att.id]) {
+                <div class="image-preview-wrapper">
+                  <img [src]="imageUrls()[att.id]" [alt]="att.originalName" class="image-preview" />
+                </div>
+              }
+            }
+          </div>
+
+          @if (currentAudioUrl()) {
+            <div class="audio-player-bar">
+              <p>Lecteur audio intégré :</p>
+              <audio [src]="currentAudioUrl()!" controls autoplay class="audio-element"></audio>
+            </div>
+          }
+        </section>
+      }
+    </article>
+  }
+</div>

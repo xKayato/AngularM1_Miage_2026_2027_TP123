@@ -107,4 +107,22 @@ describe('authInterceptor', () => {
     expect(mockAuthService.handleUnauthorized).not.toHaveBeenCalled();
     expect(receivedError?.status).toBe(401);
   });
+
+  it('should NOT call handleUnauthorized on 401 response if request had no Authorization header (requête anonyme)', () => {
+    mockAuthService.token.mockReturnValue(null);
+
+    let receivedError: HttpErrorResponse | undefined;
+    httpClient.get('/api/posts/post-1').subscribe({
+      error: (err: HttpErrorResponse) => {
+        receivedError = err;
+      },
+    });
+
+    const req = httpTesting.expectOne('/api/posts/post-1');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({ message: 'Authentification requise' }, { status: 401, statusText: 'Unauthorized' });
+
+    expect(mockAuthService.handleUnauthorized).not.toHaveBeenCalled();
+    expect(receivedError?.status).toBe(401);
+  });
 });

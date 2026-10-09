@@ -4,8 +4,10 @@
     <small>Le cloud qui manque à votre ampli</small>
   </div>
   <nav aria-label="Navigation principale">
+    <a routerLink="/posts">Catalogue</a>
     @if (auth.isAuthenticated()) {
       <a routerLink="/tracks">Backing tracks</a>
+      <a routerLink="/my-posts">Mes projets</a>
       <a routerLink="/profile">
         Profil
         @if (auth.currentUser(); as user) {

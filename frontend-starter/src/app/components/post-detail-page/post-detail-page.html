@@ -1,0 +1,134 @@
+<div class="detail-container">
+  <div class="nav-back">
+    <a routerLink="/posts" class="btn-back">← Retour au catalogue</a>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state" aria-live="polite">
+      <div class="spinner"></div>
+      <p>Chargement du projet...</p>
+    </div>
+  } @else if (error()) {
+    <div class="alert alert-error" role="alert">
+      <h2>Accès impossible</h2>
+      <p>{{ error() }}</p>
+      <a routerLink="/posts" class="btn-primary">Explorer les créations disponibles</a>
+    </div>
+  } @else if (isLocked() && postPreview(); as preview) {
+    <!-- VUE APERÇU VERROUILLÉ (Followers / Abonnés) -->
+    <article class="locked-preview-card">
+      <div class="locked-header">
+        <span class="lock-big-icon">🔒</span>
+        <span class="badge-visibility">{{ preview.visibility === 'followers' ? 'Réservé aux followers' : 'Réservé aux abonnés' }}</span>
+        <h1>{{ preview.title }}</h1>
+        <p class="author-sub">Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }}</p>
+      </div>
+
+      <div class="locked-description">
+        <p>{{ preview.shortDescription }}</p>
+      </div>
+
+      <div class="locked-banner">
+        <h3>Contenu restreint</h3>
+        <p>
+          Ce projet contient des instructions, fichiers et pièces jointes réservés
+          @if (preview.visibility === 'followers') {
+            aux followers de l'auteur.
+          } @else {
+            aux abonnés actifs de l'auteur.
+          }
+        </p>
+
+        @if (!auth.isAuthenticated()) {
+          <div class="actions-prompt">
+            <a routerLink="/login" class="btn-primary">Se connecter</a>
+            <a routerLink="/register" class="btn-secondary">Créer un compte</a>
+          </div>
+        } @else {
+          <div class="actions-prompt">
+            <p class="info-note">Vous devez suivre ou vous abonner à ce créateur pour déverrouiller ce projet.</p>
+          </div>
+        }
+      </div>
+    </article>
+  } @else if (postDetail(); as detail) {
+    <!-- VUE DÉTAIL COMPLET AUTORISÉ -->
+    <article class="post-full-detail">
+      <header class="detail-header">
+        <div class="meta-line">
+          <span class="category-pill">{{ detail.category }}</span>
+          <span class="badge-visibility" [attr.data-visibility]="detail.visibility">{{ detail.visibility }}</span>
+          <span class="likes-badge">❤️ {{ detail.likesCount }} j'aime</span>
+        </div>
+
+        <h1>{{ detail.title }}</h1>
+        <p class="author-info">Par <b>{{ detail.author.name }}</b> • Publié le {{ detail.publishedAt ? (detail.publishedAt | date:'mediumDate') : 'Non publié' }}</p>
+        <p class="short-desc">{{ detail.shortDescription }}</p>
+
+        <div class="tags-list">
+          @for (tag of detail.tags; track tag) {
+            <span class="tag">#{{ tag }}</span>
+          }
+        </div>
+      </header>
+
+      <section class="content-body">
+        <h2>Description et instructions du projet</h2>
+        <div class="text-content">
+          {{ detail.content }}
+        </div>
+      </section>
+
+      @if (detail.attachments.length > 0) {
+        <section class="attachments-section">
+          <h2>Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
+
+          <div class="attachments-list">
+            @for (att of detail.attachments; track att.id) {
+              <div class="attachment-row" [attr.data-family]="att.family">
+                <div class="att-info">
+                  <span class="att-icon">
+                    {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                  </span>
+                  <div>
+                    <span class="att-name">{{ att.originalName }}</span>
+                    <span class="att-meta">{{ formatBytes(att.size) }} • {{ att.family }}</span>
+                  </div>
+                </div>
+
+                <div class="att-actions">
+                  @if (att.family === 'audio') {
+                    <button
+                      type="button"
+                      class="btn-action"
+                      (click)="playAudio(att)"
+                      [disabled]="activeAudioAttachmentId() === att.id && currentAudioUrl()"
+                    >
+                      {{ activeAudioAttachmentId() === att.id ? 'Lecture en cours...' : 'Écouter' }}
+                    </button>
+                  }
+                  <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
+                    Télécharger
+                  </button>
+                </div>
+              </div>
+
+              @if (att.family === 'image' && imageUrls()[att.id]) {
+                <div class="image-preview-wrapper">
+                  <img [src]="imageUrls()[att.id]" [alt]="att.originalName" class="image-preview" />
+                </div>
+              }
+            }
+          </div>
+
+          @if (currentAudioUrl()) {
+            <div class="audio-player-bar">
+              <p>Lecteur audio intégré :</p>
+              <audio [src]="currentAudioUrl()!" controls autoplay class="audio-element"></audio>
+            </div>
+          }
+        </section>
+      }
+    </article>
+  }
+</div>

@@ -21,9 +21,11 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         })
       : request;
 
+  const hasAuthHeader = authRequest.headers.has('Authorization');
+
   return next(authRequest).pipe(
     catchError((error: unknown) => {
-      if (error instanceof HttpErrorResponse && error.status === 401 && !isPublic) {
+      if (error instanceof HttpErrorResponse && error.status === 401 && hasAuthHeader) {
         authService.handleUnauthorized();
       }
       return throwError(() => error);
