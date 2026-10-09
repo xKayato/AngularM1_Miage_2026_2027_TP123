@@ -561,4 +561,50 @@
   - **Principe de non-prolongation :** Un abonnement actif ne peut pas être réactivé avant son terme. Le serveur renvoie `409 Conflict` en rappelant l'échéance actuelle. Après expiration, une nouvelle période de 30 jours peut être activée via une mise à jour atomique conditionnelle.
   - **Indépendance Follow / Abonnement :** Suivre un créateur relève d'un flux d'actualité consenti gratuit, alors que s'abonner donne accès aux projets payants/privés. Les deux droits sont découplés techniquement et fonctionnellement.
 
+---
+
+## Mission 6 — Likes Uniques et Compteur Cohérent
+
+- **Objectif :** Implémenter le système d'appréciation sociale (Like / Unlike) avec unicité stricte `{ userId, postId }` en base, calcul dynamique de `likesCount` sans dénormalisation dans le modèle `Post`, respect de la matrice de visibilité avant autorisation de liker, et bouton interactif dans Angular 22 avec protection anti-double clic.
+- **Prompt principal :**
+  > « GO pour la Mission 6 — Likes uniques et compteur cohérent.
+  > Avant de coder, audite le modèle Like, les routes et DTO existants, le calcul de likesCount, ainsi que les méthodes PostService.likePost() et unlikePost(). Vérifie git status et confirme que RAPPORT_IA_LIBRE.md reste dans .gitignore, local et non versionné.
+  > Implémente uniquement la Mission 6 :
+  > - POST /api/posts/:id/like et DELETE /api/posts/:id/like, via authMakerShare ;
+  > - refus de l’auto-like (400), d’un compte suspendu (403) et de toute interaction sans droit de lecture complète du post ;
+  > - unicité réelle { userId, postId } en base, avec traitement explicite des appels répétés et concurrents ; précise et teste la réponse attendue pour chaque cas ;
+  > - compteur likesCount calculé à partir de la collection likes, sans ajouter de compteur dénormalisé au modèle Post ;
+  > - bouton Like/Unlike et compteur dans le détail du post, uniquement lorsque l’action est autorisée, avec état de chargement, prévention du double clic et mise à jour après réponse du serveur. Ne te fie pas au seul masquage du bouton pour sécuriser l’action.
+  > Ajoute des tests backend sur MongoDB isolé pour l’unicité, deux likes simultanés, unlike répété, auto-like et matrice d’accès, puis des tests frontend pour les requêtes, états et erreurs. Vérifie également que catalogue, aperçu et détail affichent le même comptage calculé. »
+- **Plan proposé et points clés :**
+  1. Backend `backend/src/routes/posts.js` :
+     - `POST /api/posts/:id/like` : authentification et compte actif (`authMakerShare`), validation ObjectId, rejet de l'auto-like (`400 Bad Request`), contrôle d'accès de lecture complète via `canAccessPost(post, req.user)` (refus 403 followers/subscribers non débloqués, 404 brouillon ou créateur suspendu, 410 post archivé).
+     - Insertion `Like.create({ userId, postId })` avec interception de l'erreur `11000 DuplicateKey` pour garantir l'idempotence sous double-clic ou concurrence simultanée.
+     - Calcul dynamique : `likesCount = await Like.countDocuments({ postId: post._id })`. Réponse `200 { liked: true, likesCount }`.
+     - `DELETE /api/posts/:id/like` : suppression via `Like.deleteOne`, recalcul dynamique du compteur, réponse `200 { liked: false, likesCount }`.
+  2. Frontend Angular 22 (`post-detail-page`) :
+     - Bouton interactif `btn-like` conditionné aux utilisateurs connectés non-auteurs autorisés.
+     - Signal `isLikeLoading` désactivant le bouton et protégeant contre les doubles soumissions.
+     - Mise à jour réactive des propriétés `likesCount` et `userInteractions.isLiked` après confirmation serveur.
+     - Affichage du compteur calculé dans le catalogue, l'aperçu verrouillé et la vue détaillée.
+- **Fichiers modifiés :**
+  - Backend : `backend/src/routes/posts.js`, `backend/test/likes.test.js`.
+  - Frontend : `post-detail-page.ts`, `post-detail-page.html`, `post-detail-page.css`, `post-detail-page.spec.ts`.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **154 passants sur 154 (100% de succès)** (`node --test`), incluant 18 tests dédiés dans `likes.test.js` :
+    - Rejet auto-like (400) et auto-unlike (400).
+    - Rejet compte suspendu (403), brouillon d'autrui (404), post archivé (410), créateur suspendu (404).
+    - Déblocage dynamique du like sur post followers après follow (403 $\rightarrow$ 200).
+    - Déblocage dynamique du like sur post subscribers après souscription (403 $\rightarrow$ 200).
+    - Premier like (200), clic répété (200 idempotent sans double incrémentation).
+    - **Deux likes simultanés (`Promise.all`) sur base isolée :** les deux requêtes reçoivent 200, exactement 1 document dans la collection `Like`.
+    - Unlike et unlike répété (200, likesCount décrémenté).
+    - **Cohérence vérifiée :** catalogue, aperçu et détail retournent le même `likesCount: 3`, aucun champ dénormalisé présent sur `Post`.
+  - Tests Frontend : **176 passants sur 176 (13 suites)** (`ng test --watch=false`), dont 15 tests sur `post-detail-page.spec.ts`.
+  - Build Frontend : **Compilation réussie sans erreur** en 7.53s (`ng build`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi ne pas dénormaliser `likesCount` dans le schéma Post :** Stocker un compteur dans le document Post entraîne des risques majeurs de dérive en cas d'écritures concurrentes ou d'échecs partiels. Calculer le total à partir de la collection `Like` garantit une source unique de vérité et une intégrité parfaite.
+  - **Nécessité de vérifier l'accès complet au post avant de liker :** Pour empêcher un utilisateur d'aimer un contenu privé, réservé ou payant qu'il ne peut pas consulter, `canAccessPost()` est exécuté côté serveur avant toute insertion de like.
+  - **Idempotence et capture de l'erreur 11000 :** Le code 11000 levé par l'index unique `{ userId: 1, postId: 1 }` lors d'un clic répété est intercepté par Express pour renvoyer un statut 200 avec le comptage réel plutôt qu'un crash 500, offrant une expérience robuste et fluide.
+
 

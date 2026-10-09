@@ -21,7 +21,7 @@
         <span class="lock-big-icon">🔒</span>
         <span class="badge-visibility">{{ preview.visibility === 'followers' ? 'Réservé aux followers' : 'Réservé aux abonnés' }}</span>
         <h1>{{ preview.title }}</h1>
-        <p class="author-sub">Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }}</p>
+        <p class="author-sub">Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }} • ❤️ {{ preview.likesCount }} j'aime</p>
       </div>
 
       <div class="locked-description">
@@ -105,7 +105,24 @@
         <div class="meta-line">
           <span class="category-pill">{{ detail.category }}</span>
           <span class="badge-visibility" [attr.data-visibility]="detail.visibility">{{ detail.visibility }}</span>
-          <span class="likes-badge">❤️ {{ detail.likesCount }} j'aime</span>
+          @if (auth.isAuthenticated() && !isSelfAuthor()) {
+            <button
+              type="button"
+              class="btn-like"
+              [class.liked]="detail.userInteractions.isLiked"
+              (click)="toggleLike()"
+              [disabled]="isLikeLoading()"
+              [attr.aria-label]="detail.userInteractions.isLiked ? 'Je n’aime plus ce projet' : 'J’aime ce projet'"
+            >
+              <span class="like-heart" aria-hidden="true">{{ detail.userInteractions.isLiked ? '❤️' : '🤍' }}</span>
+              <span class="likes-count">{{ detail.likesCount }}</span>
+              <span class="like-label">{{ detail.userInteractions.isLiked ? 'Aimé' : 'J’aime' }}</span>
+            </button>
+          } @else {
+            <span class="likes-badge" title="Nombre de mentions j'aime">
+              ❤️ {{ detail.likesCount }} j'aime
+            </span>
+          }
         </div>
 
         <h1>{{ detail.title }}</h1>

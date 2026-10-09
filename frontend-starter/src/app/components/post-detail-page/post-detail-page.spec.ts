@@ -15,6 +15,8 @@ describe('PostDetailPageComponent', () => {
     getPostDetail: ReturnType<typeof vi.fn>;
     getPostPreview: ReturnType<typeof vi.fn>;
     getAttachmentBlob: ReturnType<typeof vi.fn>;
+    likePost: ReturnType<typeof vi.fn>;
+    unlikePost: ReturnType<typeof vi.fn>;
   };
   let creatorServiceMock: {
     getStatus: ReturnType<typeof vi.fn>;
@@ -94,6 +96,8 @@ describe('PostDetailPageComponent', () => {
       getPostDetail: vi.fn().mockReturnValue(of(mockDetail)),
       getPostPreview: vi.fn().mockReturnValue(of(mockPreview)),
       getAttachmentBlob: vi.fn().mockReturnValue(of(new Blob(['dummy'], { type: 'text/plain' }))),
+      likePost: vi.fn().mockReturnValue(of({ liked: true, likesCount: 16 })),
+      unlikePost: vi.fn().mockReturnValue(of({ liked: false, likesCount: 15 })),
     };
 
     creatorServiceMock = {
@@ -278,5 +282,61 @@ describe('PostDetailPageComponent', () => {
 
     component.subscribeAuthor();
     expect(creatorServiceMock.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('permet d’ajouter un like via toggleLike si non liké', () => {
+    fixture.detectChanges();
+
+    expect(component.postDetail()?.userInteractions.isLiked).toBe(false);
+    expect(component.postDetail()?.likesCount).toBe(15);
+
+    component.toggleLike();
+
+    expect(postServiceMock.likePost).toHaveBeenCalledWith('post-1');
+    expect(component.postDetail()?.userInteractions.isLiked).toBe(true);
+    expect(component.postDetail()?.likesCount).toBe(16);
+    expect(component.isLikeLoading()).toBe(false);
+  });
+
+  it('permet de retirer un like via toggleLike si déjà liké', () => {
+    fixture.detectChanges();
+
+    // Simuler un post déjà liké
+    component.postDetail.update((p) =>
+      p ? { ...p, likesCount: 16, userInteractions: { ...p.userInteractions, isLiked: true } } : null
+    );
+
+    component.toggleLike();
+
+    expect(postServiceMock.unlikePost).toHaveBeenCalledWith('post-1');
+    expect(component.postDetail()?.userInteractions.isLiked).toBe(false);
+    expect(component.postDetail()?.likesCount).toBe(15);
+    expect(component.isLikeLoading()).toBe(false);
+  });
+
+  it('empêche un auteur de liker son propre post', () => {
+    authServiceMock.currentUser.mockReturnValue({ id: 'author-1', name: 'HendrixMaker' });
+    fixture.detectChanges();
+
+    expect(component.isSelfAuthor()).toBe(true);
+
+    component.toggleLike();
+
+    expect(postServiceMock.likePost).not.toHaveBeenCalled();
+    expect(postServiceMock.unlikePost).not.toHaveBeenCalled();
+  });
+
+  it('gère une erreur serveur lors du like sans corrompre le post', () => {
+    postServiceMock.likePost.mockReturnValue(
+      throwError(() => ({ status: 403, error: { message: 'Contenu réservé' } }))
+    );
+    fixture.detectChanges();
+
+    component.toggleLike();
+
+    expect(component.actionError()).toContain('Contenu réservé');
+    expect(component.postDetail()?.userInteractions.isLiked).toBe(false);
+    expect(component.postDetail()?.likesCount).toBe(15);
+    expect(component.isLikeLoading()).toBe(false);
   });
 });

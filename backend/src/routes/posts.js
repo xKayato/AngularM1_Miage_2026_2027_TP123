@@ -1,4 +1,5 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import path from "node:path";
 import crypto from "node:crypto";
 import fsPromises from "node:fs/promises";
@@ -448,6 +449,104 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
         isAuthor: access.isAuthor,
       })
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/posts/:id/like
+ * Ajoute un like sur un post si l'utilisateur y a accès.
+ * - Vérifie l'authentification et le compte actif (authMakerShare).
+ * - Interdit formellement l'auto-like (400).
+ * - Vérifie l'accès complet de lecture au post via canAccessPost (refus 403/404/410).
+ * - Garantit l'unicité { userId, postId } en base (idempotent sur appels répétés / concurrents).
+ * - Calcule likesCount à partir de la collection Like.
+ */
+postsRouter.post("/:id/like", authMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Identifiant de post invalide" });
+    }
+
+    const post = await Post.findById(req.params.id).populate("author", "name status");
+    if (!post) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    const authorIdStr = String(post.author?._id || post.author);
+    if (String(req.user._id) === authorIdStr) {
+      return res.status(400).json({ message: "Un auteur ne peut pas liker son propre post" });
+    }
+
+    const access = await canAccessPost(post, req.user);
+    if (!access.allowed) {
+      return res.status(access.status || 403).json({ message: access.message || "Accès non autorisé" });
+    }
+
+    try {
+      await Like.create({
+        userId: req.user._id,
+        postId: post._id,
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        // Déjà liké : idempotence sous clics répétés ou concurrence simultanée
+      } else {
+        throw err;
+      }
+    }
+
+    const likesCount = await Like.countDocuments({ postId: post._id });
+    return res.status(200).json({
+      liked: true,
+      likesCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/posts/:id/like
+ * Retire un like sur un post.
+ * - Vérifie l'authentification et le compte actif (authMakerShare).
+ * - Interdit l'auto-interaction pour l'auteur (400).
+ * - Vérifie l'accès complet au post (403/404/410).
+ * - Idempotent : supprime le document si existant.
+ * - Calcule likesCount à partir de la collection Like.
+ */
+postsRouter.delete("/:id/like", authMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Identifiant de post invalide" });
+    }
+
+    const post = await Post.findById(req.params.id).populate("author", "name status");
+    if (!post) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    const authorIdStr = String(post.author?._id || post.author);
+    if (String(req.user._id) === authorIdStr) {
+      return res.status(400).json({ message: "Un auteur ne peut pas interagir sur ses propres likes" });
+    }
+
+    const access = await canAccessPost(post, req.user);
+    if (!access.allowed) {
+      return res.status(access.status || 403).json({ message: access.message || "Accès non autorisé" });
+    }
+
+    await Like.deleteOne({
+      userId: req.user._id,
+      postId: post._id,
+    });
+
+    const likesCount = await Like.countDocuments({ postId: post._id });
+    return res.status(200).json({
+      liked: false,
+      likesCount,
+    });
   } catch (err) {
     next(err);
   }

@@ -33,6 +33,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   readonly isSubscribeLoading = signal<boolean>(false);
   readonly actionMessage = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
+  readonly isLikeLoading = signal<boolean>(false);
 
   readonly isSelfAuthor = computed(() => {
     const myId = this.auth.currentUser()?.id;
@@ -197,6 +198,43 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
         } else {
           this.actionError.set(err.error?.message || 'Erreur lors de la souscription.');
         }
+      },
+    });
+  }
+
+  toggleLike(): void {
+    const detail = this.postDetail();
+    if (!detail || this.isLikeLoading() || this.isSelfAuthor() || !this.auth.isAuthenticated()) {
+      return;
+    }
+
+    this.isLikeLoading.set(true);
+    this.actionError.set(null);
+
+    const isCurrentlyLiked = detail.userInteractions?.isLiked ?? false;
+    const request$ = isCurrentlyLiked
+      ? this.postService.unlikePost(detail.id)
+      : this.postService.likePost(detail.id);
+
+    request$.subscribe({
+      next: (res) => {
+        this.isLikeLoading.set(false);
+        this.postDetail.update((current) =>
+          current
+            ? {
+                ...current,
+                likesCount: res.likesCount,
+                userInteractions: {
+                  ...current.userInteractions,
+                  isLiked: res.liked,
+                },
+              }
+            : null
+        );
+      },
+      error: (err) => {
+        this.isLikeLoading.set(false);
+        this.actionError.set(err.error?.message || 'Erreur lors de la mise à jour du like.');
       },
     });
   }

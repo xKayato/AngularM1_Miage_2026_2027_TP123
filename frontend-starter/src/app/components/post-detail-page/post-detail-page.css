@@ -136,6 +136,50 @@
 .likes-badge {
   color: #64748b;
   font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-like:hover:not(:disabled) {
+  border-color: #f43f5e;
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.btn-like.liked {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  color: #e11d48;
+}
+
+.btn-like:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.like-count {
+  font-weight: 700;
+}
+
+.like-label {
+  font-size: 0.8rem;
 }
 
 .detail-header h1 {
