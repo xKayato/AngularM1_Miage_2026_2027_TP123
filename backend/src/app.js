@@ -12,6 +12,7 @@ import { Track } from "./models/Track.js";
 import { detectRealImageMime } from "./utils/imageValidator.js";
 import { postsRouter } from "./routes/posts.js";
 import { creatorsRouter } from "./routes/creators.js";
+import { adminRouter } from "./routes/admin.js";
 
 // Les fichiers audio restent sur le disque du serveur dans ce TP.
 // MongoDB ne conserve que leurs métadonnées : titre, nom, taille, etc.
@@ -257,6 +258,11 @@ export function createApp() {
         return res.status(401).json({ message: "Identifiants incorrects" });
       }
 
+      if (user.status === "suspended") {
+        console.warn(`[auth] Connexion refusée pour compte suspendu : ${email}`);
+        return res.status(403).json({ message: "Compte suspendu" });
+      }
+
       console.log(`[auth] Connexion réussie : ${user.id}`);
       res.json({ token: token(user), user: user.toPublic() });
     } catch (error) {
@@ -316,6 +322,7 @@ export function createApp() {
   // Routes MakerShare (TP4) — Gestion des posts, brouillons et publication
   app.use("/api/posts", postsRouter);
   app.use("/api/creators", creatorsRouter);
+  app.use("/api/admin", adminRouter);
 
   /** Retourne une page des pistes appartenant exclusivement à l'utilisateur via mongoose-aggregate-paginate-v2. */
   app.get("/api/tracks", auth, async (req, res, next) => {

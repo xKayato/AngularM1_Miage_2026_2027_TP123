@@ -19,6 +19,7 @@ export class AuthService {
   readonly token = signal<string | null>(this.readStoredToken());
   readonly authStatus = signal<AuthStatus>(this.readStoredToken() ? 'loading' : 'anonymous');
   readonly isAuthenticated = computed(() => this.authStatus() === 'authenticated');
+  readonly isAdmin = computed(() => this.currentUser()?.role === 'admin');
 
   /**
    * Restores user session if a token exists in storage.

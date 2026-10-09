@@ -1,0 +1,345 @@
+<div class="admin-container">
+  <header class="admin-header">
+    <div class="header-titles">
+      <span class="badge badge-admin">Modération</span>
+      <h1>Espace d'Administration</h1>
+      <p class="subtitle">Gestion des publications signalées et modération des comptes utilisateurs.</p>
+    </div>
+  </header>
+
+  <div class="admin-grid">
+    <!-- SECTION 1 : MODÉRATION DES POSTS -->
+    <section class="admin-card" aria-labelledby="post-mod-heading">
+      <div class="card-header">
+        <h2 id="post-mod-heading">Modération des Posts</h2>
+        <span class="tag-counter">Archivage / Restauration</span>
+      </div>
+
+      <!-- Recherche de post -->
+      <div class="search-form">
+        <label for="post-id-input" class="form-label">Identifiant du post (ID MongoDB)</label>
+        <div class="input-group">
+          <input
+            id="post-id-input"
+            type="text"
+            class="form-control"
+            placeholder="Ex : 660f789abcde..."
+            [ngModel]="searchPostId()"
+            (ngModelChange)="searchPostId.set($event)"
+            (keyup.enter)="inspectPost()"
+          />
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="postLoading()"
+            (click)="inspectPost()"
+          >
+            @if (postLoading()) {
+              <span class="spinner" aria-hidden="true"></span>
+              Chargement...
+            } @else {
+              Inspecter
+            }
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages de statut post -->
+      @if (postError()) {
+        <div class="alert alert-error" role="alert">
+          {{ postError() }}
+        </div>
+      }
+      @if (postSuccess()) {
+        <div class="alert alert-success" role="status">
+          {{ postSuccess() }}
+        </div>
+      }
+
+      <!-- Détail du post inspecté -->
+      @if (inspectedPost(); as post) {
+        <div class="inspected-entity">
+          <div class="entity-header">
+            <h3>{{ post.title }}</h3>
+            <span class="status-badge" [class]="'status-' + post.status">
+              {{ post.status }}
+            </span>
+          </div>
+
+          <p class="entity-desc">{{ post.shortDescription }}</p>
+
+          <dl class="meta-grid">
+            <div>
+              <dt>Auteur</dt>
+              <dd>{{ post.author.name }} (ID: {{ post.author.id }})</dd>
+            </div>
+            <div>
+              <dt>Catégorie</dt>
+              <dd>{{ post.category }}</dd>
+            </div>
+            <div>
+              <dt>Visibilité</dt>
+              <dd>{{ post.visibility }}</dd>
+            </div>
+            <div>
+              <dt>Likes</dt>
+              <dd>{{ post.likesCount }}</dd>
+            </div>
+            <div>
+              <dt>Pièces jointes</dt>
+              <dd>{{ post.attachments.length }} fichier(s)</dd>
+            </div>
+            @if (post.archivedAt) {
+              <div>
+                <dt>Date d'archivage</dt>
+                <dd>{{ post.archivedAt | date:'medium' }}</dd>
+              </div>
+            }
+            @if (post.archiveReason) {
+              <div class="full-width">
+                <dt>Motif d'archivage</dt>
+                <dd class="reason-text">{{ post.archiveReason }}</dd>
+              </div>
+            }
+          </dl>
+
+          <!-- Actions de modération du post -->
+          <div class="action-panel">
+            @if (post.status !== 'archived') {
+              @if (!showArchiveConfirm()) {
+                <div class="archive-action-group">
+                  <label for="archive-reason-input" class="form-label">Motif de modération</label>
+                  <input
+                    id="archive-reason-input"
+                    type="text"
+                    class="form-control"
+                    [ngModel]="archiveReason()"
+                    (ngModelChange)="archiveReason.set($event)"
+                    placeholder="Raison de l'archivage..."
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    [disabled]="postLoading()"
+                    (click)="promptArchive()"
+                  >
+                    Archiver ce post
+                  </button>
+                </div>
+              } @else {
+                <div class="confirm-box confirm-danger">
+                  <p><strong>Confirmation :</strong> Voulez-vous archiver immédiatement ce post ? Il sera masqué du catalogue et des détails ordinaires.</p>
+                  <div class="confirm-actions">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      [disabled]="postLoading()"
+                      (click)="cancelArchive()"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="postLoading()"
+                      (click)="executeArchive()"
+                    >
+                      Confirmer l'archivage
+                    </button>
+                  </div>
+                </div>
+              }
+            } @else {
+              @if (!showRestoreConfirm()) {
+                <button
+                  type="button"
+                  class="btn btn-success"
+                  [disabled]="postLoading()"
+                  (click)="promptRestore()"
+                >
+                  Restaurer ce post
+                </button>
+              } @else {
+                <div class="confirm-box confirm-info">
+                  <p><strong>Confirmation :</strong> Restaurer ce post et le rendre à nouveau accessible ?</p>
+                  <div class="confirm-actions">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      [disabled]="postLoading()"
+                      (click)="cancelRestore()"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-success"
+                      [disabled]="postLoading()"
+                      (click)="executeRestore()"
+                    >
+                      Confirmer la restauration
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <!-- SECTION 2 : MODÉRATION DES UTILISATEURS -->
+    <section class="admin-card" aria-labelledby="user-mod-heading">
+      <div class="card-header">
+        <h2 id="user-mod-heading">Modération des Utilisateurs</h2>
+        <span class="tag-counter">Suspension / Réactivation</span>
+      </div>
+
+      <!-- Recherche d'utilisateur -->
+      <div class="search-form">
+        <label for="user-id-input" class="form-label">Identifiant ou Email de l'utilisateur</label>
+        <div class="input-group">
+          <input
+            id="user-id-input"
+            type="text"
+            class="form-control"
+            placeholder="Ex : user@test.com ou 660f789abcde..."
+            [ngModel]="searchUserId()"
+            (ngModelChange)="searchUserId.set($event)"
+            (keyup.enter)="inspectUser()"
+          />
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="userLoading()"
+            (click)="inspectUser()"
+          >
+            @if (userLoading()) {
+              <span class="spinner" aria-hidden="true"></span>
+              Chargement...
+            } @else {
+              Inspecter
+            }
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages de statut user -->
+      @if (userError()) {
+        <div class="alert alert-error" role="alert">
+          {{ userError() }}
+        </div>
+      }
+      @if (userSuccess()) {
+        <div class="alert alert-success" role="status">
+          {{ userSuccess() }}
+        </div>
+      }
+
+      <!-- Détail de l'utilisateur inspecté -->
+      @if (inspectedUser(); as user) {
+        <div class="inspected-entity">
+          <div class="entity-header">
+            <h3>{{ user.name }}</h3>
+            <span class="status-badge" [class]="'status-' + (user.status || 'active')">
+              {{ user.status || 'active' }}
+            </span>
+          </div>
+
+          <dl class="meta-grid">
+            <div>
+              <dt>ID Utilisateur</dt>
+              <dd>{{ user.id }}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+            <div>
+              <dt>Rôle</dt>
+              <dd class="role-text">{{ user.role || 'user' }}</dd>
+            </div>
+            <div>
+              <dt>Inscrit le</dt>
+              <dd>{{ user.createdAt | date:'mediumDate' }}</dd>
+            </div>
+          </dl>
+
+          <!-- Actions de modération de l'utilisateur -->
+          <div class="action-panel">
+            @if ((user.status || 'active') === 'active') {
+              @if (!showSuspendConfirm()) {
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="userLoading() || authService.currentUser()?.id === user.id"
+                  (click)="promptSuspend()"
+                >
+                  Suspendre ce compte
+                </button>
+                @if (authService.currentUser()?.id === user.id) {
+                  <p class="hint-text">Vous ne pouvez pas suspendre votre propre compte d'administrateur.</p>
+                }
+              } @else {
+                <div class="confirm-box confirm-danger">
+                  <p><strong>Confirmation :</strong> Suspendre <em>{{ user.name }}</em> ? Tous ses posts seront masqués et ses écritures bloquées.</p>
+                  <div class="confirm-actions">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      [disabled]="userLoading()"
+                      (click)="cancelSuspend()"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      [disabled]="userLoading()"
+                      (click)="executeSuspend()"
+                    >
+                      Confirmer la suspension
+                    </button>
+                  </div>
+                </div>
+              }
+            } @else {
+              @if (!showReactivateConfirm()) {
+                <button
+                  type="button"
+                  class="btn btn-success"
+                  [disabled]="userLoading()"
+                  (click)="promptReactivate()"
+                >
+                  Réactiver ce compte
+                </button>
+              } @else {
+                <div class="confirm-box confirm-info">
+                  <p><strong>Confirmation :</strong> Réactiver le compte de <em>{{ user.name }}</em> ? Ses posts redeviendront découvrables.</p>
+                  <div class="confirm-actions">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      [disabled]="userLoading()"
+                      (click)="cancelReactivate()"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-success"
+                      [disabled]="userLoading()"
+                      (click)="executeReactivate()"
+                    >
+                      Confirmer la réactivation
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</div>

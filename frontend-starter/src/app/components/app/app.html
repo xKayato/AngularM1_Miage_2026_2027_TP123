@@ -8,6 +8,9 @@
     @if (auth.isAuthenticated()) {
       <a routerLink="/tracks">Backing tracks</a>
       <a routerLink="/my-posts">Mes projets</a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" style="color: #cbd5e1; font-weight: bold;">Administration</a>
+      }
       <a routerLink="/profile">
         Profil
         @if (auth.currentUser(); as user) {

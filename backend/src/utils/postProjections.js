@@ -178,6 +178,8 @@ export function toPostDetail(post, options = {}) {
       ...(options.userInteractions || {}),
     },
     publishedAt: raw.publishedAt ? new Date(raw.publishedAt).toISOString() : null,
+    archivedAt: raw.archivedAt ? new Date(raw.archivedAt).toISOString() : null,
+    archiveReason: raw.archiveReason || null,
     createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : new Date().toISOString(),
   };

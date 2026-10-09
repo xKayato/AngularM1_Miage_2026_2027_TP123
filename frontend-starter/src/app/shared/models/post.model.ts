@@ -66,6 +66,8 @@ export interface PostDetail {
   attachments: AttachmentInfo[];
   userInteractions: UserInteractions;
   publishedAt: string | null;
+  archivedAt?: string | null;
+  archiveReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
