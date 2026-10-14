@@ -511,3 +511,150 @@ test("Mode Suggestion — Sécurité stricte : exclusion des drafts, visibilité
   assert.equal(data.docs[0].title, "Test création publique");
 });
 
+test("Mission 5 — Validation et tris déterministes (date, likes, pertinence)", async (t) => {
+  const { user: author } = await createUser();
+  const sortTag = `sort-test-${Date.now()}`;
+
+  const postOld = await createPost(author._id, {
+    title: "Ancien Projet",
+    category: "Lego",
+    tags: [sortTag],
+    publishedAt: new Date("2026-01-01T10:00:00Z"),
+  });
+
+  const postMid = await createPost(author._id, {
+    title: "Moyen Projet",
+    category: "Lego",
+    tags: [sortTag],
+    publishedAt: new Date("2026-06-01T10:00:00Z"),
+  });
+
+  const postNew = await createPost(author._id, {
+    title: "Nouveau Projet",
+    category: "Lego",
+    tags: [sortTag],
+    publishedAt: new Date("2026-10-01T10:00:00Z"),
+  });
+
+  // Ajout de likes : postOld -> 5 likes, postMid -> 1 like, postNew -> 0 like
+  const { user: user1 } = await createUser();
+  const { user: user2 } = await createUser();
+  const { user: user3 } = await createUser();
+  const { user: user4 } = await createUser();
+  const { user: user5 } = await createUser();
+
+  await Like.create({ userId: user1._id, postId: postOld._id });
+  await Like.create({ userId: user2._id, postId: postOld._id });
+  await Like.create({ userId: user3._id, postId: postOld._id });
+  await Like.create({ userId: user4._id, postId: postOld._id });
+  await Like.create({ userId: user5._id, postId: postOld._id });
+
+  await Like.create({ userId: user1._id, postId: postMid._id });
+
+  await t.test("Rejette un critère de tri invalide (400)", async () => {
+    const res = await fetch(`${base}/api/posts?sort=invalide`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /critère de tri invalide/i);
+  });
+
+  await t.test("Tri par date décroissante (date-desc) par défaut", async () => {
+    const res = await fetch(`${base}/api/posts?tags=${sortTag}&sort=date-desc`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.docs.length, 3);
+    assert.equal(data.docs[0].title, "Nouveau Projet");
+    assert.equal(data.docs[1].title, "Moyen Projet");
+    assert.equal(data.docs[2].title, "Ancien Projet");
+    // Vérification de la présence de la date ISO
+    assert.equal(data.docs[0].publishedAt, "2026-10-01T10:00:00.000Z");
+  });
+
+  await t.test("Tri par date croissante (date-asc)", async () => {
+    const res = await fetch(`${base}/api/posts?tags=${sortTag}&sort=date-asc`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.docs.length, 3);
+    assert.equal(data.docs[0].title, "Ancien Projet");
+    assert.equal(data.docs[1].title, "Moyen Projet");
+    assert.equal(data.docs[2].title, "Nouveau Projet");
+  });
+
+  await t.test("Tri par likes décroissants (likes-desc) calculé en base avec pagination", async () => {
+    // Page 1 avec limit=2 : postOld (5 likes) puis postMid (1 like)
+    const resPage1 = await fetch(`${base}/api/posts?tags=${sortTag}&sort=likes-desc&page=1&limit=2`);
+    assert.equal(resPage1.status, 200);
+    const data1 = await resPage1.json();
+    assert.equal(data1.totalDocs, 3);
+    assert.equal(data1.totalPages, 2);
+    assert.equal(data1.docs.length, 2);
+    assert.equal(data1.docs[0].title, "Ancien Projet");
+    assert.equal(data1.docs[0].likesCount, 5);
+    assert.equal(data1.docs[1].title, "Moyen Projet");
+    assert.equal(data1.docs[1].likesCount, 1);
+
+    // Page 2 avec limit=2 : postNew (0 like)
+    const resPage2 = await fetch(`${base}/api/posts?tags=${sortTag}&sort=likes-desc&page=2&limit=2`);
+    assert.equal(resPage2.status, 200);
+    const data2 = await resPage2.json();
+    assert.equal(data2.docs.length, 1);
+    assert.equal(data2.docs[0].title, "Nouveau Projet");
+    assert.equal(data2.docs[0].likesCount, 0);
+  });
+});
+
+test("Mission 5 — Recherche avec syntaxe #tag dans le champ query", async (t) => {
+  const { user: author } = await createUser();
+  const baseTag = `ms5-${Date.now()}`;
+
+  await createPost(author._id, {
+    title: "Château médiéval fortifié",
+    shortDescription: "Tours de garde et pont-levis fonctionnel",
+    category: "Lego",
+    tags: [baseTag, "medieval", "chateau"],
+  });
+
+  await createPost(author._id, {
+    title: "Vaisseau spatial furtif",
+    shortDescription: "Chasseur stellaire rapide",
+    category: "Lego",
+    tags: [baseTag, "spatial", "chateau"],
+  });
+
+  await createPost(author._id, {
+    title: "Château spatial en origami",
+    shortDescription: "Pliage géant",
+    category: "Origami",
+    tags: [baseTag, "chateau", "origami"],
+  });
+
+  await t.test("Recherche composée uniquement de #tags : extrait et applique le filtre $all", async () => {
+    const res = await fetch(`${base}/api/posts?query=%23${baseTag}%20%23medieval`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.totalDocs, 1);
+    assert.equal(data.docs[0].title, "Château médiéval fortifié");
+  });
+
+  await t.test("Recherche mixte texte + #tag : extrait le tag et recherche le texte nettoyé", async () => {
+    // Texte "spatial" + tag #chateau + tag #baseTag
+    const res = await fetch(`${base}/api/posts?query=spatial%20%23${baseTag}%20%23chateau`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    // Doit matcher "Vaisseau spatial furtif" et "Château spatial en origami"
+    assert.equal(data.totalDocs, 2);
+    const titles = data.docs.map((d) => d.title);
+    assert.ok(titles.includes("Vaisseau spatial furtif"));
+    assert.ok(titles.includes("Château spatial en origami"));
+  });
+
+  await t.test("Fusion et dédoublonnage de #tag inline avec le paramètre tags existant", async () => {
+    const res = await fetch(`${base}/api/posts?query=%23medieval&tags=${baseTag},medieval`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.totalDocs, 1);
+    assert.equal(data.docs[0].title, "Château médiéval fortifié");
+  });
+});
+
+

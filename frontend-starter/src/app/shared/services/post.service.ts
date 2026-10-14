@@ -55,6 +55,9 @@ export class PostService {
       if (params.mode) {
         httpParams = httpParams.set('mode', params.mode);
       }
+      if (params.sort) {
+        httpParams = httpParams.set('sort', params.sort);
+      }
     }
 
     return this.http.get<Page<PostPreview>>(this.baseUrl, { params: httpParams });

@@ -121,6 +121,7 @@ export interface PostFilterParams {
   tags?: string | string[];
   category?: string;
   mode?: 'catalog' | 'suggest';
+  sort?: 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance';
 }
 
 export interface MyPostsFilterParams {

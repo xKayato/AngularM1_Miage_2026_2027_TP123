@@ -107,6 +107,17 @@
         <div class="sort-col">
           <label class="control-label">Trier les créations par</label>
           <div class="sort-btn-group" role="group" aria-label="Critères de tri">
+            @if (appliedQuery()) {
+              <button
+                type="button"
+                class="sort-btn"
+                [class.active]="sortCriteria() === 'relevance'"
+                (click)="setSortCriteria('relevance')"
+                title="Trier par pertinence de la recherche"
+              >
+                🎯 Pertinence
+              </button>
+            }
             <button
               type="button"
               class="sort-btn"
@@ -224,7 +235,7 @@
             <!-- Date d'ajout visible directement sur la carte avant le clic -->
             <div class="cover-bottom-bar">
               <span class="date-badge">
-                📅 {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+                📅 {{ (post.publishedAt | date:'dd MMM yyyy') || 'Date inconnue' }}
               </span>
             </div>
           </div>
@@ -233,7 +244,7 @@
           <div class="card-content">
             <div class="meta-top">
               <span class="meta-date">
-                Ajouté le <strong>{{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</strong>
+                Ajouté le <strong>{{ (post.publishedAt | date:'dd MMM yyyy') || 'Date inconnue' }}</strong>
               </span>
               <span class="attachments-count">
                 {{ post.attachmentsCount }} pièce{{ post.attachmentsCount > 1 ? 's' : '' }} jointe{{ post.attachmentsCount > 1 ? 's' : '' }}

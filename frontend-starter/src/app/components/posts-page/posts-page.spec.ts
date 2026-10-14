@@ -115,6 +115,7 @@ describe('PostsPageComponent', () => {
       category: undefined,
       query: undefined,
       tags: undefined,
+      sort: 'date-desc',
     });
     expect(component.posts().length).toBe(1);
     expect(component.posts()[0].title).toBe('Guitare Lego Custom');
@@ -179,6 +180,7 @@ describe('PostsPageComponent', () => {
       category: undefined,
       query: 'vaisseau',
       tags: undefined,
+      sort: 'relevance',
     });
   });
 
@@ -197,6 +199,7 @@ describe('PostsPageComponent', () => {
       category: undefined,
       query: undefined,
       tags: undefined,
+      sort: 'date-desc',
     });
   });
 
@@ -277,6 +280,7 @@ describe('PostsPageComponent', () => {
       category: 'Lego',
       query: 'requete-validee',
       tags: undefined,
+      sort: 'date-desc',
     });
   });
 
@@ -412,6 +416,63 @@ describe('PostsPageComponent', () => {
 
     // Vérification de la suppression de l'ancien bouton redondant
     expect(compiled.querySelector('.btn-view')).toBeNull();
+  });
+
+  it('met à jour le critère de tri, remet à la page 1 et appelle le service avec le bon paramètre sort', () => {
+    postServiceMock.getPosts.mockClear();
+
+    component.setSortCriteria('likes-desc');
+
+    expect(component.sortCriteria()).toBe('likes-desc');
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        sort: 'likes-desc',
+      }),
+    );
+
+    postServiceMock.getPosts.mockClear();
+    component.setSortCriteria('date-asc');
+
+    expect(component.sortCriteria()).toBe('date-asc');
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        sort: 'date-asc',
+      }),
+    );
+  });
+
+  it('affiche le bouton Pertinence en présence d\'une recherche et réinitialise à date-desc à l\'effacement', () => {
+    component.searchControl.setValue('origami');
+    component.onSubmitSearch();
+
+    expect(component.appliedQuery()).toBe('origami');
+    expect(component.sortCriteria()).toBe('relevance');
+
+    fixture.detectChanges();
+    const relevanceBtn = fixture.nativeElement.querySelector('.sort-btn.active');
+    expect(relevanceBtn?.textContent).toContain('Pertinence');
+
+    // Effacement de la recherche
+    component.clearSearch();
+    expect(component.appliedQuery()).toBe('');
+    expect(component.sortCriteria()).toBe('date-desc');
+  });
+
+  it('affiche la date de publication formatée sur les cartes du catalogue', () => {
+    const postWithDate: PostPreview = {
+      ...mockPostPreview1,
+      publishedAt: '2026-10-14T10:00:00.000Z',
+    };
+    component.posts.set([postWithDate]);
+    fixture.detectChanges();
+
+    const dateBadges = fixture.nativeElement.querySelectorAll('.date-badge, .meta-date');
+    expect(dateBadges.length).toBeGreaterThanOrEqual(1);
+    const combinedText = Array.from(dateBadges).map((el: any) => el.textContent).join(' ').toLowerCase();
+    expect(combinedText).toContain('14 oct');
+    expect(combinedText).toContain('2026');
   });
 
   it('nettoie les abonnements lors de la destruction (ngOnDestroy)', () => {

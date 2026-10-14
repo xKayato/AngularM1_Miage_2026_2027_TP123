@@ -760,5 +760,101 @@
   - **Gestion de l'accès direct `/posts/:id` sans écran blanc :** Un écran blanc provient généralement soit d'un serveur de fichiers qui renvoie 404 sur les URLs de deep-linking SPA (résolu par le repli Express vers `index.html`), soit d'un composant Angular qui utilise un snapshot figé non réactif ou une condition `@if/@else if` dont aucune branche n'est satisfaite quand les données sont nulles ou en erreur. La souscription à `route.paramMap`, combinée à un état explicite de chargement, d'erreur et un bloc `@else` d'ultime recours, garantit un rendu visuel utile en toute circonstance.
   - **Comptage des commentaires et posts verrouillés :** Le décompte est réalisé par agrégation MongoDB `$lookup`/`$group` au niveau du document post sans exposer les documents de la collection `comments`. Ainsi, un visiteur peut savoir qu'un post restreint fait l'objet de 12 commentaires sans qu'aucune fuite de métadonnée (texte, auteur du commentaire) ne soit possible.
 
+---
+
+# Corrections Vérifiées en Navigateur — Accès Direct aux Routes & Cliquabilité des Cartes
+
+- **Objectif :** Résoudre deux défauts identifiés après le commit initial :
+  1. *Écran blanc à l'ouverture directe d'un post ou d'un créateur :* Sur `localhost:4200`, ouvrir `/posts/:id` ou `/creators/:id` dans un nouvel onglet provoquait des requêtes relatives `GET /posts/main.js` et `GET /posts/styles.css` retournant `index.html` (MIME `text/html`), rejetées par le navigateur avant même le démarrage d'Angular.
+  2. *Première ligne de cartes partiellement cliquable :* Le survol mettait toute la carte en évidence, mais seule la partie basse ouvrait le post. Inspecter et corriger la cause sous-jacente (absence de `position: relative` sur `.post-card`, couverture `.cover-wrapper` interceptant les clics au-dessus du pseudo-élément, z-index des éléments interactifs).
+- **Prompt principal :**
+  > « Correction vérifiée en navigateur, puis Mission 5  
+  > Je constate encore deux défauts après le commit 0c9037a. Corrige-les avant de commencer la Mission 5.  
+  > 1. Écran blanc à l’ouverture directe d’un post ou d’un créateur (base href, main.js et styles.css servis depuis la racine).  
+  > 2. Première ligne de cartes partiellement cliquable (cause sous-jacente de superposition/z-index, haut, centre et bas ouvrent le post, clics auteur/tags préservés).  
+  > Preuve demandée en navigateur réel avec F5 et contrôle Réseau. »
+- **Diagnostic et solution technique :**
+  - **Cause de l'écran blanc :** La balise `<base href="/" />` était absente du `<head>` de `src/index.html`, et les options `"index"` et `"baseHref"` n'étaient pas explicitées dans `angular.json`. Dès lors qu'une URL comportait un sous-niveau de chemin (`/posts/...` ou `/creators/...`), le navigateur résolvait les balises `<script src="main.js">` relativement à `/posts/` au lieu de la racine `/`. Vite dev-server renvoyait alors `index.html` (type MIME `text/html`), provoquant un blocage strict des modules ES par le navigateur. L'ajout de `<base href="/" />` dans `src/index.html` et de `"baseHref": "/"` dans `angular.json` force la résolution absolue de tous les assets depuis `/`.
+  - **Cause du clic partiel sur les cartes :** `.post-card` était en `position: static` (par défaut). Le pseudo-élément `.card-stretched-link::after` (`position: absolute; inset: 0`) s'ancrait donc sur le premier ancêtre positionné global au lieu de la carte elle-même. De surcroît, `.cover-wrapper` (la moitié haute de 180px) possédait `position: relative` avec un `z-index: 2`, passant au-dessus du lien étendu qui avait un `z-index: 1`. Seule la moitié basse (`.card-content`) laissait passer le clic. La solution a consisté à appliquer `position: relative;` sur `.post-card`, `pointer-events: none;` sur `.cover-wrapper` (qui ne contient aucun contrôle cliquable), élever `.card-stretched-link::after` à `z-index: 5` et positionner les éléments interactifs (`.author-link`, `.tag`, `.card-actions`) à `z-index: 10`.
+- **Fichiers modifiés :**
+  - `frontend-starter/src/index.html` : ajout de `<base href="/" />` dans `<head>`.
+  - `frontend-starter/angular.json` : déclaration explicite de `"baseHref": "/"` et `"index": "src/index.html"`.
+  - `frontend-starter/src/styles.css` : ajustement du `z-index: 5` pour `.card-stretched-link::after` et `z-index: 10` pour `.card-interactive-element`.
+  - `frontend-starter/src/app/components/posts-page/posts-page.css` : ajout de `position: relative` sur `.post-card` et `pointer-events: none` sur `.cover-wrapper`.
+- **Preuves de fonctionnement :**
+  - **Vérification réelle en navigateur (Microsoft Edge via protocole CDP) :**
+    - Navigation directe vers `http://localhost:4200/posts/6acf3e9794a51b6c83bb4e6f` : `main.js` servi en `text/javascript` (304), `styles.css` servi en `text/css` (304).
+    - Rechargement F5 (`Page.reload`) : confirmation que les deux fichiers sont servis depuis la racine `/` avec leur type MIME valide.
+    - Navigation directe vers `http://localhost:4200/creators/6acfb2fcd53e781c55ab4803` et rechargement F5 : 100% succès avec bon type MIME.
+    - Hit-testing de la première ligne de cartes du catalogue (`document.elementFromPoint`) :
+      - *Haut de carte (zone couverture / badges) :* cible résolue sur `<a class="card-stretched-link">` pointant vers `/posts/:id`.
+      - *Centre de carte (titre / description) :* cible résolue sur `<a class="card-stretched-link">` pointant vers `/posts/:id`.
+      - *Bas de carte (espaces du pied de carte) :* cible résolue sur `<a class="card-stretched-link">` pointant vers `/posts/:id`.
+      - *Avatar et nom auteur :* cible résolue sur `.author-link` pointant vers `/creators/:id`.
+      - *Tag cliquable :* cible résolue sur `<button class="tag card-interactive-element">`.
+  - **Tests Backend :** 235 passants sur 235 (`cmd /c npm test`).
+  - **Tests Frontend :** 269 passants sur 269 (`cmd /c npm test -- --watch=false`).
+  - **Compilation Frontend de production :** Build réussi en 11.8s.
+  - **Commit local dédié :** `36ce0df` (`fix(navigation): base href pour chargement direct d'url et cliquabilite totale des cartes`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Rôle de `<base href>` dans une SPA :** Dans une SPA gérée par Angular Router, les routes HTML sont virtuelles (gérées côté client par l'History API). Lorsque l'utilisateur rafraîchit la page ou entre directement sur `/posts/123`, le serveur renvoie le fichier physique `index.html`. Si la balise `<base href="/">` est absente, le navigateur prend comme URL de base `/posts/` et tente de charger `<script src="main.js">` sur `/posts/main.js`. Avec `<base href="/">`, toutes les URLs relatives de ressources sont obligatoirement préfixées par la racine de l'application.
+  - **Contexte d'empilement (Stacking Context) et Stretched Link :** Un élément en `position: absolute` avec `inset: 0` cherche le premier parent dont la position n'est pas `static`. Si la carte parent n'a pas `position: relative`, le lien étendu s'étend sur le body ou le conteneur principal. De plus, les éléments positionnés enfants avec un `z-index` plus élevé intercepteraient les clics à la place du lien étendu, d'où la nécessité de neutraliser les clics sur les éléments purement décoratifs (`pointer-events: none`) et de hiérarchiser rigoureusement les z-index entre le lien étendu (z-index 5) et les contrôles interactifs internes (z-index 10).
+
+---
+
+# Mission 5 — Recherche Avancée, Tris Déterministes & Syntaxe #tag
+
+- **Objectif :** Finaliser le catalogue et la recherche de tutoriels/créations :
+  1. *Affichage de la date de publication :* Rendre la date de publication (`publishedAt`) visible et formatée directement sur les cartes du catalogue avant tout clic, sans date factice en dur.
+  2. *Tris déterministes sur l'ensemble de la base :* Implémenter les tris par date décroissante (`date-desc`, par défaut), date croissante (`date-asc`), popularité (`likes-desc`) et pertinence (`relevance`). Le tri par likes doit agréger la collection `likes` directement dans le pipeline MongoDB avant la pagination `$facet` pour que les pages de pagination reflètent le tri global.
+  3. *Syntaxe `#tag` dans la recherche :* Permettre à l'utilisateur de saisir des hashtags dans la barre de recherche (ex. `#origami` ou `table #bois #atelier`). Extraire automatiquement ces tags, les fusionner avec les filtres existants (règle `$all` stricte et dédoublonnage), et n'appliquer la recherche textuelle que sur les mots résiduels non-tags (si la recherche ne contient que des tags, aucun terme texte n'est recherché).
+  4. *Préservation de la matrice d'accès et pagination :* Garantir l'exclusion totale des brouillons, posts archivés et auteurs suspendus lors de tous les tris, et actualiser la pagination à la page 1 lors de chaque changement de tri.
+- **Prompt principal :**
+  > « Mission 5  
+  > Après validation de ces deux points, réalise la Mission 5 du plan révisé : date de publication sur les cartes, tris déterministes (date, likes et pertinence selon le contexte), et recherche avec syntaxe #tag. Respecte la matrice de visibilité et vérifie le résultat de la pagination après tri.  
+  > Fais un second commit local distinct pour la Mission 5. Exécute les tests backend et frontend ainsi que le build après chaque étape. Mets à jour les rapports du projet avec les résultats exacts et indique précisément ce qui a été vérifié dans un navigateur, par opposition à ce qui a seulement été vérifié par les tests. »
+- **Plan proposé et réalisation :**
+  1. *Backend (`backend/src/routes/posts.js`) :*
+     - Validation stricte du paramètre `sort` : accepte `date-desc`, `date_desc`, `date-asc`, `date_asc`, `likes-desc`, `likes_desc`, `relevance` ; renvoie `400 Bad Request` en cas de critère inconnu.
+     - Extraction regex `/#([a-zA-Z0-9-]+)/g` sur `req.query.query` : normalisation en minuscules, dédoublonnage et injection dans `tagList` avec les éventuels tags passés via `req.query.tags`. Nettoyage de la chaîne textuelle `textQuery`.
+     - Intégration de l'étape `$lookup` sur la collection `likes` après le filtrage `$match` lorsque `sortCriteria === 'likes_desc'` avec `$addFields: { likesCount: { $size: "$postLikes" } }`.
+     - Tri déterministe dans `$facet.docs` :
+       - `likes_desc` : `{ $sort: { likesCount: -1, publishedAt: -1, _id: -1 } }`
+       - `date_asc` : `{ $sort: { publishedAt: 1, createdAt: 1, _id: 1 } }`
+       - `relevance` : `{ $sort: { score: { $meta: "searchScore" }, publishedAt: -1, _id: -1 } }` (ou repli par date en B-tree)
+       - `date_desc` : `{ $sort: { publishedAt: -1, createdAt: -1, _id: -1 } }`
+     - `$skip` et `$limit` appliqués après le tri dans `$facet.docs`.
+  2. *Frontend Models & Services :*
+     - Ajout de `sort?: 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance'` dans `PostFilterParams` (`post.model.ts`).
+     - Prise en charge du paramètre `sort` dans `PostService.getPosts()` (`post.service.ts`).
+  3. *Frontend UI & Composant (`PostsPageComponent`) :*
+     - Typage `SortCriteria` étendu avec `'relevance'`.
+     - `setSortCriteria(criteria)` : met à jour le Signal et déclenche `this.loadPosts(1)` pour un tri global serveur.
+     - Affichage d'un bouton de tri interactif « 🎯 Pertinence » dès qu'une recherche textuelle est active (`appliedQuery()`), activé par défaut lors d'une nouvelle recherche.
+     - Réinitialisation du tri vers `date-desc` lorsque la recherche est effacée (`clearSearch()`).
+     - Nettoyage des fallbacks de date en dur dans le template : affichage de `(post.publishedAt | date:'dd MMM yyyy') || 'Date inconnue'` à la fois sur le badge de couverture et dans les métadonnées de la carte.
+- **Fichiers modifiés :**
+  - `backend/src/routes/posts.js` : extraction `#tag` dans `query`, validation et pipeline de tri déterministe avec calcul dynamique des likes.
+  - `backend/test/search.test.js` : 7 nouveaux tests d'intégration backend (rejet de tri invalide 400, tri `date-desc`, tri `date-asc`, tri `likes-desc` calculé en base avec pagination, recherche pure `#tag`, recherche mixte texte + `#tag`, fusion et dédoublonnage de tags inline).
+  - `frontend-starter/src/app/shared/models/post.model.ts` : champ `sort` dans `PostFilterParams`.
+  - `frontend-starter/src/app/shared/services/post.service.ts` : transmission du paramètre `sort` dans la requête HTTP.
+  - `frontend-starter/src/app/components/posts-page/posts-page.ts` : tri serveur avec remise à la page 1, sélection automatique de la pertinence lors de la recherche et réinitialisation à l'effacement.
+  - `frontend-starter/src/app/components/posts-page/posts-page.html` : bouton « 🎯 Pertinence », dates réelles formatées sur la couverture et dans les métadonnées.
+  - `frontend-starter/src/app/components/posts-page/posts-page.spec.ts` : 3 nouveaux tests unitaires pour le tri serveur, le bouton pertinence, et le formatage de la date de publication.
+- **Preuves de fonctionnement :**
+  - **Tests Backend :** **244 passants sur 244 (5 suites, 100% succès)** (`cmd /c npm test` dans `backend/`).
+  - **Tests Frontend :** **272 passants sur 272 (19 suites, 100% succès)** (`cmd /c npm test -- --watch=false` dans `frontend-starter/`).
+  - **Compilation Frontend de production :** **Build réussi sans erreur en 9.8s** (`cmd /c npm run build` dans `frontend-starter/`).
+  - **Vérification réelle en navigateur (Microsoft Edge via CDP) :**
+    - *Dates de publication visibles :* Cartes affichant fidèlement leur date (`📅 13 Oct 2026`, `📅 12 Oct 2026`, etc.).
+    - *Tri interactif par likes :* Clic sur le bouton « ♥ Plus aimés (Likes) » recharge instantanément le catalogue en plaçant les créations les plus aimées en tête de liste.
+    - *Recherche avec syntaxe `#tag` :* Saisie de `#origami` dans l'input de recherche $\rightarrow$ extraction transparente du tag, requête backend ciblée, 3 créations avec le tag `#origami` retournées sans erreur textuelle.
+  - **Commit local dédié :** `8297c2b` (`feat(catalog): mission 5 — deterministic sorting, publication date, and #tag search syntax`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi le tri par likes doit s'exécuter dans le pipeline MongoDB et non en JavaScript :** Si le tri par likes est fait côté client sur les éléments reçus, il ne trie que les 9 éléments de la page en cours. Un post situé en page 5 avec 100 likes ne remontera jamais en page 1. En intégrant `$lookup` et `$addFields: { likesCount: { $size: "$postLikes" } }` dans le pipeline d'agrégation juste avant le `$sort` et le `$facet`, MongoDB trie l'ensemble des créations de la base, garantissant que la page 1 contient les projets les plus populaires de toute la plateforme.
+  - **Pourquoi le calcul des likes doit se situer après le `$match` de filtrage :** Si la jointure `$lookup` avec la collection des likes était faite avant le filtre de sécurité, MongoDB calculerait les likes de tous les posts de la base (y compris les brouillons, les posts privés ou ceux d'utilisateurs suspendus), gaspillant de la mémoire et des cycles processeur pour des documents qui seront de toute façon éliminés par la suite.
+  - **Traitement d'une recherche purement composée de hashtags (`#tag1 #tag2`) :** Une recherche textuelle MongoDB ou Atlas Search sur une chaîne vide ou composée de ponctuations peut échouer ou renvoyer des résultats inattendus. En extrayant les tags et en nettoyant la chaîne textuelle, si celle-ci devient vide, le système omet purement et simplement l'étape de recherche textuelle `$search` et applique directement le filtre d'ensemble `$all: ['tag1', 'tag2']` sur le champ indexé `tags`.
+
+
 
 

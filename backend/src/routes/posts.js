@@ -120,15 +120,76 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       tagList = Array.from(new Set(normalized));
     }
 
-    // 4. Validation du texte de recherche
+    // 4. Validation du texte de recherche et extraction de la syntaxe #tag
     let textQuery = "";
     if (typeof req.query.query === "string") {
-      textQuery = req.query.query.trim();
-      if (textQuery.length > 150) {
+      const rawQuery = req.query.query.trim();
+      if (rawQuery.length > 150) {
         return res.status(400).json({
           message: "La requête de recherche ne doit pas dépasser 150 caractères.",
         });
       }
+
+      // Extraction de la syntaxe #tag (ex. 'château #lego #star-wars' ou '#origami')
+      const inlineTagRegex = /#([a-zA-Z0-9-]+)/g;
+      let match;
+      const inlineTags = [];
+      while ((match = inlineTagRegex.exec(rawQuery)) !== null) {
+        const extracted = match[1].toLowerCase();
+        if (TAG_REGEX.test(extracted)) {
+          inlineTags.push(extracted);
+        }
+      }
+
+      if (inlineTags.length > 0) {
+        tagList = Array.from(new Set([...tagList, ...inlineTags]));
+      }
+
+      // Nettoyage des occurrences #tag de la chaîne textuelle
+      const cleanedQuery = rawQuery
+        .replace(/#([a-zA-Z0-9-]+)/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      textQuery = cleanedQuery;
+    }
+
+    if (mode === "suggest" && !textQuery && tagList.length > 0) {
+      textQuery = tagList[0];
+    }
+
+    // 4b. Validation et normalisation du paramètre de tri déterministe
+    const VALID_SORTS = new Set([
+      "date_desc",
+      "date-desc",
+      "date_asc",
+      "date-asc",
+      "likes_desc",
+      "likes-desc",
+      "relevance",
+    ]);
+
+    let sortCriteria = "date_desc";
+    if (req.query.sort !== undefined) {
+      const rawSort = String(req.query.sort).trim().toLowerCase();
+      if (!VALID_SORTS.has(rawSort)) {
+        return res.status(400).json({
+          message: `Critère de tri invalide: '${rawSort}'. Valeurs autorisées: date-desc, date-asc, likes-desc, relevance.`,
+        });
+      }
+      if (rawSort === "date-desc" || rawSort === "date_desc") {
+        sortCriteria = "date_desc";
+      } else if (rawSort === "date-asc" || rawSort === "date_asc") {
+        sortCriteria = "date_asc";
+      } else if (rawSort === "likes-desc" || rawSort === "likes_desc") {
+        sortCriteria = "likes_desc";
+      } else if (rawSort === "relevance") {
+        sortCriteria = "relevance";
+      }
+    } else if (mode === "suggest") {
+      sortCriteria = "relevance";
+    } else if (textQuery) {
+      sortCriteria = "relevance";
     }
 
     // 5. Construction du pipeline d'agrégation MakerShare
@@ -252,14 +313,49 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
 
       pipeline.push({ $match: matchStage });
 
-      // Étape 4 : $facet pour total exact et pagination simultanée
+      // Étape 4 : Calcul des likes si tri likes_desc (après le match de sécurité)
+      if (sortCriteria === "likes_desc") {
+        pipeline.push(
+          {
+            $lookup: {
+              from: "likes",
+              localField: "_id",
+              foreignField: "postId",
+              as: "postLikes",
+            },
+          },
+          {
+            $addFields: {
+              likesCount: { $size: "$postLikes" },
+            },
+          },
+          {
+            $project: {
+              postLikes: 0,
+            },
+          }
+        );
+      }
+
+      // Étape 5 : Détermination du tri déterministe dans $facet.docs
+      let sortStage;
+      if (sortCriteria === "likes_desc") {
+        sortStage = { $sort: { likesCount: -1, publishedAt: -1, _id: -1 } };
+      } else if (sortCriteria === "date_asc") {
+        sortStage = { $sort: { publishedAt: 1, createdAt: 1, _id: 1 } };
+      } else if (sortCriteria === "relevance" && useAtlasSearch && textQuery) {
+        sortStage = { $sort: { score: { $meta: "searchScore" }, publishedAt: -1, _id: -1 } };
+      } else {
+        // date_desc par défaut (et repli pertinence regex)
+        sortStage = { $sort: { publishedAt: -1, createdAt: -1, _id: -1 } };
+      }
+
+      // Étape 6 : $facet pour total exact et pagination simultanée après tri
       pipeline.push({
         $facet: {
           totalDocs: [{ $count: "count" }],
           docs: [
-            ...(useAtlasSearch && textQuery
-              ? [{ $sort: { score: { $meta: "searchScore" }, publishedAt: -1, _id: -1 } }]
-              : [{ $sort: { publishedAt: -1, createdAt: -1, _id: -1 } }]),
+            sortStage,
             { $skip: offset },
             { $limit: limit },
           ],

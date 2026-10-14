@@ -6,7 +6,7 @@ import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { PostService } from '../../shared/services/post.service';
 import { PostPreview } from '../../shared/models/post.model';
 
-export type SortCriteria = 'date-desc' | 'likes-desc' | 'date-asc';
+export type SortCriteria = 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance';
 
 @Component({
   selector: 'app-posts-page',
@@ -56,12 +56,14 @@ export class PostsPageComponent implements OnInit, OnDestroy {
         return dateA - dateB;
       });
     }
-    // 'date-desc' par défaut
-    return list.sort((a, b) => {
-      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    if (criteria === 'date-desc') {
+      return list.sort((a, b) => {
+        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+    return list;
   });
 
   // Recherche & Suggestions
@@ -109,7 +111,10 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   }
 
   setSortCriteria(criteria: SortCriteria): void {
-    this.sortCriteria.set(criteria);
+    if (this.sortCriteria() !== criteria) {
+      this.sortCriteria.set(criteria);
+      this.loadPosts(1);
+    }
   }
 
   getInitials(name?: string | null): string {
@@ -220,6 +225,9 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     this.closeSuggestions();
     const query = this.searchControl.value.trim();
     this.appliedQuery.set(query);
+    if (query && this.sortCriteria() === 'date-desc') {
+      this.sortCriteria.set('relevance');
+    }
     this.loadPosts(1);
   }
 
@@ -241,6 +249,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
         category: category || undefined,
         query: query || undefined,
         tags: tag || undefined,
+        sort: this.sortCriteria(),
       })
       .subscribe({
         next: (pageData) => {
@@ -296,6 +305,9 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   clearSearch(): void {
     this.searchControl.setValue('', { emitEvent: false });
     this.closeSuggestions();
+    if (this.sortCriteria() === 'relevance') {
+      this.sortCriteria.set('date-desc');
+    }
     if (this.appliedQuery()) {
       this.appliedQuery.set('');
       this.loadPosts(1);
