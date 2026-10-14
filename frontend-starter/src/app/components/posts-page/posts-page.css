@@ -480,3 +480,15 @@
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+.author-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.author-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+

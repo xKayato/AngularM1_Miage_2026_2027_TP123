@@ -10,11 +10,15 @@ import { PostsPageComponent } from './components/posts-page/posts-page';
 import { PostDetailPageComponent } from './components/post-detail-page/post-detail-page';
 import { SharedPostPageComponent } from './components/shared-post-page/shared-post-page';
 import { AdminPageComponent } from './components/admin-page/admin-page';
+import { CreatorsSearchPageComponent } from './components/creators-search-page/creators-search-page';
+import { CreatorProfilePageComponent } from './components/creator-profile-page/creator-profile-page';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'posts' },
   { path: 'posts', component: PostsPageComponent },
   { path: 'posts/:id', component: PostDetailPageComponent },
+  { path: 'creators', component: CreatorsSearchPageComponent },
+  { path: 'creators/:id', component: CreatorProfilePageComponent },
   { path: 'share/:token', component: SharedPostPageComponent },
   { path: 'login', component: LoginPageComponent },
   { path: 'register', component: RegisterPageComponent },

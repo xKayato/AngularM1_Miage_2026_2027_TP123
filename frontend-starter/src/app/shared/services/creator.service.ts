@@ -2,7 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
+  CreatorPublicProfile,
+  CreatorQueryParams,
   CreatorStatusResponse,
+  CreatorSummary,
   FollowItem,
   FollowResponse,
   SubscribeResponse,
@@ -87,4 +90,36 @@ export class CreatorService {
       params: httpParams,
     });
   }
+
+  /**
+   * Récupère la liste paginée et filtrable des créateurs publics.
+   */
+  getCreators(params?: CreatorQueryParams): Observable<Page<CreatorSummary>> {
+    let httpParams = new HttpParams();
+    if (params?.page) {
+      httpParams = httpParams.set('page', params.page.toString());
+    }
+    if (params?.limit) {
+      httpParams = httpParams.set('limit', params.limit.toString());
+    }
+    if (params?.query) {
+      httpParams = httpParams.set('query', params.query);
+    }
+    if (params?.tag) {
+      httpParams = httpParams.set('tag', params.tag);
+    }
+    return this.http.get<Page<CreatorSummary>>(this.baseUrl, {
+      params: httpParams,
+    });
+  }
+
+  /**
+   * Récupère le profil public d'un créateur avec ses compteurs et créations découvrables.
+   */
+  getCreatorProfile(creatorId: string): Observable<CreatorPublicProfile> {
+    return this.http.get<CreatorPublicProfile>(
+      `${this.baseUrl}/${encodeURIComponent(creatorId)}`,
+    );
+  }
 }
+

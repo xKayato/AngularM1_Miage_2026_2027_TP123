@@ -126,7 +126,7 @@
         </div>
 
         <h1>{{ detail.title }}</h1>
-        <p class="author-info">Par <b>{{ detail.author.name }}</b> • Publié le {{ detail.publishedAt ? (detail.publishedAt | date:'mediumDate') : 'Non publié' }}</p>
+        <p class="author-info">Par <b><a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">{{ detail.author.name }}</a></b> • Publié le {{ detail.publishedAt ? (detail.publishedAt | date:'mediumDate') : 'Non publié' }}</p>
         <p class="short-desc">{{ detail.shortDescription }}</p>
 
         <div class="tags-list">
@@ -143,7 +143,9 @@
             <span class="creator-avatar-badge">👤</span>
             <div>
               <span class="creator-title">Créateur</span>
-              <h3 class="creator-name">{{ detail.author.name }}</h3>
+              <h3 class="creator-name">
+                <a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">{{ detail.author.name }}</a>
+              </h3>
             </div>
           </div>
           <div class="simulation-badge-pill" title="Cette plateforme est un bac à sable sans carte bancaire ni paiement réel">

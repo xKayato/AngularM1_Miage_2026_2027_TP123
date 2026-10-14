@@ -473,3 +473,227 @@ test("Mission III — GET /api/creators/my/subscriptions (abonnements actifs uni
     assert.ok(body.docs[0].expiresAt);
   });
 });
+
+test("Mission 1 — Recherche de créateurs (GET /api/creators)", async (t) => {
+  const { user: alice } = await createUser();
+  alice.name = "Alice Luthier";
+  await alice.save();
+
+  const { user: bob } = await createUser();
+  bob.name = "Bob Maker";
+  await bob.save();
+
+  const { user: suspendedUser } = await createUser("user", "suspended");
+  suspendedUser.name = "Alice Suspended";
+  await suspendedUser.save();
+
+  // Créer un post public pour Alice
+  await Post.create({
+    author: alice._id,
+    title: "Post public Alice",
+    shortDescription: "Description publique d'Alice",
+    content: "Contenu public d'Alice",
+    category: "Musique",
+    tags: ["lutherie"],
+    visibility: "public",
+    status: "published",
+    publishedAt: new Date(),
+  });
+
+  // Créer un follow pour Alice
+  const { user: follower } = await createUser();
+  await Follow.create({
+    followerId: follower._id,
+    creatorId: alice._id,
+  });
+
+  await t.test("Recherche par nom insensible à la casse avec query", async () => {
+    const res = await fetch(`${base}/api/creators?query=alice`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.docs.length >= 1);
+    const found = body.docs.find((d) => d.id === String(alice._id));
+    assert.ok(found);
+    assert.equal(found.name, "Alice Luthier");
+    assert.equal(found.followersCount, 1);
+    assert.equal(found.creationsCount, 1);
+    assert.equal(found.email, undefined, "L'email ne doit jamais être exposé publiquement");
+  });
+
+  await t.test("Exclut formellement les utilisateurs suspendus de la recherche", async () => {
+    const res = await fetch(`${base}/api/creators?query=suspended`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const found = body.docs.find((d) => d.id === String(suspendedUser._id));
+    assert.equal(found, undefined, "Un compte suspendu ne doit jamais apparaître dans les résultats");
+  });
+
+  await t.test("Pagination correcte (page, limit, totalDocs)", async () => {
+    const res = await fetch(`${base}/api/creators?page=1&limit=2`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.limit, 2);
+    assert.equal(body.page, 1);
+    assert.ok(body.totalDocs >= 2);
+    assert.equal(body.docs.length, 2);
+  });
+});
+
+test("Mission 1 — Profil public créateur (GET /api/creators/:id)", async (t) => {
+  const { user: creator } = await createUser();
+  creator.name = "Camille Origami";
+  await creator.save();
+
+  const { user: visitor, token: visitorToken } = await createUser();
+
+  // Créer des posts de différentes visibilités
+  const publicPost = await Post.create({
+    author: creator._id,
+    title: "Grue en papier",
+    shortDescription: "Tutoriel origami débutant",
+    content: "Instructions pas à pas",
+    category: "Origami",
+    tags: ["papier"],
+    visibility: "public",
+    status: "published",
+    publishedAt: new Date(),
+  });
+
+  const followersPost = await Post.create({
+    author: creator._id,
+    title: "Dragon complexe",
+    shortDescription: "Origami réservé aux followers",
+    content: "Plis avancés",
+    category: "Origami",
+    tags: ["expert"],
+    visibility: "followers",
+    status: "published",
+    publishedAt: new Date(),
+  });
+
+  const subscribersPost = await Post.create({
+    author: creator._id,
+    title: "Chef d'oeuvre 3D",
+    shortDescription: "Origami réservé aux abonnés VIP",
+    content: "Modèle exclusif abonnés",
+    category: "Origami",
+    tags: ["vip"],
+    visibility: "subscribers",
+    status: "published",
+    publishedAt: new Date(),
+  });
+
+  const linkPost = await Post.create({
+    author: creator._id,
+    title: "Post secret non répertorié",
+    shortDescription: "Accessible uniquement par lien",
+    content: "Lien privé",
+    category: "Origami",
+    tags: ["secret"],
+    visibility: "link",
+    status: "published",
+    publishedAt: new Date(),
+  });
+
+  const draftPost = await Post.create({
+    author: creator._id,
+    title: "Brouillon en cours",
+    shortDescription: "Brouillon non publié",
+    content: "Brouillon privé",
+    category: "Origami",
+    tags: ["draft"],
+    visibility: "public",
+    status: "draft",
+  });
+
+  // Abonnement actif et abonnement expiré
+  const future = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+  const past = new Date(Date.now() - 5 * 24 * 3600 * 1000);
+
+  const { user: subUser1 } = await createUser();
+  await Subscription.create({
+    subscriberId: subUser1._id,
+    creatorId: creator._id,
+    active: true,
+    expiresAt: future,
+  });
+
+  const { user: subUser2 } = await createUser();
+  await Subscription.create({
+    subscriberId: subUser2._id,
+    creatorId: creator._id,
+    active: true,
+    expiresAt: past, // Expiré : ne doit pas compter dans subscribersCount
+  });
+
+  await t.test("Rejette un id invalide (400)", async () => {
+    const res = await fetch(`${base}/api/creators/invalid-id`);
+    assert.equal(res.status, 400);
+  });
+
+  await t.test("Renvoie 404 si créateur introuvable ou suspendu", async () => {
+    const ghostId = new mongoose.Types.ObjectId();
+    const res1 = await fetch(`${base}/api/creators/${ghostId}`);
+    assert.equal(res1.status, 404);
+
+    const { user: suspended } = await createUser("user", "suspended");
+    const res2 = await fetch(`${base}/api/creators/${suspended._id}`);
+    assert.equal(res2.status, 404);
+  });
+
+  await t.test("Visiteur anonyme : profil public avec compteurs réels et créations découvrables", async () => {
+    const res = await fetch(`${base}/api/creators/${creator._id}`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.equal(body.id, String(creator._id));
+    assert.equal(body.name, "Camille Origami");
+    assert.equal(body.email, undefined, "Email strictement masqué");
+    assert.ok(body.createdAt);
+    assert.equal(body.subscribersCount, 1, "subscribersCount compte uniquement les abonnements actifs non expirés");
+    assert.equal(body.isSelf, false);
+    assert.equal(body.userInteractions.isFollowing, false);
+    assert.equal(body.userInteractions.isSubscribed, false);
+
+    // Vérifier les créations découvrables
+    assert.equal(body.creationsCount, 3, "Uniquement public, followers et subscribers (pas link, pas draft)");
+    const titles = body.creations.map((c) => c.title);
+    assert.ok(titles.includes("Grue en papier"));
+    assert.ok(titles.includes("Dragon complexe"));
+    assert.ok(titles.includes("Chef d'oeuvre 3D"));
+    assert.ok(!titles.includes("Post secret non répertorié"), "Le post link ne doit pas figurer sur le profil public");
+    assert.ok(!titles.includes("Brouillon en cours"), "Le draft ne doit pas figurer sur le profil public");
+
+    // Pour l'anonyme : public est déverrouillé, followers et subscribers sont verrouillés
+    const grue = body.creations.find((c) => c.title === "Grue en papier");
+    assert.equal(grue.isLocked, false);
+
+    const dragon = body.creations.find((c) => c.title === "Dragon complexe");
+    assert.equal(dragon.isLocked, true);
+
+    const vip = body.creations.find((c) => c.title === "Chef d'oeuvre 3D");
+    assert.equal(vip.isLocked, true);
+  });
+
+  await t.test("Visiteur follower : post followers déverrouillé sur le profil public", async () => {
+    await Follow.create({
+      followerId: visitor._id,
+      creatorId: creator._id,
+    });
+
+    const res = await fetch(`${base}/api/creators/${creator._id}`, {
+      headers: { Authorization: `Bearer ${visitorToken}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.userInteractions.isFollowing, true);
+    assert.equal(body.userInteractions.isSubscribed, false);
+
+    const dragon = body.creations.find((c) => c.title === "Dragon complexe");
+    assert.equal(dragon.isLocked, false, "Le post followers doit être déverrouillé pour le follower");
+
+    const vip = body.creations.find((c) => c.title === "Chef d'oeuvre 3D");
+    assert.equal(vip.isLocked, true, "Le post subscribers reste verrouillé");
+  });
+});
+

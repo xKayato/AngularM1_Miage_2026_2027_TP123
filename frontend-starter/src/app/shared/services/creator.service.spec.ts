@@ -193,4 +193,88 @@ describe('CreatorService', () => {
       hasNextPage: false,
     });
   });
+
+  it('getCreators — appelle GET /api/creators avec pagination et query', () => {
+    service.getCreators({ page: 1, limit: 10, query: 'Alice' }).subscribe((res) => {
+      expect(res.totalDocs).toBe(1);
+      expect(res.docs?.[0].name).toBe('Alice Luthier');
+    });
+
+    const req = httpTesting.expectOne((r) => r.url === '/api/creators');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('1');
+    expect(req.request.params.get('limit')).toBe('10');
+    expect(req.request.params.get('query')).toBe('Alice');
+
+    const mockItem = {
+      id: 'c-alice',
+      name: 'Alice Luthier',
+      bio: 'Bio Alice',
+      profileTags: ['lutherie'],
+      avatarUrl: '/api/users/c-alice/avatar',
+      createdAt: '2026-10-14T00:00:00.000Z',
+      followersCount: 5,
+      creationsCount: 3,
+    };
+
+    req.flush({
+      items: [mockItem],
+      docs: [mockItem],
+      total: 1,
+      totalDocs: 1,
+      page: 1,
+      limit: 10,
+      pages: 1,
+      totalPages: 1,
+      hasPrevPage: false,
+      hasNextPage: false,
+    });
+  });
+
+  it('getCreatorProfile — appelle GET /api/creators/:id', () => {
+    service.getCreatorProfile('c-alice').subscribe((res) => {
+      expect(res.name).toBe('Alice Luthier');
+      expect(res.subscribersCount).toBe(2);
+      expect(res.creations.length).toBe(1);
+    });
+
+    const req = httpTesting.expectOne('/api/creators/c-alice');
+    expect(req.request.method).toBe('GET');
+
+    req.flush({
+      id: 'c-alice',
+      name: 'Alice Luthier',
+      bio: 'Bio Alice',
+      profileTags: ['lutherie'],
+      avatarUrl: '/api/users/c-alice/avatar',
+      createdAt: '2026-10-14T00:00:00.000Z',
+      followersCount: 5,
+      subscribersCount: 2,
+      creationsCount: 1,
+      isSelf: false,
+      userInteractions: {
+        isFollowing: false,
+        isSubscribed: false,
+        subscriptionExpiresAt: null,
+      },
+      creations: [
+        {
+          id: 'p-1',
+          title: 'Guitare',
+          category: 'Musique',
+          tags: ['lutherie'],
+          visibility: 'public',
+          likesCount: 10,
+          attachmentsCount: 1,
+          hasAudio: false,
+          coverUrl: null,
+          publishedAt: '2026-10-14T00:00:00.000Z',
+          isLocked: false,
+          author: { id: 'c-alice', name: 'Alice Luthier' },
+          shortDescription: 'Guitare fait main',
+        },
+      ],
+    });
+  });
 });
+

@@ -37,3 +37,42 @@ export interface SubscriptionItem {
   expiresAt: string;
   createdAt: string;
 }
+
+export interface CreatorSummary {
+  id: string;
+  name: string;
+  bio: string;
+  profileTags: string[];
+  avatarUrl: string;
+  createdAt: string;
+  followersCount: number;
+  creationsCount: number;
+  isFollowing?: boolean;
+}
+
+export interface CreatorPublicProfile {
+  id: string;
+  name: string;
+  bio: string;
+  profileTags: string[];
+  avatarUrl: string;
+  createdAt: string;
+  followersCount: number;
+  subscribersCount: number;
+  creationsCount: number;
+  isSelf: boolean;
+  userInteractions: {
+    isFollowing: boolean;
+    isSubscribed: boolean;
+    subscriptionExpiresAt: string | null;
+  };
+  creations: import('./post.model').PostPreview[];
+}
+
+export interface CreatorQueryParams {
+  query?: string;
+  tag?: string;
+  page?: number;
+  limit?: number;
+}
+

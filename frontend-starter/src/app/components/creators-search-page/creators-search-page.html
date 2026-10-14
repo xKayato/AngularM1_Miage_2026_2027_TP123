@@ -1,0 +1,109 @@
+<section class="creators-container" aria-labelledby="creators-title">
+  <div class="creators-header">
+    <div>
+      <h1 id="creators-title">Communauté & Créateurs MakerShare</h1>
+      <p class="subtitle">Découvrez les créateurs passionnés, suivez leurs projets et soutenez leurs tutoriels DIY.</p>
+    </div>
+
+    <div class="search-bar-row">
+      <div class="search-box">
+        <label for="creator-search-input" class="sr-only">Rechercher un créateur</label>
+        <input
+          id="creator-search-input"
+          type="search"
+          placeholder="Rechercher un créateur par son nom..."
+          [formControl]="searchControl"
+          autocomplete="off"
+        />
+        @if (searchControl.value) {
+          <button
+            type="button"
+            class="btn-clear"
+            (click)="clearSearch()"
+            aria-label="Effacer la recherche"
+          >
+            ✕ Effacer
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error" role="alert">
+      {{ error() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-state" aria-live="polite">
+      <div class="spinner"></div>
+      <p>Chargement des créateurs...</p>
+    </div>
+  } @else {
+    <div class="creators-grid">
+      @for (creator of creators(); track creator.id) {
+        <article class="creator-card">
+          <div class="creator-card-top">
+            <div class="avatar-badge" aria-hidden="true">
+              {{ getInitials(creator.name) }}
+            </div>
+            <div class="creator-info-text">
+              <h2 class="creator-name">
+                <a [routerLink]="['/creators', creator.id]">{{ creator.name }}</a>
+              </h2>
+              <span class="member-since">Membre depuis {{ creator.createdAt | date:'mediumDate' }}</span>
+            </div>
+          </div>
+
+          <p class="creator-bio">{{ creator.bio }}</p>
+
+          <div class="creator-stats-row">
+            <div class="stat-pill">
+              <span class="stat-number">{{ creator.creationsCount }}</span>
+              <span class="stat-label">création{{ creator.creationsCount > 1 ? 's' : '' }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-number">{{ creator.followersCount }}</span>
+              <span class="stat-label">follower{{ creator.followersCount > 1 ? 's' : '' }}</span>
+            </div>
+          </div>
+
+          <div class="creator-card-bottom">
+            <a [routerLink]="['/creators', creator.id]" class="btn-view-profile">
+              Voir le profil public →
+            </a>
+          </div>
+        </article>
+      } @empty {
+        <div class="empty-state">
+          <p>Aucun créateur trouvé pour votre recherche.</p>
+        </div>
+      }
+    </div>
+
+    @if (totalPages() > 1) {
+      <nav class="pagination-bar" aria-label="Pagination des créateurs">
+        <button
+          type="button"
+          class="btn-page"
+          [disabled]="currentPage() <= 1 || loading()"
+          (click)="goToPage(currentPage() - 1)"
+        >
+          Précédent
+        </button>
+        <span class="page-indicator">
+          Page {{ currentPage() }} sur {{ totalPages() }} ({{ totalDocs() }} créateur{{ totalDocs() > 1 ? 's' : '' }} au total)
+        </span>
+        <button
+          type="button"
+          class="btn-page"
+          [disabled]="currentPage() >= totalPages() || loading()"
+          (click)="goToPage(currentPage() + 1)"
+        >
+          Suivant
+        </button>
+      </nav>
+    }
+  }
+</section>

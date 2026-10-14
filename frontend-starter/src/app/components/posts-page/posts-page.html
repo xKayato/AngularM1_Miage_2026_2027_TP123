@@ -178,7 +178,7 @@
             </div>
 
             <div class="card-footer">
-              <span class="author-name">Par <b>{{ post.author.name }}</b></span>
+              <span class="author-name">Par <b><a [routerLink]="['/creators', post.author.id]" class="author-link">{{ post.author.name }}</a></b></span>
               <a [routerLink]="['/posts', post.id]" class="btn-view">
                 {{ post.isLocked ? 'Voir l’aperçu' : 'Voir le projet' }}
               </a>

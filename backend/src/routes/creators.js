@@ -3,6 +3,9 @@ import mongoose from "mongoose";
 import { User } from "../models/User.js";
 import { Follow } from "../models/Follow.js";
 import { Subscription } from "../models/Subscription.js";
+import { Post } from "../models/Post.js";
+import { Like } from "../models/Like.js";
+import { toPostPreview } from "../utils/postProjections.js";
 import { authMakerShare } from "../middlewares/authMakerShare.js";
 import { optionalAuthMakerShare } from "../middlewares/optionalAuthMakerShare.js";
 
@@ -14,6 +17,120 @@ export const creatorsRouter = Router();
 function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
+
+/**
+ * GET /api/creators
+ * Recherche publique et liste paginée des créateurs de contenu.
+ * Exclut formellement les utilisateurs suspendus.
+ * Ne divulgue jamais les emails, hash de mot de passe ni les comptes suivis.
+ */
+creatorsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const offset = (page - 1) * limit;
+
+    const matchStage = {
+      status: { $ne: "suspended" },
+    };
+
+    const rawQuery = typeof req.query.query === "string" ? req.query.query.trim() : "";
+    if (rawQuery) {
+      const escaped = rawQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchStage.name = { $regex: escaped, $options: "i" };
+    }
+
+    const rawTag = typeof req.query.tag === "string" ? req.query.tag.trim().toLowerCase() : "";
+    if (rawTag) {
+      matchStage.profileTags = rawTag;
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $skip: offset },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                id: { $toString: "$_id" },
+                name: 1,
+                bio: { $ifNull: ["$bio", ""] },
+                profileTags: { $ifNull: ["$profileTags", []] },
+                avatarUrl: { $concat: ["/api/users/", { $toString: "$_id" }, "/avatar"] },
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = await User.aggregate(pipeline);
+    const totalDocs = result[0]?.totalDocs[0]?.count || 0;
+    const rawDocs = result[0]?.docs || [];
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    const creatorIds = rawDocs.map((d) => new mongoose.Types.ObjectId(d.id));
+
+    // Comptage des followers par créateur
+    const followCounts = await Follow.aggregate([
+      { $match: { creatorId: { $in: creatorIds } } },
+      { $group: { _id: "$creatorId", count: { $sum: 1 } } },
+    ]);
+    const followMap = new Map(followCounts.map((f) => [String(f._id), f.count]));
+
+    // Comptage des créations publiques/découvrables par créateur
+    const postCounts = await Post.aggregate([
+      {
+        $match: {
+          author: { $in: creatorIds },
+          status: "published",
+          visibility: { $in: ["public", "followers", "subscribers"] },
+        },
+      },
+      { $group: { _id: "$author", count: { $sum: 1 } } },
+    ]);
+    const postMap = new Map(postCounts.map((p) => [String(p._id), p.count]));
+
+    // Relations de l'utilisateur connecté si présent
+    let followingSet = new Set();
+    if (req.user) {
+      const userFollows = await Follow.find({
+        followerId: req.user._id,
+        creatorId: { $in: creatorIds },
+      }).select("creatorId");
+      followingSet = new Set(userFollows.map((f) => String(f.creatorId)));
+    }
+
+    const docs = rawDocs.map((c) => ({
+      ...c,
+      bio: c.bio || "Aucune biographie renseignée pour le moment.",
+      followersCount: followMap.get(c.id) || 0,
+      creationsCount: postMap.get(c.id) || 0,
+      isFollowing: followingSet.has(c.id),
+    }));
+
+    res.json({
+      docs,
+      items: docs,
+      totalDocs,
+      total: totalDocs,
+      limit,
+      page,
+      totalPages,
+      pages: totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/creators/my/follows
@@ -154,6 +271,124 @@ creatorsRouter.get("/my/subscriptions", authMakerShare, async (req, res, next) =
       pages: totalPages,
       hasPrevPage: page > 1,
       hasNextPage: page < totalPages,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/creators/:id
+ * Retourne le profil public d'un créateur avec ses compteurs réels et ses créations découvrables.
+ * Exclut formellement les créateurs suspendus (404).
+ * Ne divulgue jamais les emails, hash de mot de passe, ni la liste des comptes suivis.
+ */
+creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
+  try {
+    const creatorId = req.params.id;
+    if (!isValidObjectId(creatorId)) {
+      return res.status(400).json({ message: "Identifiant créateur invalide" });
+    }
+
+    const creator = await User.findById(creatorId);
+    if (!creator || creator.status === "suspended") {
+      return res.status(404).json({ message: "Créateur introuvable ou inactif" });
+    }
+
+    const isSelf = Boolean(req.user && String(req.user._id) === String(creator._id));
+
+    // Relations de l'utilisateur connecté vis-à-vis de ce créateur
+    let isFollowing = false;
+    let isSubscribed = false;
+    let subscriptionExpiresAt = null;
+
+    if (req.user && !isSelf) {
+      isFollowing = Boolean(
+        await Follow.exists({
+          followerId: req.user._id,
+          creatorId: creator._id,
+        })
+      );
+
+      const sub = await Subscription.findOne({
+        subscriberId: req.user._id,
+        creatorId: creator._id,
+        active: true,
+        expiresAt: { $gt: new Date() },
+      });
+      if (sub) {
+        isSubscribed = true;
+        subscriptionExpiresAt = sub.expiresAt ? new Date(sub.expiresAt).toISOString() : null;
+      }
+    }
+
+    // Compteurs réels du créateur
+    const followersCount = await Follow.countDocuments({ creatorId: creator._id });
+    // Compteur d'abonnés : compteurs UNIQUEMENT actifs non expirés
+    const subscribersCount = await Subscription.countDocuments({
+      creatorId: creator._id,
+      active: true,
+      expiresAt: { $gt: new Date() },
+    });
+
+    // Créations découvrables du créateur :
+    // - Strictement exclure les drafts (sauf si auteur connecté)
+    // - Strictement exclure les posts link (non répertoriés)
+    // - Posts followers/subscribers : inclus avec isLocked: true si pas les droits
+    const postFilter = {
+      author: creator._id,
+      status: "published",
+      visibility: { $in: ["public", "followers", "subscribers"] },
+    };
+
+    const creatorPosts = await Post.find(postFilter)
+      .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
+      .limit(30)
+      .lean();
+
+    const postIds = creatorPosts.map((p) => p._id);
+    const likeCounts = await Like.aggregate([
+      { $match: { postId: { $in: postIds } } },
+      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    ]);
+    const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
+
+    const creations = creatorPosts.map((post) => {
+      let isLocked = true;
+      if (post.visibility === "public" || isSelf) {
+        isLocked = false;
+      } else if (post.visibility === "followers") {
+        isLocked = !isFollowing;
+      } else if (post.visibility === "subscribers") {
+        isLocked = !isSubscribed;
+      }
+
+      return toPostPreview(post, {
+        isLocked,
+        likesCount: likesMap.get(String(post._id)) || 0,
+        authorName: creator.name,
+      });
+    });
+
+    const creationsCount = creations.length;
+
+    res.json({
+      id: String(creator._id),
+      name: creator.name,
+      bio: creator.bio || "Aucune biographie renseignée pour le moment.",
+      profileTags: Array.isArray(creator.profileTags) ? creator.profileTags : [],
+      avatarUrl: `/api/users/${creator._id}/avatar`,
+      createdAt: creator.createdAt,
+      followersCount,
+      subscribersCount,
+      creationsCount,
+      isSelf,
+      userInteractions: {
+        isFollowing,
+        isSubscribed,
+        subscriptionExpiresAt,
+      },
+      creations,
     });
   } catch (err) {
     next(err);
