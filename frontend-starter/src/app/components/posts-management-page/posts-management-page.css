@@ -793,3 +793,36 @@ html.dark .status-published {
   padding-top: 0.75rem;
   border-top: 1px solid var(--border-color);
 }
+
+.cover-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-cover-action {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.btn-cover-action:hover {
+  background: var(--bg-subtle);
+}
+
+.btn-set-cover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.btn-remove-cover {
+  color: #DC2626;
+  border-color: var(--border-color);
+}
+

@@ -411,4 +411,28 @@ describe('PostService', () => {
       req.flush({ liked: false, likesCount: 11 });
     });
   });
+
+  describe('Couverture (Mission 3)', () => {
+    it('setCover — appelle PUT /api/posts/:id/cover avec attachmentId pour définir la couverture', () => {
+      service.setCover('post-1', 'att-123').subscribe((res) => {
+        expect(res.id).toBe('post-1');
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/cover');
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ attachmentId: 'att-123' });
+      req.flush({ ...mockDetail, id: 'post-1' });
+    });
+
+    it('setCover — appelle PUT /api/posts/:id/cover avec null pour retirer la couverture', () => {
+      service.setCover('post-1', null).subscribe((res) => {
+        expect(res.id).toBe('post-1');
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/cover');
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ attachmentId: null });
+      req.flush({ ...mockDetail, id: 'post-1' });
+    });
+  });
 });

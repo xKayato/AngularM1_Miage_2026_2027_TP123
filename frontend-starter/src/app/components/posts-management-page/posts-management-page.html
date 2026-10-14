@@ -331,34 +331,8 @@
           } @else {
             <!-- Onglet 2 : Aperçu en direct du rendu mis en page (Figma Frame 3D) -->
             <div class="editor-preview-pane">
-              <div class="preview-notice-badge font-display">Aperçu en direct du rendu mis en page :</div>
-              <div class="preview-rendered-body">
-                <h4 class="preview-h4 font-display">1. Instructions & Matériel nécessaire</h4>
-                <ul class="preview-list">
-                  <li><strong>Ventilateur 120mm</strong> (12V silencieux)</li>
-                  <li><strong>Filtre à charbon actif</strong> découpé aux cotes <code>120 x 120 mm</code></li>
-                  <li>Interrupteur à bascule + connecteur Jack DC</li>
-                </ul>
-
-                <h4 class="preview-h4 font-display">2. Schéma de câblage électrique</h4>
-                <p>Branchez l'interrupteur en série sur le fil positif 12V en suivant le schéma ci-dessous :</p>
-
-                <!-- Rendu visuel de la PJ in-text -->
-                <div class="intext-attachment-box">
-                  <div class="intext-left">
-                    <span class="intext-badge font-mono">PDF</span>
-                    <div>
-                      <strong class="intext-name">schema-cablage-12v.pdf</strong>
-                      <div class="intext-sub">Pièce jointe intégrée au fil du paragraphe • 1,1 Mo</div>
-                    </div>
-                  </div>
-                  <span class="btn-mini-action">⬇️ Télécharger</span>
-                </div>
-
-                <blockquote class="workshop-tip-box">
-                  💡 <strong>Conseil d'atelier :</strong> Vérifiez le sens du flux d'air indiqué par la flèche sur le châssis du ventilateur avant de fermer le boîtier.
-                </blockquote>
-              </div>
+              <div class="preview-notice-badge font-display">Aperçu en direct du tutoriel Markdown :</div>
+              <div class="preview-rendered-body markdown-rendered-content" [innerHTML]="previewHtml()"></div>
             </div>
           }
         </div>
@@ -545,8 +519,29 @@
                     <span class="attachment-name">{{ att.originalName }}</span>
                     <span class="attachment-details">{{ formatBytes(att.size) }} • {{ att.mimeType }}</span>
                   </div>
-                  @if (att.isCover) {
-                    <span class="badge badge-cover">Couverture</span>
+                  @if (att.family === 'image') {
+                    <div class="cover-actions">
+                      @if (att.isCover) {
+                        <span class="badge badge-cover">⭐ Couverture</span>
+                        <button
+                          type="button"
+                          class="btn-cover-action btn-remove-cover"
+                          (click)="setCover(null)"
+                          title="Retirer cette couverture"
+                        >
+                          ✕ Retirer
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="btn-cover-action btn-set-cover"
+                          (click)="setCover(att.id)"
+                          title="Définir comme couverture du projet"
+                        >
+                          ⭐ Définir comme couverture
+                        </button>
+                      }
+                    </div>
                   }
                 </li>
               }

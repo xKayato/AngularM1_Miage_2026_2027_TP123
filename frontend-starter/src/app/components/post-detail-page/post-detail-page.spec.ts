@@ -339,4 +339,17 @@ describe('PostDetailPageComponent', () => {
     expect(component.postDetail()?.likesCount).toBe(15);
     expect(component.isLikeLoading()).toBe(false);
   });
+
+  it('génère un rendu Markdown sécurisé pour le contenu du projet', () => {
+    component.postDetail.set({
+      ...mockDetail,
+      content: '### Instructions\n\nBien brancher les fils en **série** avec <script>hack()</script>',
+    });
+
+    const rendered = component.renderedContent();
+    expect(rendered).toContain('<h4 class="tutorial-h4 font-display">Instructions</h4>');
+    expect(rendered).toContain('<strong>série</strong>');
+    expect(rendered).not.toContain('<script>');
+    expect(rendered).toContain('&lt;script&gt;');
+  });
 });

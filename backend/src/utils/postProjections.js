@@ -58,12 +58,11 @@ export function toPostPreview(post, options = {}) {
 
   // Règle stricte de coverUrl :
   // Si verrouillé -> null (placeholder neutre / cadenas)
-  // Si déverrouillé -> URL uniquement si une image de couverture réelle est trouvée, sinon null
+  // Si déverrouillé -> URL uniquement si une image de couverture explicite (isCover: true) existe.
+  // La réapparition automatique de la première image par fallback silencieux est formellement supprimée.
   let coverUrl = null;
   if (!isLocked) {
-    const coverAttachment =
-      attachments.find((att) => att.isCover) ||
-      attachments.find((att) => att.family === "image");
+    const coverAttachment = attachments.find((att) => att.isCover);
     if (coverAttachment) {
       const attId = String(coverAttachment._id || coverAttachment.id);
       coverUrl = `/api/posts/${postId}/attachments/${attId}`;
@@ -140,6 +139,7 @@ export function toPostDetail(post, options = {}) {
       size: att.size,
       family: att.family,
       downloadUrl: `/api/posts/${postId}/attachments/${attId}`,
+      isCover: Boolean(att.isCover),
     };
   });
 

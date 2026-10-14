@@ -16,6 +16,7 @@ describe('PostsManagementPageComponent', () => {
     publishPost: ReturnType<typeof vi.fn>;
     unpublishPost: ReturnType<typeof vi.fn>;
     uploadAttachments: ReturnType<typeof vi.fn>;
+    setCover: ReturnType<typeof vi.fn>;
   };
 
   const mockPost: PostAuthorManagement = {
@@ -65,6 +66,7 @@ describe('PostsManagementPageComponent', () => {
       publishPost: vi.fn(),
       unpublishPost: vi.fn(),
       uploadAttachments: vi.fn(),
+      setCover: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -426,6 +428,41 @@ describe('PostsManagementPageComponent', () => {
       expect(component.formatBytes(512)).toBe('512 o');
       expect(component.formatBytes(2048)).toBe('2.0 Ko');
       expect(component.formatBytes(15 * 1024 * 1024)).toBe('15.0 Mo');
+    });
+
+    it('setCover — appelle postService.setCover pour définir une couverture et rafraîchit la liste', () => {
+      component.openAttachmentsModal(mockPost);
+      const updatedPost = { ...mockPost };
+      postServiceMock.setCover.mockReturnValue(of(updatedPost));
+
+      component.setCover('att-img-1');
+
+      expect(postServiceMock.setCover).toHaveBeenCalledWith('post-1', 'att-img-1');
+      expect(component.successMessage()).toContain('mise à jour avec succès');
+      expect(postServiceMock.getMyPosts).toHaveBeenCalledTimes(2);
+    });
+
+    it('setCover — appelle postService.setCover avec null pour retirer la couverture', () => {
+      component.openAttachmentsModal(mockPost);
+      const updatedPost = { ...mockPost };
+      postServiceMock.setCover.mockReturnValue(of(updatedPost));
+
+      component.setCover(null);
+
+      expect(postServiceMock.setCover).toHaveBeenCalledWith('post-1', null);
+      expect(component.successMessage()).toContain('retirée avec succès');
+    });
+
+    it('previewHtml — génère un rendu Markdown sécurisé à partir du contenu saisi', () => {
+      component.postForm.patchValue({
+        content: '# Nouveau Titre\n\nVoici un texte en **gras** avec <script>alert(1)</script>',
+      });
+
+      const html = component.previewHtml();
+      expect(html).toContain('<h2 class="tutorial-h2 font-display">Nouveau Titre</h2>');
+      expect(html).toContain('<strong>gras</strong>');
+      expect(html).not.toContain('<script>');
+      expect(html).toContain('&lt;script&gt;');
     });
   });
 });

@@ -152,6 +152,7 @@ interface SubscriptionItem {
 | `/api/posts/:id/unpublish` | `POST` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 200 PostAuthorManagement | 403 Forbidden |
 | `/api/posts/:id/attachments` | `POST` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 201 AttachmentInfo[] | 403 Forbidden |
 | `/api/posts/:id/attachments/:attId` | `DELETE` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 204 No Content | 403 Forbidden |
+| `/api/posts/:id/cover` | `PUT` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | **200 PostAuthorManagement** (atomique) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `POST` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 201 (secret 7j) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `GET` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 200 (état sans secret) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `DELETE` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 204 No Content | 403 Forbidden |

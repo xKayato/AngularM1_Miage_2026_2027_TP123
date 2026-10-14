@@ -7,6 +7,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { PostService } from '../../shared/services/post.service';
+import { MarkdownService } from '../../shared/services/markdown.service';
 import {
   AttachmentInfo,
   Category,
@@ -43,6 +44,7 @@ const TAG_REGEX = /^[a-z0-9-]+$/;
 })
 export class PostsManagementPageComponent implements OnInit {
   private readonly postService = inject(PostService);
+  private readonly markdownService = inject(MarkdownService);
   private readonly fb = inject(FormBuilder);
 
   readonly categories = CATEGORIES;
@@ -505,6 +507,29 @@ export class PostsManagementPageComponent implements OnInit {
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   }
 
+  // --- GESTION DE LA COUVERTURE (MISSION 3) ---
+  setCover(attachmentId: string | null): void {
+    const post = this.attachmentsModalPost();
+    if (!post) return;
+
+    this.postService.setCover(post.id, attachmentId).subscribe({
+      next: (updated) => {
+        this.attachmentsModalPost.set(updated);
+        this.successMessage.set(
+          attachmentId
+            ? 'Couverture du projet mise à jour avec succès.'
+            : 'Couverture retirée avec succès.'
+        );
+        this.loadPosts(this.currentPage());
+      },
+      error: (err) => {
+        this.attachmentsError.set(
+          err.error?.message || 'Erreur lors de la modification de la couverture.'
+        );
+      },
+    });
+  }
+
   // --- Outils Éditeur Riche & Insertion Pièces Jointes in-text (Figma Frame 3D) ---
   readonly editorTab = signal<'edit' | 'preview'>('edit');
 
@@ -512,6 +537,13 @@ export class PostsManagementPageComponent implements OnInit {
     const id = this.editingPostId();
     if (!id) return null;
     return this.posts().find((p) => p.id === id) || null;
+  });
+
+  /** Prévisualisation dynamique et sécurisée du Markdown via MarkdownService */
+  readonly previewHtml = computed(() => {
+    const content = this.postForm.get('content')?.value || '';
+    const attachments = this.currentEditingPost()?.attachments || [];
+    return this.markdownService.render(content, attachments);
   });
 
   switchEditorTab(tab: 'edit' | 'preview'): void {
@@ -529,6 +561,14 @@ export class PostsManagementPageComponent implements OnInit {
   insertAttachmentInText(filename: string, meta = ''): void {
     const tag = `\n\n[📎 PIÈCE JOINTE DANS LE TEXTE : ${filename}${meta ? ' (' + meta + ')' : ''}]\n\n`;
     this.formatEditor(tag);
+  }
+
+  insertAttachmentMarkdown(att: AttachmentInfo): void {
+    if (att.family === 'image') {
+      this.formatEditor(`\n\n![${att.originalName}](attachment:${att.id})\n\n`);
+    } else {
+      this.formatEditor(`\n\n[📎 PIÈCE JOINTE DANS LE TEXTE : ${att.originalName}]\n\n`);
+    }
   }
 
   isAttachmentInContent(filename: string): boolean {

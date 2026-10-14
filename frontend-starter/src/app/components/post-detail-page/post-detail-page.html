@@ -253,9 +253,7 @@
           <!-- Corps du tutoriel mis en page (Frame 3C) -->
           <section class="content-body card">
             <h2 class="section-heading font-display">Description et instructions du projet</h2>
-            <div class="text-content">
-              {{ detail.content }}
-            </div>
+            <div class="text-content markdown-rendered-content" [innerHTML]="renderedContent()"></div>
 
             <!-- Exemple de widget d'astuce d'atelier (Figma v2) -->
             <blockquote class="workshop-tip-box">

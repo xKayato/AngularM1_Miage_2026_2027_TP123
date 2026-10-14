@@ -233,4 +233,18 @@ export class PostService {
       `${this.baseUrl}/${encodeURIComponent(postId)}/like`,
     );
   }
+
+  /**
+   * Définit ou retire la pièce jointe servant de couverture au projet (Mission 3).
+   * Transmet { attachmentId } ou { attachmentId: null } pour le retrait.
+   */
+  setCover(
+    postId: string,
+    attachmentId: string | null,
+  ): Observable<PostAuthorManagement> {
+    return this.http.put<PostAuthorManagement>(
+      `${this.baseUrl}/${encodeURIComponent(postId)}/cover`,
+      { attachmentId },
+    );
+  }
 }

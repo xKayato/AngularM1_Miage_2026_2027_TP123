@@ -1148,6 +1148,118 @@ postsRouter.post(
 );
 
 /**
+ * PUT /api/posts/:id/cover
+ * Choix et retrait explicites de la pièce jointe servant de couverture.
+ * Réservé à l'auteur du post actif (refus strict 400 si archivé, 403 si tiers).
+ * Garantie atomique de l'unicité de la couverture sous requêtes concurrentes.
+ */
+postsRouter.put("/:id/cover", authMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Identifiant de post invalide" });
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    if (String(post.author) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Vous n'êtes pas l'auteur de ce post" });
+    }
+
+    if (post.status === "archived") {
+      return res.status(400).json({
+        message: "Impossible de modifier la couverture d'un post archivé",
+      });
+    }
+
+    const { attachmentId } = req.body || {};
+
+    let updatedPost;
+
+    if (attachmentId) {
+      if (!mongoose.Types.ObjectId.isValid(attachmentId)) {
+        return res.status(400).json({ message: "Identifiant de pièce jointe invalide" });
+      }
+
+      const targetObjId = new mongoose.Types.ObjectId(attachmentId);
+      const targetAtt = (post.attachments || []).find(
+        (a) => String(a._id) === String(targetObjId)
+      );
+
+      if (!targetAtt) {
+        return res.status(400).json({
+          message: "La pièce jointe spécifiée n'existe pas sur ce post",
+        });
+      }
+
+      if (targetAtt.family !== "image") {
+        return res.status(400).json({
+          message: "Seule une pièce jointe de type image peut être choisie comme couverture",
+        });
+      }
+
+      // Mise à jour conditionnelle atomique garantissant l'unicité stricte de isCover: true
+      // Utilisation de filtres disjoints (other vs target) pour éviter l'erreur ConflictingUpdateOperators
+      updatedPost = await Post.findOneAndUpdate(
+        {
+          _id: post._id,
+          author: req.user._id,
+          status: { $ne: "archived" },
+          "attachments._id": targetObjId,
+          "attachments.family": "image",
+        },
+        {
+          $set: {
+            "attachments.$[other].isCover": false,
+            "attachments.$[target].isCover": true,
+          },
+        },
+        {
+          arrayFilters: [
+            { "other._id": { $ne: targetObjId } },
+            { "target._id": targetObjId },
+          ],
+          returnDocument: "after",
+          runValidators: true,
+        }
+      );
+    } else {
+      // Retrait explicite de la couverture : toutes les pièces jointes passent à isCover: false
+      updatedPost = await Post.findOneAndUpdate(
+        {
+          _id: post._id,
+          author: req.user._id,
+          status: { $ne: "archived" },
+        },
+        {
+          $set: {
+            "attachments.$[all].isCover": false,
+          },
+        },
+        {
+          arrayFilters: [{ "all._id": { $exists: true } }],
+          returnDocument: "after",
+          runValidators: true,
+        }
+      );
+    }
+
+    if (!updatedPost) {
+      return res.status(400).json({
+        message: "Impossible de mettre à jour la couverture du post",
+      });
+    }
+
+    const likesCount = await Like.countDocuments({ postId: updatedPost._id });
+    return res.status(200).json(toPostAuthorManagement(updatedPost, { likesCount }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/posts/:id/attachments/:attachmentId
  * Téléchargement et lecture sécurisés de pièces jointes (fichiers audio, images, PDF).
  * Supporte le streaming HTTP Range, l'en-tête X-Share-Token et la protection des fichiers.

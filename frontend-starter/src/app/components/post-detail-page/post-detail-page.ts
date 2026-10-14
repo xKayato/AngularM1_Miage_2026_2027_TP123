@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PostService } from '../../shared/services/post.service';
 import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
+import { MarkdownService } from '../../shared/services/markdown.service';
 import { AttachmentInfo, PostDetail, PostPreview } from '../../shared/models/post.model';
 import { CreatorStatusResponse } from '../../shared/models/creator.model';
 
@@ -18,6 +19,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly postService = inject(PostService);
   private readonly creatorService = inject(CreatorService);
+  private readonly markdownService = inject(MarkdownService);
   readonly auth = inject(AuthService);
 
   readonly postId = signal<string>('');
@@ -26,6 +28,18 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   readonly isLocked = signal<boolean>(false);
   readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
+
+  /** Rendu sécurisé du contenu tutoriel Markdown via MarkdownService */
+  readonly renderedContent = computed(() => {
+    const detail = this.postDetail();
+    if (!detail) return '';
+    const images = this.imageUrls();
+    return this.markdownService.render(
+      detail.content,
+      detail.attachments,
+      (att) => images[att.id] || att.downloadUrl,
+    );
+  });
 
   // Gestion des interactions créateur (Mission 5)
   readonly creatorStatus = signal<CreatorStatusResponse | null>(null);

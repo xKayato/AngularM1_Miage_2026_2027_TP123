@@ -656,6 +656,32 @@
   - **Architecture de la double palette CSS (Variables & Mode Sombre) :** Définir les jetons de design via des propriétés personnalisées CSS (`:root` et `html.dark`) permet une bascule instantanée sans recalcul de bundle JS ni scintillement d'affichage (FOUC).
   - **Découplage Tri Client vs Pagination Serveur :** Le tri interactif par date ou likes sur la page courante est géré par un signal réactif calculé (`computed()`) pour offrir une réponse utilisateur instantanée tout en respectant scrupuleusement le contrat d'API paginée côté serveur.
   - **Approche modulaire de l'éditeur riche avec pièces jointes in-text :** Les pièces jointes sont représentées dans le texte par des jetons sémantiques normalisés (`[📎 PIÈCE JOINTE DANS LE TEXTE : filename (meta)]`), ce qui permet une persistance simple au format texte dans MongoDB tout en offrant un rendu visuel riche (téléchargement, aperçu) lors de la prévisualisation et de la consultation du projet.
+---
 
+# Mission 3 — Éditeur Markdown, Images Intégrées et Couverture Choisie
 
+- **Objectif :**
+  - Permettre l'édition et la prévisualisation sécurisée du Markdown pour les tutoriels : aucun HTML brut utilisateur, aucun usage de `bypassSecurityTrustHtml` sur le contenu, liens restreints aux protocoles sécurisés (`http:`, `https:`, `mailto:`), et résolution contrôlée des images locales via les pièces jointes accessibles du post (rejet des images externes pour empêcher le pistage et les failles SSRF).
+  - Implémenter le choix et le retrait explicite de l'image de couverture via `PUT /api/posts/:id/cover` avec vérification de l'auteur, rejet des posts archivés (`400 Bad Request`), vérification de la famille `image`, et garantie d'unicité atomique sous concurrence via `Post.findOneAndUpdate` avec `arrayFilters` disjoints.
+  - Supprimer le fallback silencieux dans `toPostPreview` (si la couverture est retirée, `coverUrl` est strictement `null`).
+- **Prompt principal :**
+  > « Mission 3 — Éditeur Markdown, images intégrées et couverture : Ajouter l’édition et la prévisualisation du Markdown avec un rendu sécurisé : pas de HTML brut utilisateur, pas de bypassSecurityTrustHtml sur le contenu du post, liens limités aux protocoles autorisés et images intégrées résolues uniquement depuis des pièces jointes accessibles. Implémenter le choix et le retrait explicites de la couverture via PUT /api/posts/:id/cover. Respecter les droits de l’auteur, rejeter la modification d’un post archivé et garantir l’unicité de la couverture en cas de requêtes concurrentes. Supprimer le fallback qui réaffiche automatiquement la première image lorsqu’une couverture a été retirée. Tester les cas normaux, les refus d’accès et les entrées Markdown dangereuses. »
+- **Fichiers modifiés :**
+  - `backend/src/utils/postProjections.js` : suppression du fallback silencieux à la première image dans `toPostPreview`, ajout de `isCover` dans `toPostDetail`.
+  - `backend/src/routes/posts.js` : route `PUT /api/posts/:id/cover` avec atomicité par filtres disjoints `arrayFilters`.
+  - `backend/test/cover.test.js` : 7 tests d'intégration backend (sélection, retrait, rejet PDF, rejet non-auteur, rejet archivé, unicité sous concurrence).
+  - `API_CONTRACT.md` : documentation de `PUT /api/posts/:id/cover`.
+  - `frontend-starter/src/app/shared/models/post.model.ts` : ajout de `isCover?: boolean`.
+  - `frontend-starter/src/app/shared/services/post.service.ts` & `spec.ts` : méthode `setCover(postId, attachmentId)`.
+  - `frontend-starter/src/app/shared/services/markdown.service.ts` & `spec.ts` : service de rendu Markdown sécurisé (échappement HTML brut préalable, whitelist de protocoles, neutralisation de balises et scripts dangereux, résolution d'images locales).
+  - `frontend-starter/src/app/components/posts-management-page/` : boutons de couverture et prévisualisation Markdown en direct.
+  - `frontend-starter/src/app/components/post-detail-page/` : rendu du tutoriel via `MarkdownService` avec liaison `[innerHTML]="renderedContent()"`.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **225 passants sur 225 (4 suites, 100% succès)** (`npm test` dans `backend/`).
+  - Tests Frontend : **249 passants sur 249 (19 suites, 100% succès)** (`npm test -- --watch=false` dans `frontend-starter/`).
+  - Compilation Frontend de production : **Build réussi sans erreur en 10.4s** (`npm run build` dans `frontend-starter/`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi refuser `bypassSecurityTrustHtml` sur le contenu :** Cette méthode neutralise la protection XSS native d'Angular. Si un auteur injectait du code JavaScript malveillant (ex: balise `<script>` ou attribut inline `onerror`), celui-ci s'exécuterait directement dans le navigateur du lecteur. Échapper le HTML brut avant de parser les balises Markdown garantit que seule une structure sémantique saine est générée.
+  - **Pourquoi bloquer les images externes :** Les images externes (`![alt](https://...)`) permettent de traquer les utilisateurs via leur adresse IP lors de l'affichage du post et posent des risques de contenu mixte ou d'indisponibilité. En limitant les images aux pièces jointes autorisées (`attachment:<id>`), on garantit le respect de la vie privée et l'intégrité du contenu.
+  - **Comment garantir l'unicité de la couverture sous concurrence :** En utilisant `findOneAndUpdate` avec des `arrayFilters` disjoints (`other._id: { $ne: targetId }` et `target._id: targetId`), MongoDB effectue la mise à zéro des anciennes couvertures et l'activation de la nouvelle en une transaction atomique au niveau du document, empêchant tout état incohérent avec plusieurs couvertures.
 
