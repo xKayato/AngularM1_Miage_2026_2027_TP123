@@ -37,6 +37,41 @@ const schema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    // Biographie de profil (max 500 caractères)
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
+    },
+    // Centres d'intérêt et compétences du créateur
+    profileTags: {
+      type: [
+        {
+          type: String,
+          trim: true,
+          lowercase: true,
+          match: [
+            /^[a-z0-9-]+$/,
+            "Format de tag invalide (minuscules, chiffres et tirets uniquement)",
+          ],
+        },
+      ],
+      default: [],
+    },
+    // Photo d'avatar de profil
+    avatar: {
+      storedName: { type: String, default: null },
+      originalName: { type: String, default: null },
+      mimeType: { type: String, default: null },
+      size: { type: Number, default: 0 },
+    },
+    // Horodatage du dernier changement de mot de passe (pour invalidation des JWT antérieurs)
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true },
 );
@@ -70,12 +105,17 @@ schema.methods.verifyPassword = function (value) {
 
 /** Retourne uniquement les champs qu'une réponse HTTP peut exposer. */
 schema.methods.toPublic = function () {
+  const hasAvatar = Boolean(this.avatar?.storedName);
   return {
     id: this.id,
     name: this.name,
     email: this.email,
     role: this.role || "user",
     status: this.status || "active",
+    bio: this.bio || "",
+    profileTags: Array.isArray(this.profileTags) ? this.profileTags : [],
+    hasAvatar,
+    avatarUrl: hasAvatar ? `/api/users/${this.id}/avatar` : null,
     createdAt: this.createdAt,
   };
 };

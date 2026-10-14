@@ -43,7 +43,8 @@ export interface CreatorSummary {
   name: string;
   bio: string;
   profileTags: string[];
-  avatarUrl: string;
+  hasAvatar?: boolean;
+  avatarUrl: string | null;
   createdAt: string;
   followersCount: number;
   creationsCount: number;
@@ -55,7 +56,8 @@ export interface CreatorPublicProfile {
   name: string;
   bio: string;
   profileTags: string[];
-  avatarUrl: string;
+  hasAvatar?: boolean;
+  avatarUrl: string | null;
   createdAt: string;
   followersCount: number;
   subscribersCount: number;

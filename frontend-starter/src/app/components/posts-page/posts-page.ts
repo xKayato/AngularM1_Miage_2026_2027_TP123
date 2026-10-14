@@ -1,10 +1,12 @@
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { PostService } from '../../shared/services/post.service';
 import { PostPreview } from '../../shared/models/post.model';
+
+export type SortCriteria = 'date-desc' | 'likes-desc' | 'date-asc';
 
 @Component({
   selector: 'app-posts-page',
@@ -37,6 +39,31 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   readonly selectedTag = signal<string>('');
   readonly appliedQuery = signal<string>('');
 
+  // Tri interactif Figma MakerShare v2
+  readonly sortCriteria = signal<SortCriteria>('date-desc');
+
+  readonly sortedPosts = computed(() => {
+    const list = [...this.posts()];
+    const criteria = this.sortCriteria();
+
+    if (criteria === 'likes-desc') {
+      return list.sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0));
+    }
+    if (criteria === 'date-asc') {
+      return list.sort((a, b) => {
+        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        return dateA - dateB;
+      });
+    }
+    // 'date-desc' par défaut
+    return list.sort((a, b) => {
+      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  });
+
   // Recherche & Suggestions
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly suggestions = signal<PostPreview[]>([]);
@@ -47,6 +74,9 @@ export class PostsPageComponent implements OnInit, OnDestroy {
 
   readonly categories = [
     'Toutes',
+    'Menuiserie',
+    'Électronique',
+    'Maroquinerie',
     'Lego',
     'Papercraft',
     'Origami',
@@ -76,6 +106,17 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     if (this.showSuggestions() && !this.elementRef.nativeElement.contains(event.target)) {
       this.closeSuggestions();
     }
+  }
+
+  setSortCriteria(criteria: SortCriteria): void {
+    this.sortCriteria.set(criteria);
+  }
+
+  getInitials(name?: string | null): string {
+    if (!name || !name.trim()) return 'CL';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
   loadSuggestions(text: string): void {
@@ -108,7 +149,6 @@ export class PostsPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (pageData) => {
           if (reqId !== this.currentSuggestionRequestId) {
-            // Réponse tardive ou suggestions déjà fermées : ignorée
             return;
           }
           this.suggestionsLoading.set(false);
@@ -205,7 +245,6 @@ export class PostsPageComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (pageData) => {
           if (requestId !== this.currentRequestId) {
-            // Protection anti-collision : réponse obsolète ignorée
             return;
           }
           this.posts.set(pageData.docs || pageData.items || []);
@@ -269,4 +308,3 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     }
   }
 }
-

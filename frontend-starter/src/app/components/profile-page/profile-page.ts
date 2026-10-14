@@ -8,6 +8,7 @@ import { AuthService } from '../../shared/services/auth.service';
 import { PostService } from '../../shared/services/post.service';
 import { CreatorService } from '../../shared/services/creator.service';
 import { FollowItem, SubscriptionItem } from '../../shared/models/creator.model';
+import { User } from '../../shared/models/user.model';
 
 @Component({
   imports: [ReactiveFormsModule, RouterLink, DatePipe],
@@ -30,7 +31,44 @@ export class ProfilePageComponent implements OnInit {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(2)],
     }),
+    email: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.email],
+    }),
+    bio: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(500)],
+    }),
+    profileTags: new FormControl('', {
+      nonNullable: true,
+    }),
   });
+
+  // Password form state
+  readonly passwordForm = new FormGroup({
+    currentPassword: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
+    newPassword: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.minLength(8)],
+    }),
+    confirmPassword: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.minLength(8)],
+    }),
+  });
+
+  readonly submittingPassword = signal(false);
+  readonly passwordSuccess = signal('');
+  readonly passwordError = signal('');
+
+  // Avatar upload state
+  readonly uploadingAvatar = signal(false);
+  readonly deletingAvatar = signal(false);
+  readonly avatarError = signal('');
+  readonly avatarSuccess = signal('');
 
   // Projects metrics state
   readonly loadingMetrics = signal(false);
@@ -55,20 +93,43 @@ export class ProfilePageComponent implements OnInit {
 
   /** Checks if the form has unchanged content compared to currentUser */
   isUnchanged(): boolean {
-    const currentName = this.auth.currentUser()?.name?.trim() ?? '';
-    const formName = this.form.controls.name.value.trim();
-    return currentName === formName;
+    const user = this.auth.currentUser();
+    if (!user) return true;
+    const formVals = this.form.getRawValue();
+    const currentTags = (user.profileTags || []).join(', ');
+    return (
+      user.name.trim() === formVals.name.trim() &&
+      user.email.trim().toLowerCase() === formVals.email.trim().toLowerCase() &&
+      (user.bio || '').trim() === formVals.bio.trim() &&
+      currentTags === formVals.profileTags.trim()
+    );
+  }
+
+  getInitials(name?: string | null): string {
+    if (!name || !name.trim()) return 'MK';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
   ngOnInit(): void {
     const user = this.auth.currentUser();
     if (user) {
-      this.form.setValue({ name: user.name });
+      this.populateForm(user);
     } else {
       this.load();
     }
 
     this.loadDashboardData();
+  }
+
+  private populateForm(user: User): void {
+    this.form.setValue({
+      name: user.name || '',
+      email: user.email || '',
+      bio: user.bio || '',
+      profileTags: (user.profileTags || []).join(', '),
+    });
   }
 
   load(): void {
@@ -78,7 +139,7 @@ export class ProfilePageComponent implements OnInit {
     this.auth.profile().subscribe({
       next: (user) => {
         this.loading.set(false);
-        this.form.setValue({ name: user.name });
+        this.populateForm(user);
       },
       error: (err: unknown) => {
         this.loading.set(false);
@@ -105,19 +166,133 @@ export class ProfilePageComponent implements OnInit {
     this.success.set('');
     this.error.set('');
 
-    const newName = this.form.controls.name.value.trim();
-    this.auth.update(newName).subscribe({
-      next: (updatedUser) => {
-        this.submitting.set(false);
-        this.form.setValue({ name: updatedUser.name });
-        this.success.set('Profil mis à jour avec succès !');
+    const raw = this.form.getRawValue();
+    const tagsArray = raw.profileTags
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0);
+
+    this.auth
+      .updateProfile({
+        name: raw.name.trim(),
+        email: raw.email.trim().toLowerCase(),
+        bio: raw.bio.trim(),
+        profileTags: tagsArray,
+      })
+      .subscribe({
+        next: (updatedUser) => {
+          this.submitting.set(false);
+          this.populateForm(updatedUser);
+          this.success.set('Profil mis à jour avec succès !');
+        },
+        error: (err: unknown) => {
+          this.submitting.set(false);
+          if (err instanceof HttpErrorResponse) {
+            this.error.set(err.error?.message ?? 'Impossible de mettre à jour le profil');
+          } else {
+            this.error.set('Erreur lors de la mise à jour');
+          }
+        },
+      });
+  }
+
+  savePassword(): void {
+    if (this.passwordForm.invalid) {
+      this.passwordForm.markAllAsTouched();
+      return;
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = this.passwordForm.getRawValue();
+
+    if (newPassword !== confirmPassword) {
+      this.passwordError.set('Les deux nouveaux mots de passe ne correspondent pas.');
+      return;
+    }
+
+    this.submittingPassword.set(true);
+    this.passwordSuccess.set('');
+    this.passwordError.set('');
+
+    this.auth.updatePassword(currentPassword, newPassword).subscribe({
+      next: () => {
+        this.submittingPassword.set(false);
+        this.passwordForm.reset();
+        this.passwordSuccess.set(
+          'Mot de passe mis à jour avec succès. Toutes vos autres sessions ont été invalidées par sécurité.'
+        );
       },
       error: (err: unknown) => {
-        this.submitting.set(false);
+        this.submittingPassword.set(false);
         if (err instanceof HttpErrorResponse) {
-          this.error.set(err.error?.message ?? 'Impossible de mettre à jour le profil');
+          // L'erreur 400 ne déconnecte pas l'utilisateur dans Angular
+          this.passwordError.set(err.error?.message ?? 'Impossible de modifier le mot de passe');
         } else {
-          this.error.set('Erreur lors de la mise à jour');
+          this.passwordError.set('Erreur lors du changement de mot de passe');
+        }
+      },
+    });
+  }
+
+  onAvatarFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    this.avatarError.set('');
+    this.avatarSuccess.set('');
+
+    // Validation taille (2 Mo max)
+    if (file.size > 2 * 1024 * 1024) {
+      this.avatarError.set("L'image d'avatar ne doit pas dépasser 2 Mo.");
+      input.value = '';
+      return;
+    }
+
+    // Validation type MIME
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      this.avatarError.set('Format image non accepté (JPEG, PNG ou WebP uniquement).');
+      input.value = '';
+      return;
+    }
+
+    this.uploadingAvatar.set(true);
+    this.auth.uploadAvatar(file).subscribe({
+      next: () => {
+        this.uploadingAvatar.set(false);
+        this.avatarSuccess.set('Avatar mis à jour avec succès !');
+        input.value = '';
+      },
+      error: (err: unknown) => {
+        this.uploadingAvatar.set(false);
+        input.value = '';
+        if (err instanceof HttpErrorResponse) {
+          this.avatarError.set(err.error?.message ?? "Erreur lors du téléversement de l'avatar.");
+        } else {
+          this.avatarError.set("Erreur lors de l'enregistrement de l'avatar.");
+        }
+      },
+    });
+  }
+
+  deleteAvatar(): void {
+    if (this.deletingAvatar()) return;
+
+    this.deletingAvatar.set(true);
+    this.avatarError.set('');
+    this.avatarSuccess.set('');
+
+    this.auth.deleteAvatar().subscribe({
+      next: () => {
+        this.deletingAvatar.set(false);
+        this.avatarSuccess.set('Avatar supprimé avec succès.');
+      },
+      error: (err: unknown) => {
+        this.deletingAvatar.set(false);
+        if (err instanceof HttpErrorResponse) {
+          this.avatarError.set(err.error?.message ?? "Erreur lors de la suppression de l'avatar.");
+        } else {
+          this.avatarError.set("Erreur lors de la suppression de l'avatar.");
         }
       },
     });

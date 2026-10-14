@@ -16,17 +16,20 @@
     </div>
   } @else if (postDetail(); as detail) {
     <article class="post-full-detail">
+      <!-- Bannière de lien secret (Figma v2) -->
       <div class="shared-banner">
-        <span>🔗 Projet partagé via un lien direct sécurisé</span>
+        <span class="shared-banner-icon">🔗</span>
+        <span>Accès par lien secret uniquement (Projet non répertorié dans le catalogue public)</span>
       </div>
 
-      <header class="detail-header">
+      <header class="detail-header card">
         <div class="meta-line">
+          <span class="badge-vis-link">🔗 Lien secret</span>
           <span class="category-pill">{{ detail.category }}</span>
           <span class="likes-badge">❤️ {{ detail.likesCount }} j'aime</span>
         </div>
 
-        <h1>{{ detail.title }}</h1>
+        <h1 class="font-display detail-title">{{ detail.title }}</h1>
         <p class="author-info">Par <b>{{ detail.author.name }}</b></p>
         <p class="short-desc">{{ detail.shortDescription }}</p>
 
@@ -37,16 +40,16 @@
         </div>
       </header>
 
-      <section class="content-body">
-        <h2>Description et instructions du projet</h2>
+      <section class="content-body card">
+        <h2 class="font-display">Description et instructions du projet</h2>
         <div class="text-content">
           {{ detail.content }}
         </div>
       </section>
 
       @if (detail.attachments.length > 0) {
-        <section class="attachments-section">
-          <h2>Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
+        <section class="attachments-section card">
+          <h2 class="font-display">Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
 
           <div class="attachments-list">
             @for (att of detail.attachments; track att.id) {
@@ -73,7 +76,7 @@
                     </button>
                   }
                   <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
-                    Télécharger
+                    ⬇️ Télécharger
                   </button>
                 </div>
               </div>

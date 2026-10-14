@@ -1,123 +1,173 @@
 <section class="catalogue-container" aria-labelledby="catalogue-title">
+  <!-- En-tête du catalogue -->
   <div class="catalogue-header">
-    <div>
-      <h1 id="catalogue-title">Explorer les créations MakerShare</h1>
-      <p class="subtitle">Découvrez les projets de la communauté DIY, modèles, tutos et compositions</p>
+    <div class="header-titles">
+      <span class="badge-tagline font-display">Kit UI MakerShare v2</span>
+      <h1 id="catalogue-title">Catalogue des créations</h1>
+      <p class="subtitle">Découvrez, apprenez et reproduisez les projets d'atelier, tutoriels DIY et modèles partagés par la communauté.</p>
     </div>
 
-    <div class="filters-bar">
-      <div class="search-box-wrapper">
-        <div class="search-box">
-          <label for="search-input" class="sr-only">Rechercher</label>
-          <input
-            id="search-input"
-            type="search"
-            role="combobox"
-            aria-autocomplete="list"
-            [attr.aria-expanded]="showSuggestions()"
-            aria-controls="suggestions-listbox"
-            [attr.aria-activedescendant]="highlightedIndex() >= 0 ? 'suggestion-item-' + highlightedIndex() : null"
-            placeholder="Rechercher par titre ou mot-clé..."
-            [formControl]="searchControl"
-            (keydown)="onKeyDown($event)"
-            autocomplete="off"
-          />
-          @if (searchControl.value) {
-            <button
-              type="button"
-              class="btn-clear-search"
-              (click)="clearSearch()"
-              aria-label="Effacer la recherche"
-            >
-              ✕ Effacer
-            </button>
-          }
-          <button
-            type="button"
-            class="btn-search"
-            (click)="onSubmitSearch()"
-            aria-label="Lancer la recherche"
-          >
-            Chercher
-          </button>
+    <!-- Barre d'outils : Recherche, Suggestions, Tris et Filtres -->
+    <div class="controls-card">
+      <div class="search-and-sort-grid">
+        <!-- Recherche textuelle & Suggestions en temps réel -->
+        <div class="search-col">
+          <label for="search-input" class="control-label">Rechercher un projet ou tutoriel</label>
+          <div class="search-box-wrapper">
+            <div class="search-box">
+              <span class="search-icon" aria-hidden="true">🔍</span>
+              <input
+                id="search-input"
+                type="search"
+                role="combobox"
+                aria-autocomplete="list"
+                [attr.aria-expanded]="showSuggestions()"
+                aria-controls="suggestions-listbox"
+                [attr.aria-activedescendant]="highlightedIndex() >= 0 ? 'suggestion-item-' + highlightedIndex() : null"
+                placeholder="Ex. bois, établi, solaire, cuir..."
+                [formControl]="searchControl"
+                (keydown)="onKeyDown($event)"
+                autocomplete="off"
+              />
+              @if (searchControl.value) {
+                <button
+                  type="button"
+                  class="btn-clear-search"
+                  (click)="clearSearch()"
+                  aria-label="Effacer la recherche"
+                >
+                  ✕ Effacer
+                </button>
+              }
+              <button
+                type="button"
+                class="btn-search"
+                (click)="onSubmitSearch()"
+                aria-label="Lancer la recherche"
+              >
+                Chercher
+              </button>
+            </div>
+
+            @if (showSuggestions()) {
+              <div
+                id="suggestions-listbox"
+                class="suggestions-dropdown"
+                role="listbox"
+                aria-label="Suggestions de créations"
+              >
+                <div class="suggestions-dropdown-header">
+                  <span>Suggestions pendant la saisie</span>
+                </div>
+                @if (suggestionsLoading()) {
+                  <div class="suggestion-status" aria-live="polite">
+                    <span class="mini-spinner"></span> Recherche de suggestions...
+                  </div>
+                } @else if (suggestionsError()) {
+                  <div class="suggestion-status error" role="alert">
+                    {{ suggestionsError() }}
+                  </div>
+                } @else if (suggestions().length === 0) {
+                  <div class="suggestion-status empty">
+                    Aucune suggestion trouvée pour « {{ searchControl.value }} »
+                  </div>
+                } @else {
+                  <ul class="suggestions-list">
+                    @for (item of suggestions(); track item.id; let idx = $index) {
+                      <li
+                        [id]="'suggestion-item-' + idx"
+                        role="option"
+                        class="suggestion-item"
+                        [class.highlighted]="highlightedIndex() === idx"
+                        [attr.aria-selected]="highlightedIndex() === idx"
+                        (click)="openPost(item.id)"
+                      >
+                        <div class="suggestion-main">
+                          <span class="suggestion-title">{{ item.title }}</span>
+                          <span class="suggestion-meta">
+                            Par {{ item.author.name }} • <span class="suggestion-category">{{ item.category }}</span>
+                          </span>
+                        </div>
+                        <div class="suggestion-badges">
+                          @if (item.isLocked) {
+                            <span class="badge-lock" title="Contenu réservé">🔒</span>
+                          }
+                          <span class="suggestion-likes">❤️ {{ item.likesCount }}</span>
+                        </div>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          </div>
         </div>
 
-        @if (showSuggestions()) {
-          <div
-            id="suggestions-listbox"
-            class="suggestions-dropdown"
-            role="listbox"
-            aria-label="Suggestions de créations"
-          >
-            @if (suggestionsLoading()) {
-              <div class="suggestion-status" aria-live="polite">
-                <span class="mini-spinner"></span> Recherche de suggestions...
-              </div>
-            } @else if (suggestionsError()) {
-              <div class="suggestion-status error" role="alert">
-                {{ suggestionsError() }}
-              </div>
-            } @else if (suggestions().length === 0) {
-              <div class="suggestion-status empty">
-                Aucune suggestion trouvée pour « {{ searchControl.value }} »
-              </div>
-            } @else {
-              <ul class="suggestions-list">
-                @for (item of suggestions(); track item.id; let idx = $index) {
-                  <li
-                    [id]="'suggestion-item-' + idx"
-                    role="option"
-                    class="suggestion-item"
-                    [class.highlighted]="highlightedIndex() === idx"
-                    [attr.aria-selected]="highlightedIndex() === idx"
-                    (click)="openPost(item.id)"
-                  >
-                    <div class="suggestion-main">
-                      <span class="suggestion-title">{{ item.title }}</span>
-                      <span class="suggestion-meta">
-                        Par {{ item.author.name }} • <span class="suggestion-category">{{ item.category }}</span>
-                      </span>
-                    </div>
-                    <div class="suggestion-badges">
-                      @if (item.isLocked) {
-                        <span class="badge-lock" title="Contenu réservé">🔒</span>
-                      }
-                      <span class="suggestion-likes">❤️ {{ item.likesCount }}</span>
-                    </div>
-                  </li>
-                }
-              </ul>
-            }
+        <!-- Bouton & Menu de Tri interactif Figma v2 -->
+        <div class="sort-col">
+          <label class="control-label">Trier les créations par</label>
+          <div class="sort-btn-group" role="group" aria-label="Critères de tri">
+            <button
+              type="button"
+              class="sort-btn"
+              [class.active]="sortCriteria() === 'date-desc'"
+              (click)="setSortCriteria('date-desc')"
+              title="Trier par date d'ajout la plus récente"
+            >
+              📅 Plus récents (Date)
+            </button>
+            <button
+              type="button"
+              class="sort-btn"
+              [class.active]="sortCriteria() === 'likes-desc'"
+              (click)="setSortCriteria('likes-desc')"
+              title="Trier par popularité"
+            >
+              ♥ Plus aimés (Likes)
+            </button>
+            <button
+              type="button"
+              class="sort-btn"
+              [class.active]="sortCriteria() === 'date-asc'"
+              (click)="setSortCriteria('date-asc')"
+              title="Trier par plus ancien"
+            >
+              🕰️ Plus anciens
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtres par catégorie et tags -->
+      <div class="filters-row">
+        <div class="category-chips" role="radiogroup" aria-label="Filtrer par catégorie">
+          <span class="filter-lbl">Catégories :</span>
+          @for (cat of categories; track cat) {
+            <button
+              type="button"
+              class="chip"
+              [class.active]="(selectedCategory() === '' && cat === 'Toutes') || selectedCategory() === cat"
+              (click)="selectCategory(cat)"
+            >
+              {{ cat }}
+            </button>
+          }
+        </div>
+
+        @if (selectedTag()) {
+          <div class="active-tag-filter" role="status">
+            <span>Tag actif : <strong>#{{ selectedTag() }}</strong></span>
+            <button
+              type="button"
+              class="btn-clear-tag"
+              (click)="clearTag()"
+              aria-label="Effacer le filtre par tag"
+            >
+              ✕ Retirer
+            </button>
           </div>
         }
       </div>
-
-      <div class="category-chips" role="radiogroup" aria-label="Filtrer par catégorie">
-        @for (cat of categories; track cat) {
-          <button
-            type="button"
-            class="chip"
-            [class.active]="(selectedCategory() === '' && cat === 'Toutes') || selectedCategory() === cat"
-            (click)="selectCategory(cat)"
-          >
-            {{ cat }}
-          </button>
-        }
-      </div>
-
-      @if (selectedTag()) {
-        <div class="active-tag-filter" role="status">
-          <span>Filtré par tag : <strong>#{{ selectedTag() }}</strong></span>
-          <button
-            type="button"
-            class="btn-clear-tag"
-            (click)="clearTag()"
-            aria-label="Effacer le filtre par tag"
-          >
-            ✕ Retirer
-          </button>
-        </div>
-      }
     </div>
   </div>
 
@@ -133,36 +183,70 @@
       <p>Chargement des créations...</p>
     </div>
   } @else {
-    <div class="posts-grid">
-      @for (post of posts(); track post.id) {
-        <article class="post-card" [class.locked]="post.isLocked">
+    <!-- Grille de créations avec dates d'ajout visibles avant clic (Frame 3B) -->
+    <div id="catalogue-grid" class="posts-grid">
+      @for (post of sortedPosts(); track post.id) {
+        <article
+          class="post-card catalogue-card"
+          [class.locked]="post.isLocked"
+          [attr.data-date]="post.publishedAt || ''"
+          [attr.data-likes]="post.likesCount"
+        >
+          <!-- Zone de couverture avec badges et date visible -->
           <div class="cover-wrapper">
+            <div class="cover-top-badges">
+              <span class="visibility-badge" [attr.data-visibility]="post.visibility">
+                @switch (post.visibility) {
+                  @case ('public') { 🌐 Public }
+                  @case ('followers') { 🔒👥 Followers }
+                  @case ('subscribers') { 🔒⭐ Abonnés }
+                  @default { 🔗 Privé }
+                }
+              </span>
+              <span class="cover-category-badge">{{ post.category }}</span>
+            </div>
+
             @if (post.isLocked) {
-              <div class="locked-placeholder" aria-label="Contenu verrouillé">
+              <div class="locked-placeholder" aria-label="Contenu réservé">
                 <span class="lock-icon">🔒</span>
-                <span class="lock-label">Contenu réservé</span>
+                <span class="lock-label">
+                  {{ post.visibility === 'followers' ? "Suivez l'auteur pour débloquer" : 'Abonnement requis' }}
+                </span>
               </div>
             } @else if (post.coverUrl) {
               <img [src]="post.coverUrl" [alt]="post.title" class="cover-img" loading="lazy" />
             } @else {
-              <div class="default-cover" aria-label="Image par défaut">
-                <span>🎨</span>
+              <div class="default-cover" aria-label="Aperçu du projet">
+                <span class="cover-art-icon">📐</span>
               </div>
             }
-            <span class="visibility-badge" [attr.data-visibility]="post.visibility">
-              {{ post.visibility === 'public' ? 'Public' : post.visibility === 'followers' ? 'Followers' : 'Abonnés' }}
-            </span>
+
+            <!-- Date d'ajout visible directement sur la carte avant le clic -->
+            <div class="cover-bottom-bar">
+              <span class="date-badge">
+                📅 {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+              </span>
+            </div>
           </div>
 
+          <!-- Contenu descriptif du tutoriel -->
           <div class="card-content">
             <div class="meta-top">
-              <span class="category-tag">{{ post.category }}</span>
-              <span class="likes-count" title="Nombre de mentions j'aime">❤️ {{ post.likesCount }}</span>
+              <span class="meta-date">
+                Ajouté le <strong>{{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</strong>
+              </span>
+              <span class="attachments-count">
+                {{ post.attachmentsCount }} pièce{{ post.attachmentsCount > 1 ? 's' : '' }} jointe{{ post.attachmentsCount > 1 ? 's' : '' }}
+              </span>
             </div>
 
-            <h2 class="post-title">{{ post.title }}</h2>
+            <h2 class="post-title">
+              <a [routerLink]="['/posts', post.id]">{{ post.title }}</a>
+            </h2>
+
             <p class="post-desc">{{ post.shortDescription }}</p>
 
+            <!-- Tags -->
             <div class="tags-row">
               @for (tag of post.tags; track tag) {
                 <button
@@ -177,11 +261,21 @@
               }
             </div>
 
+            <!-- Pied de carte : Auteur avec avatar & Likes -->
             <div class="card-footer">
-              <span class="author-name">Par <b><a [routerLink]="['/creators', post.author.id]" class="author-link">{{ post.author.name }}</a></b></span>
-              <a [routerLink]="['/posts', post.id]" class="btn-view">
-                {{ post.isLocked ? 'Voir l’aperçu' : 'Voir le projet' }}
+              <a [routerLink]="['/creators', post.author.id]" class="author-link" [title]="'Voir le profil de ' + post.author.name">
+                <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
+                <span class="author-name">{{ post.author.name }}</span>
               </a>
+
+              <div class="card-actions">
+                <span class="likes-pill" title="Mentions J'aime">
+                  <span class="heart-icon">♥</span> {{ post.likesCount }}
+                </span>
+                <a [routerLink]="['/posts', post.id]" class="btn-view">
+                  {{ post.isLocked ? 'Voir l’aperçu' : 'Voir le projet' }}
+                </a>
+              </div>
             </div>
           </div>
         </article>
@@ -192,6 +286,7 @@
       }
     </div>
 
+    <!-- Barre de pagination -->
     <nav class="pagination-bar" aria-label="Pagination des créations">
       <button
         type="button"
@@ -199,7 +294,7 @@
         [disabled]="currentPage() <= 1 || loading()"
         (click)="goToPage(currentPage() - 1)"
       >
-        Précédent
+        ← Précédent
       </button>
       <span class="page-indicator">
         Page {{ currentPage() }} sur {{ totalPages() }} ({{ totalDocs() }} création{{ totalDocs() > 1 ? 's' : '' }} au total)
@@ -210,7 +305,7 @@
         [disabled]="currentPage() >= totalPages() || loading()"
         (click)="goToPage(currentPage() + 1)"
       >
-        Suivant
+        Suivant →
       </button>
     </nav>
   }

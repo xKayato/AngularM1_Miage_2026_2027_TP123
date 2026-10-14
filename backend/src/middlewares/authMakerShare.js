@@ -37,6 +37,11 @@ export async function authMakerShare(req, res, next) {
       return res.status(403).json({ message: "Compte suspendu" });
     }
 
+    // Invalidation des JWT émis avant le dernier changement de mot de passe
+    if (user.passwordChangedAt && payload.iat && payload.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+      return res.status(401).json({ message: "Jeton révoqué suite à une modification du mot de passe" });
+    }
+
     req.auth = payload;
     req.user = user;
     next();

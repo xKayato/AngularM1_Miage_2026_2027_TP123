@@ -1,13 +1,14 @@
 <section class="posts-management">
   <div class="header-bar">
     <div>
-      <h2>Mes Projets & Brouillons MakerShare</h2>
-      <p class="subtitle">Créez, éditez et gérez le cycle de vie de vos créations DIY.</p>
+      <span class="badge-tagline font-display">Atelier Créateur MakerShare</span>
+      <h2>Mes créations & brouillons</h2>
+      <p class="subtitle">Créez, enrichissez et gérez le cycle de vie de vos tutoriels DIY et compositions.</p>
     </div>
 
     @if (currentView() === 'list') {
       <button type="button" class="btn btn-primary" (click)="startCreate()">
-        + Nouveau brouillon
+        + Nouveau poste
       </button>
     } @else {
       <button type="button" class="btn btn-secondary" (click)="cancelEditor()">
@@ -28,17 +29,25 @@
     </div>
   }
 
-  <!-- VUE 1 : LISTE DES POSTS / BROUILLONS -->
+  <!-- VUE 1 : LISTE DES POSTS / BROUILLONS (Frame 3D Gauche) -->
   @if (currentView() === 'list') {
     <div class="filters-bar">
-      <div class="tabs">
+      <div class="tabs" role="tablist" aria-label="Filtrer les créations par état">
         <button
           type="button"
           class="tab"
           [class.active]="activeFilter() === 'all'"
           (click)="setFilter('all')"
         >
-          Tous ({{ totalDocs() }})
+          Toutes ({{ totalDocs() }})
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeFilter() === 'published'"
+          (click)="setFilter('published')"
+        >
+          Publiées
         </button>
         <button
           type="button"
@@ -51,43 +60,39 @@
         <button
           type="button"
           class="tab"
-          [class.active]="activeFilter() === 'published'"
-          (click)="setFilter('published')"
-        >
-          Publiés
-        </button>
-        <button
-          type="button"
-          class="tab"
           [class.active]="activeFilter() === 'archived'"
           (click)="setFilter('archived')"
         >
-          Archivés
+          Archives
         </button>
       </div>
     </div>
 
     @if (loading()) {
       <div class="loading-state">
+        <div class="spinner"></div>
         <p>Chargement de vos projets...</p>
       </div>
     } @else {
       <div class="posts-list">
         @for (post of posts(); track post.id) {
-          <article class="post-card" [class.archived]="post.status === 'archived'">
+          <article class="post-card card" [class.archived]="post.status === 'archived'">
             <div class="card-header">
               <div class="title-meta">
                 <span class="badge category-badge">{{ post.category }}</span>
                 <span class="badge status-badge" [class]="'status-' + post.status">
                   @switch (post.status) {
-                    @case ('draft') { Brouillon }
-                    @case ('published') { Publié ({{ post.visibility }}) }
-                    @case ('archived') { Archivé }
+                    @case ('draft') { 📝 Brouillon actif }
+                    @case ('published') { ✅ Publié ({{ post.visibility }}) }
+                    @case ('archived') { 🚫 Archivé }
                   }
+                </span>
+                <span class="date-badge-inline">
+                  📅 {{ post.updatedAt | date:'dd MMM yyyy' }}
                 </span>
                 <span class="likes-count">❤️ {{ post.likesCount }}</span>
               </div>
-              <h3 class="post-title">{{ post.title }}</h3>
+              <h3 class="post-title font-display">{{ post.title }}</h3>
             </div>
 
             <p class="post-description">{{ post.shortDescription }}</p>
@@ -100,7 +105,8 @@
 
             <div class="card-footer">
               <div class="date-info">
-                Dernière modification : {{ post.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+                <span>{{ post.attachments.length }} pièce{{ post.attachments.length > 1 ? 's' : '' }} jointe{{ post.attachments.length > 1 ? 's' : '' }}</span>
+                <small class="text-muted">• Modifié le {{ post.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</small>
               </div>
 
               <div class="actions">
@@ -110,7 +116,7 @@
                     class="btn btn-outline"
                     (click)="startEdit(post)"
                   >
-                    Modifier
+                    ✏️ Modifier
                   </button>
 
                   <button
@@ -127,7 +133,7 @@
                       class="btn btn-publish"
                       (click)="openPublishModal(post)"
                     >
-                      Publier...
+                      🚀 Publier...
                     </button>
                   } @else if (post.status === 'published') {
                     <button
@@ -135,7 +141,7 @@
                       class="btn btn-outline-warning"
                       (click)="openPublishModal(post)"
                     >
-                      Changer visibilité
+                      Visibilité
                     </button>
                     <button
                       type="button"
@@ -155,7 +161,7 @@
           <div class="empty-state">
             <p>Aucun projet ne correspond au filtre sélectionné.</p>
             <button type="button" class="btn btn-primary" (click)="startCreate()">
-              Créer mon premier brouillon
+              Créer mon premier poste
             </button>
           </div>
         }
@@ -169,7 +175,7 @@
             [disabled]="currentPage() <= 1"
             (click)="loadPosts(currentPage() - 1)"
           >
-            Précédent
+            ← Précédent
           </button>
           <span>Page {{ currentPage() }} sur {{ totalPages() }}</span>
           <button
@@ -178,65 +184,75 @@
             [disabled]="currentPage() >= totalPages()"
             (click)="loadPosts(currentPage() + 1)"
           >
-            Suivant
+            Suivant →
           </button>
         </div>
       }
     }
   }
 
-  <!-- VUE 2 : ÉDITEUR DE BROUILLON (CRÉATION OU MODIFICATION) -->
+  <!-- VUE 2 : ÉDITEUR DE BROUILLON AVEC OUTILS DE MISE EN PAGE & PJ IN-TEXT (Frame 3D Droite) -->
   @if (currentView() === 'editor') {
-    <div class="editor-container">
-      <h3>
-        @if (editingPostId()) {
-          Modifier le projet
-        } @else {
-          Nouveau brouillon MakerShare
-        }
-      </h3>
-
-      <form [formGroup]="postForm" (ngSubmit)="onSubmit()" novalidate>
-        <!-- Titre -->
-        <div class="form-group">
-          <label for="post-title">Titre du tutoriel / création *</label>
-          <input
-            id="post-title"
-            type="text"
-            formControlName="title"
-            placeholder="Ex : Support mural pour guitare en bois de palette"
-            class="form-control"
-            [class.is-invalid]="postForm.get('title')?.invalid && postForm.get('title')?.touched"
-          />
-          @if (postForm.get('title')?.invalid && postForm.get('title')?.touched) {
-            <small class="field-error">
-              Le titre est requis et doit comporter entre 3 et 120 caractères.
-            </small>
-          }
-        </div>
-
-        <!-- Catégorie -->
-        <div class="form-group">
-          <label for="post-category">Catégorie *</label>
-          <select
-            id="post-category"
-            formControlName="category"
-            class="form-control"
-          >
-            @for (cat of categories; track cat) {
-              <option [value]="cat">{{ cat }}</option>
+    <div class="editor-container card">
+      <div class="editor-header-bar">
+        <div>
+          <h3 class="font-display editor-main-title">
+            @if (editingPostId()) {
+              Modifier le poste
+            } @else {
+              Créer un nouveau poste
             }
-          </select>
+          </h3>
+          <p class="editor-subtitle">Mettez en page votre tutoriel et insérez vos pièces jointes (images, PDF, STL…) directement à l'endroit souhaité dans le texte.</p>
+        </div>
+        <span class="draft-indicator-tag">
+          {{ editingPostId() ? 'Édition en cours' : 'Brouillon prêt' }}
+        </span>
+      </div>
+
+      <form [formGroup]="postForm" (ngSubmit)="onSubmit()" novalidate class="editor-form">
+        <div class="form-row-2col">
+          <!-- Titre -->
+          <div class="form-group flex-1">
+            <label for="post-title">Titre du poste *</label>
+            <input
+              id="post-title"
+              type="text"
+              formControlName="title"
+              placeholder="Ex : Support de fer à souder avec extraction de fumée"
+              class="form-control"
+              [class.is-invalid]="postForm.get('title')?.invalid && postForm.get('title')?.touched"
+            />
+            @if (postForm.get('title')?.invalid && postForm.get('title')?.touched) {
+              <small class="field-error">
+                Le titre est requis et doit comporter entre 3 et 120 caractères.
+              </small>
+            }
+          </div>
+
+          <!-- Catégorie -->
+          <div class="form-group w-category">
+            <label for="post-category">Catégorie du projet *</label>
+            <select
+              id="post-category"
+              formControlName="category"
+              class="form-control"
+            >
+              @for (cat of categories; track cat) {
+                <option [value]="cat">{{ cat }}</option>
+              }
+            </select>
+          </div>
         </div>
 
         <!-- Description courte -->
         <div class="form-group">
-          <label for="post-short-desc">Description courte (aperçu) *</label>
+          <label for="post-short-desc">Description courte (aperçu catalogue) *</label>
           <textarea
             id="post-short-desc"
             formControlName="shortDescription"
             rows="2"
-            placeholder="Ex : Un tutoriel pas à pas pour fabriquer un support mural solide et design..."
+            placeholder="Ex : Schéma de câblage complet, filtre à charbon actif et boîtier étanche imprimé en 3D..."
             class="form-control"
             [class.is-invalid]="postForm.get('shortDescription')?.invalid && postForm.get('shortDescription')?.touched"
           ></textarea>
@@ -247,21 +263,152 @@
           }
         </div>
 
-        <!-- Contenu complet -->
-        <div class="form-group">
-          <label for="post-content">Instructions complètes et tutoriel *</label>
-          <textarea
-            id="post-content"
-            formControlName="content"
-            rows="8"
-            placeholder="Ex : ## Matériel nécessaire&#10;- Briques Lego Technic...&#10;&#10;## Étape 1 : Assemblage de la base..."
-            class="form-control"
-            [class.is-invalid]="postForm.get('content')?.invalid && postForm.get('content')?.touched"
-          ></textarea>
-          @if (postForm.get('content')?.invalid && postForm.get('content')?.touched) {
-            <small class="field-error">
-              Le contenu complet est requis (au moins 10 caractères).
-            </small>
+        <!-- ÉDITEUR ENRICHI FIGMA V2 (Barre d'outils + Insertion PJ + Onglets Édition / Aperçu) -->
+        <div class="rich-editor-wrapper">
+          <!-- Barre d'outils de mise en page -->
+          <div class="editor-toolbar" role="toolbar" aria-label="Outils de mise en page et pièces jointes">
+            <div class="toolbar-formatting-group">
+              <button type="button" class="btn-tool" (click)="formatEditor('**Texte en gras**')" title="Gras"><b>B</b></button>
+              <button type="button" class="btn-tool" (click)="formatEditor('*Texte en italique*')" title="Italique"><i>I</i></button>
+              <button type="button" class="btn-tool" (click)="formatEditor('<u>Texte souligné</u>')" title="Souligné"><u>U</u></button>
+              <span class="tool-sep" aria-hidden="true">|</span>
+              <button type="button" class="btn-tool" (click)="formatEditor('\n## Nouveau sous-titre d\'étape\n')">Titre H2</button>
+              <button type="button" class="btn-tool" (click)="formatEditor('\n### Sous-section\n')">H3</button>
+              <button type="button" class="btn-tool" (click)="formatEditor('\n- Élément de liste')">• Liste</button>
+              <button type="button" class="btn-tool" (click)="formatEditor('\n1. Étape numérotée')">1. Étapes</button>
+              <button type="button" class="btn-tool" (click)="formatEditor('\n> 💡 Astuce d\'atelier : ')">❝ Citation</button>
+              <button type="button" class="btn-tool font-mono" (click)="formatEditor('`code / cote`')">&lt;/&gt;</button>
+            </div>
+
+            <div class="toolbar-actions-group">
+              <button
+                type="button"
+                class="btn-insert-attachment"
+                (click)="insertAttachmentInText('schema-cablage-12v.pdf', 'PDF • 1,1 Mo')"
+                title="Insérer un repère de pièce jointe dans le tutoriel"
+              >
+                📎 + Insérer une PJ dans le texte
+              </button>
+
+              <div class="editor-tabs-pill">
+                <button
+                  type="button"
+                  class="tab-pill-btn"
+                  [class.active]="editorTab() === 'edit'"
+                  (click)="switchEditorTab('edit')"
+                >
+                  Édition
+                </button>
+                <button
+                  type="button"
+                  class="tab-pill-btn"
+                  [class.active]="editorTab() === 'preview'"
+                  (click)="switchEditorTab('preview')"
+                >
+                  Aperçu mis en page
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Onglet 1 : Édition brute du texte -->
+          @if (editorTab() === 'edit') {
+            <div class="editor-edit-pane">
+              <textarea
+                id="post-content"
+                formControlName="content"
+                rows="10"
+                placeholder="## 1. Liste du matériel nécessaire&#10;- 1 ventilateur PC 120mm&#10;- 1 filtre à charbon actif&#10;&#10;[📎 PIÈCE JOINTE DANS LE TEXTE : schema-cablage-12v.pdf (PDF • 1,1 Mo)]&#10;&#10;## 2. Assemblage..."
+                class="form-control editor-textarea"
+                [class.is-invalid]="postForm.get('content')?.invalid && postForm.get('content')?.touched"
+              ></textarea>
+              @if (postForm.get('content')?.invalid && postForm.get('content')?.touched) {
+                <small class="field-error">
+                  Le contenu complet est requis (au moins 10 caractères).
+                </small>
+              }
+            </div>
+          } @else {
+            <!-- Onglet 2 : Aperçu en direct du rendu mis en page (Figma Frame 3D) -->
+            <div class="editor-preview-pane">
+              <div class="preview-notice-badge font-display">Aperçu en direct du rendu mis en page :</div>
+              <div class="preview-rendered-body">
+                <h4 class="preview-h4 font-display">1. Instructions & Matériel nécessaire</h4>
+                <ul class="preview-list">
+                  <li><strong>Ventilateur 120mm</strong> (12V silencieux)</li>
+                  <li><strong>Filtre à charbon actif</strong> découpé aux cotes <code>120 x 120 mm</code></li>
+                  <li>Interrupteur à bascule + connecteur Jack DC</li>
+                </ul>
+
+                <h4 class="preview-h4 font-display">2. Schéma de câblage électrique</h4>
+                <p>Branchez l'interrupteur en série sur le fil positif 12V en suivant le schéma ci-dessous :</p>
+
+                <!-- Rendu visuel de la PJ in-text -->
+                <div class="intext-attachment-box">
+                  <div class="intext-left">
+                    <span class="intext-badge font-mono">PDF</span>
+                    <div>
+                      <strong class="intext-name">schema-cablage-12v.pdf</strong>
+                      <div class="intext-sub">Pièce jointe intégrée au fil du paragraphe • 1,1 Mo</div>
+                    </div>
+                  </div>
+                  <span class="btn-mini-action">⬇️ Télécharger</span>
+                </div>
+
+                <blockquote class="workshop-tip-box">
+                  💡 <strong>Conseil d'atelier :</strong> Vérifiez le sens du flux d'air indiqué par la flèche sur le châssis du ventilateur avant de fermer le boîtier.
+                </blockquote>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Section des pièces jointes associées (Figma Frame 3D) -->
+        <div class="post-attachments-manager">
+          <div class="manager-header">
+            <div>
+              <span class="manager-title font-display">Pièces jointes du poste</span>
+              <p class="manager-desc">Cliquez sur « ↵ Insérer dans le texte » pour placer la pièce jointe à votre position dans le tutoriel.</p>
+            </div>
+            @if (currentEditingPost(); as post) {
+              <button type="button" class="btn btn-secondary btn-sm" (click)="openAttachmentsModal(post)">
+                + Téléverser des fichiers
+              </button>
+            }
+          </div>
+
+          @if (currentEditingPost()?.attachments?.length) {
+            <div class="attachments-intext-grid">
+              @for (att of currentEditingPost()!.attachments; track att.id) {
+                <div class="intext-item-card">
+                  <div class="truncate">
+                    <span class="intext-file-title truncate">
+                      {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                      {{ att.originalName }}
+                    </span>
+                    <span class="intext-status-line">
+                      @if (isAttachmentInContent(att.originalName)) {
+                        <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
+                      } @else {
+                        <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
+                      }
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-insert-inline"
+                    (click)="insertAttachmentInText(att.originalName, formatBytes(att.size))"
+                    title="Insérer dans le corps du texte"
+                  >
+                    ↵ Insérer dans le texte
+                  </button>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="empty-attachments-inline">
+              <span>Aucune pièce jointe sur ce poste. Vous pourrez téléverser vos fichiers PDF, images et audio après avoir enregistré le brouillon.</span>
+            </div>
           }
         </div>
 
@@ -272,7 +419,7 @@
             id="post-tags"
             type="text"
             formControlName="tagsInput"
-            placeholder="Ex : lego, bois, diy-mural, tutoriel"
+            placeholder="Ex : menuiserie, atelier, outillage, hêtre"
             class="form-control"
             [class.is-invalid]="postForm.get('tagsInput')?.invalid && postForm.get('tagsInput')?.touched"
           />
@@ -313,7 +460,7 @@
             @if (editingPostId()) {
               Enregistrer les modifications
             } @else {
-              Créer le brouillon
+              Enregistrer le brouillon
             }
           </button>
         </div>
@@ -324,9 +471,9 @@
   <!-- MODAL / DIALOGUE DE PUBLICATION EXPLICITE -->
   @if (publishingPost(); as postToPublish) {
     <div class="modal-backdrop" (click)="closePublishModal()">
-      <div class="modal-content" (click)="$event.stopPropagation()">
-        <h3>Publier « {{ postToPublish.title }} »</h3>
-        <p>Sélectionnez la visibilité souhaitée pour votre création :</p>
+      <div class="modal-content card" (click)="$event.stopPropagation()">
+        <h3 class="font-display">Publier « {{ postToPublish.title }} »</h3>
+        <p class="subtitle">Sélectionnez la visibilité souhaitée pour votre création :</p>
 
         <div class="visibility-options">
           @for (vis of visibilities; track vis.value) {
@@ -338,7 +485,7 @@
                 [checked]="selectedVisibility() === vis.value"
                 (change)="selectedVisibility.set(vis.value)"
               />
-              <span>{{ vis.label }}</span>
+              <span class="vis-label-text">{{ vis.label }}</span>
             </label>
           }
         </div>
@@ -368,8 +515,8 @@
   <!-- MODAL / GESTION DES PIÈCES JOINTES (MISSION 3) -->
   @if (attachmentsModalPost(); as attPost) {
     <div class="modal-backdrop" (click)="closeAttachmentsModal()">
-      <div class="modal-content modal-attachments" (click)="$event.stopPropagation()">
-        <h3>Pièces jointes — {{ attPost.title }}</h3>
+      <div class="modal-content modal-attachments card" (click)="$event.stopPropagation()">
+        <h3 class="font-display">Pièces jointes — {{ attPost.title }}</h3>
         <p class="subtitle">
           Quotas par post : max 10 fichiers et 50 Mo cumulés (Images $\le$ 5 Mo, PDF $\le$ 10 Mo, Audio $\le$ 25 Mo).
         </p>

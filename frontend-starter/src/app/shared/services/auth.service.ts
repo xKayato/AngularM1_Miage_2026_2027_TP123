@@ -88,13 +88,82 @@ export class AuthService {
   }
 
   /**
-   * Updates the current user's name.
+   * Updates the current user's name (legacy method).
    */
   update(name: string): Observable<User> {
-    const payload: UpdateProfileRequest = { name: name.trim() };
+    return this.updateProfile({ name: name.trim() });
+  }
 
-    return this.http.put<User>('/api/users/me', payload).pipe(
+  /**
+   * Updates extended profile data (name, email, bio, profileTags).
+   */
+  updateProfile(data: { name?: string; email?: string; bio?: string; profileTags?: string[] }): Observable<User> {
+    interface UpdateProfileResponse extends User {
+      token?: string;
+    }
+
+    const payload: { name?: string; email?: string; bio?: string; profileTags?: string[] } = {};
+    if (data.name !== undefined) payload.name = data.name.trim();
+    if (data.email !== undefined) payload.email = data.email.trim().toLowerCase();
+    if (data.bio !== undefined) payload.bio = data.bio.trim();
+    if (data.profileTags !== undefined) payload.profileTags = data.profileTags;
+
+    return this.http.put<UpdateProfileResponse>('/api/users/me', payload).pipe(
+      tap((res: UpdateProfileResponse) => {
+        if (res.token) {
+          this.storeToken(res.token);
+          this.token.set(res.token);
+        }
+        this.currentUser.set(res);
+      }),
+    );
+  }
+
+  /**
+   * Updates password with verification and stores new active session JWT.
+   */
+  updatePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Observable<{ message: string; token: string; user: User }> {
+    return this.http
+      .put<{ message: string; token: string; user: User }>('/api/users/me/password', {
+        currentPassword,
+        newPassword,
+      })
+      .pipe(
+        tap((res) => {
+          if (res.token) {
+            this.storeToken(res.token);
+            this.token.set(res.token);
+          }
+          if (res.user) {
+            this.currentUser.set(res.user);
+          }
+        }),
+      );
+  }
+
+  /**
+   * Uploads and sets user profile avatar image.
+   */
+  uploadAvatar(file: File): Observable<User> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    return this.http.post<User>('/api/users/me/avatar', formData).pipe(
       tap((user) => this.currentUser.set(user)),
+    );
+  }
+
+  /**
+   * Deletes user profile avatar.
+   */
+  deleteAvatar(): Observable<void> {
+    return this.http.delete<void>('/api/users/me/avatar').pipe(
+      tap(() => {
+        this.currentUser.update((u) => (u ? { ...u, hasAvatar: false, avatarUrl: null } : null));
+      }),
     );
   }
 

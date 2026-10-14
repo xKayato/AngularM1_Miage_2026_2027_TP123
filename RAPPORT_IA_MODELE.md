@@ -607,4 +607,55 @@
   - **Nécessité de vérifier l'accès complet au post avant de liker :** Pour empêcher un utilisateur d'aimer un contenu privé, réservé ou payant qu'il ne peut pas consulter, `canAccessPost()` est exécuté côté serveur avant toute insertion de like.
   - **Idempotence et capture de l'erreur 11000 :** Le code 11000 levé par l'index unique `{ userId: 1, postId: 1 }` lors d'un clic répété est intercepté par Express pour renvoyer un statut 200 avec le comptage réel plutôt qu'un crash 500, offrant une expérience robuste et fluide.
 
+---
+
+# Refonte Visuelle & Intégration du Kit UI Figma MakerShare v2
+
+## Mission UI — Intégration Maquette MakerShare v2 (Mode Sombre, Éditeur Riche, Tri & Dates)
+
+- **Objectif :** Refondre intégralement l'interface utilisateur de l'application selon la maquette prototype HTML/CSS Figma v2. Mettre en place la double palette variable (Mode Clair « Papier d'atelier » et Mode Sombre « Atelier Nocturne »), le switch de thème persistant, la barre de navigation MakerShare, le tri interactif du catalogue (récents, likes, anciens), l'affichage direct des dates sur les cartes, la vue détaillée enrichie à 2 colonnes avec pièces jointes au fil du texte, et l'éditeur riche de tutoriels avec barre d'outils de formatage et insertion de pièces jointes au curseur.
+- **Prompt principal :**
+  > « Tu vas totalement modifier l'UI de ce site web pour qu'il soit comme la maquette HTML que je t'ai donné. Pour les éléments qui n'existent pas encore dans l'application mais qui sont dans la maquette, tu prépares le code html / css pour que ce soit déjà bien implémenté quand je rajouterai les fonctionnalités. »
+- **Plan proposé et points clés :**
+  1. **Fondations Visuelles & Thème (`styles.css`, `index.html`) :**
+     - Définition des variables CSS : `--bg-canvas`, `--bg-surface`, `--bg-subtle`, `--border-color`, `--text-primary`, `--text-secondary`, `--text-muted`, `--brand-primary`, `--brand-hover`, `--pine-primary`, `--pine-hover`.
+     - Intégration Google Fonts `Plus Jakarta Sans` (titres et identité) et `Inter` (corps de texte).
+     - Règle d'accessibilité WCAG : `*:focus-visible { outline: 2px solid #3B82F6 !important; }`.
+     - Création d'un `ThemeService` réactif (`isDark = signal<boolean>`) appliquant la classe `.dark` sur `<html>` et persistant le choix dans `localStorage`.
+  2. **Navigation Principale (`app.component`) :**
+     - Logo MakerShare carré « M », liens de navigation épurés, bouton switch Clair/Sombre (`🌓 Mode Clair / Sombre`), badge utilisateur avec initiales d'avatar rondes et menu mobile déroulant (adapté aux écrans 390px).
+  3. **Catalogue des créations (`posts-page` — Frame 3B) :**
+     - Barre de tri interactif avec 3 options (`📅 Plus récents (Date)`, `♥ Plus aimés (Likes)`, `🕰️ Plus anciens`) pilotée par un signal de tri et un signal calculé `sortedPosts`.
+     - Date d'ajout affichée directement sur la carte avant le clic (`📅 12 oct. 2026`).
+     - Badges de visibilité WCAG (`🌐 Public`, `🔒👥 Followers`, `🔒⭐ Abonnés`), suggestions avec badges.
+  4. **Détail d'un projet (`post-detail-page` — Frame 3C) :**
+     - Grille à deux colonnes (2fr / 1fr) : zone de tutoriel principale avec instructions, astuces d'atelier, blocs de pièces jointes intégrées et colonne latérale récapitulant les tags et toutes les pièces jointes avec boutons de téléchargement direct.
+  5. **Atelier et Création de poste (`posts-management-page` — Frame 3D) :**
+     - Barre d'outils de mise en page riche : Boutons B, I, U, Titre H2, H3, Listes, Citations, Code.
+     - Bouton d'insertion au curseur : `📎 + Insérer une PJ dans le texte`.
+     - Double onglet en temps réel : `Édition` (textarea) / `Aperçu mis en page` (rendu Markdown avec cartes visuelles de pièces jointes).
+     - Liste des pièces jointes du poste avec indicateur « ✓ Inséré dans le texte » et bouton « ↵ Insérer dans le texte ».
+  6. **Espaces Profil & Annuaire (`profile-page`, `creators-search-page`, `creator-profile-page` — Frames 3E, 3F, 3G) :**
+     - Alignement complet sur les chartes graphiques de la maquette (initiales rondes, compteurs d'atelier, bannières explicites « Simulation — aucun paiement réel », cartes d'abonnements et de suivi).
+  7. **Pages d'authentification (`login-page`, `register-page` — Frame 3A) :**
+     - Cartes centrées épurées aux couleurs MakerShare.
+- **Fichiers modifiés :**
+  - Fondations & Thème : `src/index.html`, `src/styles.css`, `src/app/shared/services/theme.service.ts`, `src/app/shared/services/theme.service.spec.ts`.
+  - Navigation : `src/app/components/app/app.ts`, `app.html`, `app.css`.
+  - Catalogue : `src/app/components/posts-page/posts-page.ts`, `posts-page.html`, `posts-page.css`.
+  - Détail : `src/app/components/post-detail-page/post-detail-page.ts`, `post-detail-page.html`, `post-detail-page.css`.
+  - Atelier / Édition : `src/app/components/posts-management-page/posts-management-page.ts`, `posts-management-page.html`, `posts-management-page.css`.
+  - Profil personnel : `src/app/components/profile-page/profile-page.ts`, `profile-page.html`, `profile-page.css`.
+  - Créateurs : `src/app/components/creators-search-page/creators-search-page.html`, `creators-search-page.css`, `src/app/components/creator-profile-page/creator-profile-page.html`, `creator-profile-page.css`.
+  - Authentification : `src/app/components/login-page/login-page.html`, `login-page.css`, `src/app/components/register-page/register-page.html`, `register-page.css`.
+  - Partage secret : `src/app/components/shared-post-page/shared-post-page.html`, `shared-post-page.css`.
+- **Preuves de fonctionnement :**
+  - **Tests unitaires :** **221 passants sur 221 (18 suites de tests)** (`ng test --watch=false`), 100% de réussite.
+  - **Compilation de production :** Build réussi en 10.74s (`ng build`) sans erreur ni warning TypeScript.
+- **Ce que je sais expliquer sans l'agent :**
+  - **Architecture de la double palette CSS (Variables & Mode Sombre) :** Définir les jetons de design via des propriétés personnalisées CSS (`:root` et `html.dark`) permet une bascule instantanée sans recalcul de bundle JS ni scintillement d'affichage (FOUC).
+  - **Découplage Tri Client vs Pagination Serveur :** Le tri interactif par date ou likes sur la page courante est géré par un signal réactif calculé (`computed()`) pour offrir une réponse utilisateur instantanée tout en respectant scrupuleusement le contrat d'API paginée côté serveur.
+  - **Approche modulaire de l'éditeur riche avec pièces jointes in-text :** Les pièces jointes sont représentées dans le texte par des jetons sémantiques normalisés (`[📎 PIÈCE JOINTE DANS LE TEXTE : filename (meta)]`), ce qui permet une persistance simple au format texte dans MongoDB tout en offrant un rendu visuel riche (téléchargement, aperçu) lors de la prévisualisation et de la consultation du projet.
+
+
 

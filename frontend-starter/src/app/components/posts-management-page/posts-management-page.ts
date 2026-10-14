@@ -504,5 +504,37 @@ export class PostsManagementPageComponent implements OnInit {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   }
+
+  // --- Outils Éditeur Riche & Insertion Pièces Jointes in-text (Figma Frame 3D) ---
+  readonly editorTab = signal<'edit' | 'preview'>('edit');
+
+  readonly currentEditingPost = computed(() => {
+    const id = this.editingPostId();
+    if (!id) return null;
+    return this.posts().find((p) => p.id === id) || null;
+  });
+
+  switchEditorTab(tab: 'edit' | 'preview'): void {
+    this.editorTab.set(tab);
+  }
+
+  formatEditor(snippet: string): void {
+    const contentCtrl = this.postForm.get('content');
+    if (!contentCtrl) return;
+    const currentVal = contentCtrl.value || '';
+    contentCtrl.setValue(currentVal + (currentVal.endsWith('\n') ? '' : '\n') + snippet);
+    contentCtrl.markAsDirty();
+  }
+
+  insertAttachmentInText(filename: string, meta = ''): void {
+    const tag = `\n\n[📎 PIÈCE JOINTE DANS LE TEXTE : ${filename}${meta ? ' (' + meta + ')' : ''}]\n\n`;
+    this.formatEditor(tag);
+  }
+
+  isAttachmentInContent(filename: string): boolean {
+    const content = this.postForm.get('content')?.value || '';
+    return content.includes(filename);
+  }
 }
+
 

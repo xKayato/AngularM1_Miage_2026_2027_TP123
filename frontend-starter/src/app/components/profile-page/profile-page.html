@@ -1,35 +1,97 @@
 <div class="dashboard-container">
-  <!-- SECTION 1 : Profil Personnel & Modification -->
-  <section class="card profile-card">
+  <!-- SECTION 1 : Profil Personnel, Identité & Avatar -->
+  <section class="card profile-card" aria-labelledby="profile-title">
     <div class="section-header">
-      <h1>Mon Profil Personnel</h1>
+      <h1 id="profile-title">Mon Profil Créateur</h1>
       <span class="badge role-badge">{{ auth.currentUser()?.role === 'admin' ? 'Administrateur' : 'Membre' }}</span>
     </div>
 
     @if (loading()) {
-      <p class="loading-state">Chargement du profil...</p>
+      <p class="loading-state" aria-live="polite">Chargement du profil...</p>
     }
 
     @if (auth.currentUser(); as user) {
+      <!-- GESTION DE L'AVATAR -->
+      <div class="avatar-management-row">
+        <div class="avatar-preview-wrapper">
+          @if (user.hasAvatar && user.avatarUrl) {
+            <img [src]="user.avatarUrl" [alt]="user.name" class="avatar-img" />
+          } @else {
+            <div class="avatar-badge-initials" aria-hidden="true">
+              {{ getInitials(user.name) }}
+            </div>
+          }
+        </div>
+
+        <div class="avatar-actions">
+          <label for="avatar-file-input" class="btn-secondary btn-upload-label">
+            📷 {{ uploadingAvatar() ? 'Téléversement...' : 'Changer la photo' }}
+          </label>
+          <input
+            id="avatar-file-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            (change)="onAvatarFileSelected($event)"
+            [disabled]="uploadingAvatar() || deletingAvatar()"
+            class="sr-only"
+          />
+
+          @if (user.hasAvatar) {
+            <button
+              type="button"
+              class="btn-danger-outline"
+              [disabled]="uploadingAvatar() || deletingAvatar()"
+              (click)="deleteAvatar()"
+            >
+              {{ deletingAvatar() ? 'Suppression...' : 'Supprimer la photo' }}
+            </button>
+          }
+
+          <p class="avatar-hint">Formats JPEG, PNG ou WebP. 2 Mo maximum.</p>
+
+          @if (avatarSuccess()) {
+            <p class="feedback-msg success" role="status">{{ avatarSuccess() }}</p>
+          }
+          @if (avatarError()) {
+            <p class="feedback-msg error" role="alert">{{ avatarError() }}</p>
+          }
+        </div>
+      </div>
+
       <div class="user-meta">
         <p class="user-info">
-          <strong class="user-name">{{ user.name }}</strong>
-          <span class="user-email">{{ user.email }}</span>
-          <small class="user-date">Membre depuis le {{ user.createdAt.slice(0, 10) }}</small>
+          <span class="member-since">Membre depuis le {{ user.createdAt | date:'mediumDate' }}</span>
+          <a [routerLink]="['/creators', user.id]" class="view-public-profile-link">
+            Voir mon profil public →
+          </a>
         </p>
       </div>
 
+      <!-- FORMULAIRE D'ÉDITION DU PROFIL -->
       <form [formGroup]="form" (ngSubmit)="save()" novalidate class="profile-form">
-        <label for="profile-name" class="form-label">
-          Nouveau nom d'affichage
-          <input
-            id="profile-name"
-            type="text"
-            formControlName="name"
-            class="form-input"
-            aria-describedby="profile-name-error"
-          />
-        </label>
+        <div class="form-row">
+          <label for="profile-name" class="form-label">
+            Nom d'affichage
+            <input
+              id="profile-name"
+              type="text"
+              formControlName="name"
+              class="form-input"
+              aria-describedby="profile-name-error"
+            />
+          </label>
+
+          <label for="profile-email" class="form-label">
+            Adresse email
+            <input
+              id="profile-email"
+              type="email"
+              formControlName="email"
+              class="form-input"
+              aria-describedby="profile-email-error"
+            />
+          </label>
+        </div>
 
         @if (form.controls.name.touched && form.controls.name.invalid) {
           <p id="profile-name-error" class="error-msg" role="alert">
@@ -41,12 +103,43 @@
           </p>
         }
 
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <p id="profile-email-error" class="error-msg" role="alert">
+            Adresse email invalide.
+          </p>
+        }
+
+        <label for="profile-bio" class="form-label">
+          Biographie (tutoriels, univers de création, compétences)
+          <textarea
+            id="profile-bio"
+            formControlName="bio"
+            rows="3"
+            class="form-textarea"
+            maxlength="500"
+            placeholder="Présentez brièvement vos centres d'intérêt, vos spécialités créatives..."
+          ></textarea>
+        </label>
+        <span class="char-counter">{{ form.controls.bio.value.length }}/500 caractères</span>
+
+        <label for="profile-tags" class="form-label">
+          Tags de profil (séparés par des virgules)
+          <input
+            id="profile-tags"
+            type="text"
+            formControlName="profileTags"
+            class="form-input"
+            placeholder="ex: lego, papercraft, electronique, 3d-print"
+          />
+        </label>
+        <span class="field-hint">Minuscules, chiffres et tirets. Maximum 10 tags.</span>
+
         <button
           type="submit"
           class="btn-primary"
           [disabled]="submitting() || form.invalid || isUnchanged()"
         >
-          {{ submitting() ? 'Enregistrement...' : 'Enregistrer les modifications' }}
+          {{ submitting() ? 'Enregistrement...' : 'Enregistrer mon profil' }}
         </button>
       </form>
     } @else if (!loading()) {
@@ -65,7 +158,76 @@
     }
   </section>
 
-  <!-- SECTION 2 : Métriques de mes créations -->
+  <!-- SECTION 2 : Sécurité du Compte & Mot de Passe -->
+  <section class="card security-card" aria-labelledby="security-title">
+    <div class="section-header">
+      <h2 id="security-title">Sécurité & Mot de Passe</h2>
+    </div>
+
+    <form [formGroup]="passwordForm" (ngSubmit)="savePassword()" novalidate class="password-form">
+      <label for="current-password" class="form-label">
+        Mot de passe actuel
+        <input
+          id="current-password"
+          type="password"
+          formControlName="currentPassword"
+          class="form-input"
+          autocomplete="current-password"
+          aria-describedby="current-password-error"
+        />
+      </label>
+
+      <div class="form-row">
+        <label for="new-password" class="form-label">
+          Nouveau mot de passe
+          <input
+            id="new-password"
+            type="password"
+            formControlName="newPassword"
+            class="form-input"
+            autocomplete="new-password"
+            aria-describedby="new-password-error"
+          />
+        </label>
+
+        <label for="confirm-password" class="form-label">
+          Confirmer le nouveau mot de passe
+          <input
+            id="confirm-password"
+            type="password"
+            formControlName="confirmPassword"
+            class="form-input"
+            autocomplete="new-password"
+            aria-describedby="confirm-password-error"
+          />
+        </label>
+      </div>
+
+      @if (passwordForm.controls.newPassword.touched && passwordForm.controls.newPassword.invalid) {
+        <p id="new-password-error" class="error-msg" role="alert">
+          Le nouveau mot de passe doit comporter au moins 8 caractères.
+        </p>
+      }
+
+      @if (passwordError()) {
+        <p class="feedback-msg error" role="alert">{{ passwordError() }}</p>
+      }
+
+      @if (passwordSuccess()) {
+        <p class="feedback-msg success" role="status">{{ passwordSuccess() }}</p>
+      }
+
+      <button
+        type="submit"
+        class="btn-primary"
+        [disabled]="submittingPassword() || passwordForm.invalid"
+      >
+        {{ submittingPassword() ? 'Modification...' : 'Modifier le mot de passe' }}
+      </button>
+    </form>
+  </section>
+
+  <!-- SECTION 3 : Métriques de mes créations -->
   <section class="card metrics-card">
     <div class="section-header">
       <h2>Mes Créations MakerShare</h2>
@@ -98,8 +260,9 @@
     }
   </section>
 
+  <!-- SECTION 4 & 5 : Réseau Social & Abonnements -->
   <div class="social-grid">
-    <!-- SECTION 3 : Créateurs Suivis -->
+    <!-- SECTION 4 : Créateurs Suivis -->
     <section class="card follows-card">
       <div class="section-header">
         <h2>Créateurs Suivis</h2>
@@ -115,7 +278,9 @@
           @for (f of follows(); track f.id) {
             <li class="item-row">
               <div class="item-info">
-                <span class="item-title">{{ f.creator.name }}</span>
+                <span class="item-title">
+                  <a [routerLink]="['/creators', f.creator.id]">{{ f.creator.name }}</a>
+                </span>
                 <small class="item-sub">Suivi depuis le {{ f.createdAt | date:'shortDate' }}</small>
               </div>
               <div class="item-actions">
@@ -139,7 +304,7 @@
       }
     </section>
 
-    <!-- SECTION 4 : Abonnements Actifs -->
+    <!-- SECTION 5 : Abonnements Actifs -->
     <section class="card subscriptions-card">
       <div class="section-header">
         <h2>Abonnements Actifs</h2>
@@ -155,7 +320,9 @@
           @for (s of subscriptions(); track s.id) {
             <li class="item-row">
               <div class="item-info">
-                <span class="item-title">👑 {{ s.creator.name }}</span>
+                <span class="item-title">
+                  <a [routerLink]="['/creators', s.creator.id]">👑 {{ s.creator.name }}</a>
+                </span>
                 <small class="item-sub text-success">
                   Valide jusqu'au {{ s.expiresAt | date:'mediumDate' }}
                 </small>

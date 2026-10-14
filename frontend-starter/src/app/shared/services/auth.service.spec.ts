@@ -176,4 +176,75 @@ describe('AuthService', () => {
     expect(service.token()).toBeNull();
     expect(service.authStatus()).toBe('anonymous');
   });
+
+  it('updateProfile should update extended fields and store new token if email changed', () => {
+    const updatedUser: User & { token?: string } = {
+      ...mockUser,
+      bio: 'New bio',
+      profileTags: ['lego', 'diy'],
+      token: 'jwt-new-token',
+    };
+
+    service
+      .updateProfile({ name: 'Alice New', bio: 'New bio', profileTags: ['lego', 'diy'] })
+      .subscribe((res) => {
+        expect(res.bio).toBe('New bio');
+      });
+
+    const req = httpTesting.expectOne('/api/users/me');
+    expect(req.request.method).toBe('PUT');
+    req.flush(updatedUser);
+
+    expect(service.token()).toBe('jwt-new-token');
+    expect(localStorage.getItem('gpc_token')).toBe('jwt-new-token');
+    expect(service.currentUser()?.bio).toBe('New bio');
+  });
+
+  it('updatePassword should send PUT /api/users/me/password and update token', () => {
+    service.updatePassword('oldPass123', 'newPass12345').subscribe((res) => {
+      expect(res.message).toBe('Success');
+      expect(res.token).toBe('fresh-jwt');
+    });
+
+    const req = httpTesting.expectOne('/api/users/me/password');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({
+      currentPassword: 'oldPass123',
+      newPassword: 'newPass12345',
+    });
+
+    req.flush({ message: 'Success', token: 'fresh-jwt', user: mockUser });
+
+    expect(service.token()).toBe('fresh-jwt');
+    expect(localStorage.getItem('gpc_token')).toBe('fresh-jwt');
+  });
+
+  it('uploadAvatar should send FormData to POST /api/users/me/avatar', () => {
+    const file = new File(['dummy'], 'avatar.png', { type: 'image/png' });
+    const userWithAvatar: User = { ...mockUser, hasAvatar: true, avatarUrl: '/api/users/user-123/avatar' };
+
+    service.uploadAvatar(file).subscribe((res) => {
+      expect(res.hasAvatar).toBe(true);
+    });
+
+    const req = httpTesting.expectOne('/api/users/me/avatar');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBe(true);
+
+    req.flush(userWithAvatar);
+    expect(service.currentUser()?.hasAvatar).toBe(true);
+  });
+
+  it('deleteAvatar should send DELETE /api/users/me/avatar and clear avatar in currentUser', () => {
+    service.currentUser.set({ ...mockUser, hasAvatar: true, avatarUrl: '/api/users/user-123/avatar' });
+
+    service.deleteAvatar().subscribe();
+
+    const req = httpTesting.expectOne('/api/users/me/avatar');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+
+    expect(service.currentUser()?.hasAvatar).toBe(false);
+    expect(service.currentUser()?.avatarUrl).toBeNull();
+  });
 });

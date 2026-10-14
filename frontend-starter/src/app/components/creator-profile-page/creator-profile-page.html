@@ -1,4 +1,5 @@
 <div class="creator-profile-container">
+  <!-- Navigation retour -->
   <div class="nav-back">
     <a routerLink="/creators" class="btn-back">← Retour aux créateurs</a>
   </div>
@@ -15,20 +16,26 @@
       <a routerLink="/creators" class="btn-primary">Explorer les créateurs disponibles</a>
     </div>
   } @else if (profile(); as creator) {
-    <!-- EN-TÊTE PROFIL CRÉATEUR (Instagram-style épuré) -->
-    <header class="profile-hero-card">
+    <!-- EN-TÊTE PROFIL CRÉATEUR (Figma Frame 3G) -->
+    <header class="profile-hero-card card">
       <div class="hero-top">
-        <div class="avatar-large" aria-hidden="true">
-          {{ getInitials(creator.name) }}
-        </div>
+        @if (creator.hasAvatar && creator.avatarUrl) {
+          <img [src]="creator.avatarUrl" [alt]="creator.name" class="avatar-large-img" />
+        } @else {
+          <div class="avatar-large font-display" aria-hidden="true">
+            {{ getInitials(creator.name) }}
+          </div>
+        }
 
         <div class="creator-details">
           <div class="name-row">
-            <h1>{{ creator.name }}</h1>
+            <h1 class="font-display creator-display-name">{{ creator.name }}</h1>
             <span class="member-tag">Membre depuis le {{ creator.createdAt | date:'mediumDate' }}</span>
           </div>
 
-          <p class="bio-text">{{ creator.bio }}</p>
+          <p class="bio-text">
+            {{ creator.bio || '« Aucune biographie renseignée pour le moment »' }}
+          </p>
 
           @if (creator.profileTags && creator.profileTags.length > 0) {
             <div class="profile-tags-list">
@@ -40,27 +47,29 @@
 
           <div class="metrics-bar">
             <div class="metric-item">
-              <span class="metric-val">{{ creator.creationsCount }}</span>
+              <span class="metric-val font-display">{{ creator.creationsCount }}</span>
               <span class="metric-lbl">création{{ creator.creationsCount > 1 ? 's' : '' }}</span>
             </div>
+            <div class="metric-sep" aria-hidden="true"></div>
             <div class="metric-item">
-              <span class="metric-val">{{ creator.followersCount }}</span>
+              <span class="metric-val font-display">{{ creator.followersCount }}</span>
               <span class="metric-lbl">follower{{ creator.followersCount > 1 ? 's' : '' }}</span>
             </div>
+            <div class="metric-sep" aria-hidden="true"></div>
             <div class="metric-item">
-              <span class="metric-val">{{ creator.subscribersCount }}</span>
+              <span class="metric-val font-display">{{ creator.subscribersCount }}</span>
               <span class="metric-lbl">abonné{{ creator.subscribersCount > 1 ? 's' : '' }} VIP</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ACTIONS DE SOUTIEN ET RELATIONS (SUIVRE / ABONNEMENT 30J) -->
+      <!-- ACTIONS DE SOUTIEN ET RELATIONS (Figma Frame 3G) -->
       @if (!isSelf()) {
         <div class="creator-actions-panel">
           <div class="simulation-banner">
-            <span class="simulation-tag">Simulation — aucun paiement</span>
-            <span class="simulation-info">Abonnement simulé de 30 jours sans carte bancaire ni transaction réelle.</span>
+            <span class="simulation-tag">ℹ️ Simulation — aucun paiement réel</span>
+            <span class="simulation-info">L'abonnement de 30 jours est activé sans tunnel bancaire ni paiement réel.</span>
           </div>
 
           @if (auth.isAuthenticated()) {
@@ -119,46 +128,69 @@
           }
         </div>
       } @else {
-        <div class="self-creator-notice">
+        <div class="self-creator-notice card">
           <span>👤 Vous consultez votre propre profil public de créateur tel qu'il apparaît aux visiteurs.</span>
           <a routerLink="/profile" class="btn-edit-profile">Modifier mon profil personnel</a>
         </div>
       }
     </header>
 
-    <!-- SECTION DES CRÉATIONS DU CRÉATEUR -->
+    <!-- SECTION DES CRÉATIONS DU CRÉATEUR AVEC DATES VISIBLES (Frame 3G) -->
     <section class="creations-section" aria-labelledby="creations-heading">
       <div class="creations-section-header">
-        <h2 id="creations-heading">Projets et tutoriels de {{ creator.name }}</h2>
+        <h2 id="creations-heading" class="font-display">Projets et tutoriels de {{ creator.name }}</h2>
         <span class="creations-count-tag">{{ creator.creations.length }} projet{{ creator.creations.length > 1 ? 's' : '' }}</span>
       </div>
 
       <div class="creations-grid">
         @for (post of creator.creations; track post.id) {
-          <article class="post-preview-card" [class.locked]="post.isLocked">
+          <article class="post-preview-card card" [class.locked]="post.isLocked">
+            <!-- Couverture avec badge de visibilité et date visible -->
             <div class="cover-box">
+              <div class="cover-top-row">
+                <span class="visibility-pill" [attr.data-visibility]="post.visibility">
+                  @switch (post.visibility) {
+                    @case ('public') { 🌐 Public }
+                    @case ('followers') { 🔒👥 Followers }
+                    @case ('subscribers') { 🔒⭐ Abonnés }
+                    @default { 🔗 Privé }
+                  }
+                </span>
+                <span class="cover-cat-pill">{{ post.category }}</span>
+              </div>
+
               @if (post.isLocked) {
                 <div class="locked-box" aria-label="Contenu réservé">
                   <span class="lock-icon">🔒</span>
-                  <span class="lock-text">Contenu réservé</span>
+                  <span class="lock-text">
+                    {{ post.visibility === 'followers' ? 'Réservé aux followers' : 'Abonnement requis' }}
+                  </span>
                 </div>
               } @else if (post.coverUrl) {
                 <img [src]="post.coverUrl" [alt]="post.title" class="post-cover-img" loading="lazy" />
               } @else {
-                <div class="default-cover-box">🎨</div>
+                <div class="default-cover-box">📐</div>
               }
-              <span class="visibility-pill" [attr.data-visibility]="post.visibility">
-                {{ post.visibility === 'public' ? 'Public' : post.visibility === 'followers' ? 'Followers' : 'Abonnés' }}
-              </span>
+
+              <!-- Date visible directement sur la carte avant le clic -->
+              <div class="cover-bottom-row">
+                <span class="card-date-badge">
+                  📅 {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+                </span>
+              </div>
             </div>
 
             <div class="card-body">
               <div class="card-meta">
-                <span class="category-name">{{ post.category }}</span>
+                <span class="meta-date-info">
+                  Ajouté le {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+                </span>
                 <span class="likes-tag">❤️ {{ post.likesCount }}</span>
               </div>
 
-              <h3 class="post-title">{{ post.title }}</h3>
+              <h3 class="post-title font-display">
+                <a [routerLink]="['/posts', post.id]">{{ post.title }}</a>
+              </h3>
               <p class="post-desc">{{ post.shortDescription }}</p>
 
               <div class="tags-row">
@@ -175,7 +207,7 @@
             </div>
           </article>
         } @empty {
-          <div class="empty-creations">
+          <div class="empty-creations card">
             <p>{{ creator.name }} n'a pas encore publié de projet public.</p>
           </div>
         }

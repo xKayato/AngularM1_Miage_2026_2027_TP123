@@ -1,33 +1,97 @@
-<header>
-  <div>
-    <b>Guitar Practice Cloud</b>
-    <small>Le cloud qui manque à votre ampli</small>
-  </div>
-  <nav aria-label="Navigation principale">
-    <a routerLink="/posts">Catalogue</a>
-    <a routerLink="/creators">Créateurs</a>
-    @if (auth.isAuthenticated()) {
-      <a routerLink="/tracks">Backing tracks</a>
-      <a routerLink="/my-posts">Mes projets</a>
-      @if (auth.isAdmin()) {
-        <a routerLink="/admin" style="color: #cbd5e1; font-weight: bold;">Administration</a>
-      }
-      <a routerLink="/profile">
-        Profil
-        @if (auth.currentUser(); as user) {
-          ({{ user.name }})
-        }
+<header class="main-header">
+  <div class="header-inner">
+    <!-- Logo & Marque MakerShare v2 -->
+    <div class="header-left">
+      <a routerLink="/posts" class="brand-link" aria-label="MakerShare Accueil">
+        <span class="brand-logo" aria-hidden="true">M</span>
+        <span class="brand-title">MakerShare</span>
       </a>
-      <button type="button" (click)="logout()" style="background: transparent; border: 1px solid white; padding: 0.3rem 0.6rem; cursor: pointer; color: white; border-radius: 4px;">
-        Déconnexion
+
+      <!-- Navigation Principale Desktop -->
+      <nav class="desktop-nav" aria-label="Navigation principale">
+        <a routerLink="/posts" routerLinkActive="active-nav-link" class="nav-link">Catalogue</a>
+        <a routerLink="/creators" routerLinkActive="active-nav-link" class="nav-link">Créateurs</a>
+        @if (auth.isAuthenticated()) {
+          <a routerLink="/my-posts" routerLinkActive="active-nav-link" class="nav-link">Mes créations</a>
+          <a routerLink="/tracks" routerLinkActive="active-nav-link" class="nav-link">Backing tracks</a>
+          @if (auth.isAdmin()) {
+            <a routerLink="/admin" routerLinkActive="active-nav-link" class="nav-link admin-link">Administration</a>
+          }
+        }
+      </nav>
+    </div>
+
+    <!-- Actions Droite : Switch Thème + Mon Espace / Auth -->
+    <div class="header-actions">
+      <!-- Bouton Thème Clair / Sombre Figma -->
+      <button
+        type="button"
+        (click)="theme.toggleTheme()"
+        class="theme-switch-btn"
+        [title]="theme.isDark() ? 'Passer en Mode Clair' : 'Activer le Mode Sombre'"
+        aria-label="Basculer le mode sombre"
+      >
+        <span class="theme-icon">{{ theme.isDark() ? '☀️' : '🌙' }}</span>
+        <span class="theme-text">{{ theme.isDark() ? 'Clair' : 'Sombre' }}</span>
       </button>
-    } @else {
-      <a routerLink="/login">Connexion</a>
-      <a routerLink="/register">Inscription</a>
-    }
-  </nav>
+
+      @if (auth.isAuthenticated()) {
+        <a routerLink="/profile" class="user-profile-badge" aria-label="Mon espace profil">
+          <span class="avatar-circle">{{ getInitials(auth.currentUser()?.name) }}</span>
+          <span class="user-display-name">{{ auth.currentUser()?.name || 'Mon espace' }}</span>
+        </a>
+        <button
+          type="button"
+          (click)="logout()"
+          class="btn-logout"
+          title="Se déconnecter"
+          aria-label="Se déconnecter"
+        >
+          Déconnexion
+        </button>
+      } @else {
+        <a routerLink="/login" class="nav-auth-login">Connexion</a>
+        <a routerLink="/register" class="nav-auth-register">Inscription</a>
+      }
+
+      <!-- Menu burger mobile -->
+      <button
+        type="button"
+        class="burger-btn"
+        (click)="toggleMobileMenu()"
+        [attr.aria-expanded]="mobileMenuOpen()"
+        aria-label="Menu de navigation mobile"
+      >
+        <span>☰</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Menu Mobile Déroulant -->
+  @if (mobileMenuOpen()) {
+    <div class="mobile-drawer">
+      <nav class="mobile-nav" aria-label="Navigation mobile">
+        <a routerLink="/posts" (click)="toggleMobileMenu()" class="mobile-link">Catalogue des créations</a>
+        <a routerLink="/creators" (click)="toggleMobileMenu()" class="mobile-link">Recherche de créateurs</a>
+        @if (auth.isAuthenticated()) {
+          <a routerLink="/my-posts" (click)="toggleMobileMenu()" class="mobile-link">Mes créations</a>
+          <a routerLink="/tracks" (click)="toggleMobileMenu()" class="mobile-link">Backing tracks</a>
+          <a routerLink="/profile" (click)="toggleMobileMenu()" class="mobile-link">Mon espace (/profile)</a>
+          @if (auth.isAdmin()) {
+            <a routerLink="/admin" (click)="toggleMobileMenu()" class="mobile-link">Administration</a>
+          }
+          <button type="button" (click)="logout(); toggleMobileMenu()" class="mobile-link mobile-logout-btn">
+            Déconnexion
+          </button>
+        } @else {
+          <a routerLink="/login" (click)="toggleMobileMenu()" class="mobile-link">Connexion</a>
+          <a routerLink="/register" (click)="toggleMobileMenu()" class="mobile-link">Inscription</a>
+        }
+      </nav>
+    </div>
+  }
 </header>
 
-<main>
+<main class="page-container">
   <router-outlet />
 </main>

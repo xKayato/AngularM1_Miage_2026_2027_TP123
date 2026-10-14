@@ -1,4 +1,5 @@
 <div class="detail-container">
+  <!-- Navigation retour -->
   <div class="nav-back">
     <a routerLink="/posts" class="btn-back">← Retour au catalogue</a>
   </div>
@@ -15,13 +16,19 @@
       <a routerLink="/posts" class="btn-primary">Explorer les créations disponibles</a>
     </div>
   } @else if (isLocked() && postPreview(); as preview) {
-    <!-- VUE APERÇU VERROUILLÉ (Followers / Abonnés) -->
-    <article class="locked-preview-card">
+    <!-- VUE APERÇU VERROUILLÉ (Followers / Abonnés) - Frame 3C -->
+    <article class="locked-preview-card card">
       <div class="locked-header">
-        <span class="lock-big-icon">🔒</span>
-        <span class="badge-visibility">{{ preview.visibility === 'followers' ? 'Réservé aux followers' : 'Réservé aux abonnés' }}</span>
-        <h1>{{ preview.title }}</h1>
-        <p class="author-sub">Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }} • ❤️ {{ preview.likesCount }} j'aime</p>
+        <span class="lock-big-icon" aria-hidden="true">🔒</span>
+        <span class="badge-visibility" [attr.data-visibility]="preview.visibility">
+          {{ preview.visibility === 'followers' ? '🔒👥 Réservé aux followers' : '🔒⭐ Réservé aux abonnés' }}
+        </span>
+        <h1 class="font-display">{{ preview.title }}</h1>
+        <p class="author-sub">
+          Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }} •
+          <span class="date-badge">📅 {{ (preview.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</span> •
+          ❤️ {{ preview.likesCount }} j'aime
+        </p>
       </div>
 
       <div class="locked-description">
@@ -31,7 +38,7 @@
       <div class="locked-banner">
         <h3>Contenu restreint</h3>
         <p>
-          Ce projet contient des instructions, fichiers et pièces jointes réservés
+          Ce projet contient des instructions détaillées, schémas et pièces jointes réservés
           @if (preview.visibility === 'followers') {
             aux followers de l'auteur.
           } @else {
@@ -49,11 +56,11 @@
             <p class="self-creator-note">Vous êtes l'auteur de ce projet.</p>
           </div>
         } @else {
-          <!-- Actions de déverrouillage directes (Mission 5) -->
+          <!-- Déverrouillage simulé MakerShare -->
           <div class="creator-unlock-box">
             <div class="simulation-banner">
               <span class="simulation-tag">Simulation — aucun paiement</span>
-              <span class="simulation-desc">Abonnement simulé de 30 jours sans carte bancaire</span>
+              <span class="simulation-desc">Abonnement simulé de 30 jours sans carte bancaire ni transaction réelle.</span>
             </div>
 
             <div class="creator-btns-group">
@@ -99,34 +106,58 @@
       </div>
     </article>
   } @else if (postDetail(); as detail) {
-    <!-- VUE DÉTAIL COMPLET AUTORISÉ -->
+    <!-- VUE DÉTAIL COMPLET AUTORISÉ (Frame 3C Desktop) -->
     <article class="post-full-detail">
-      <header class="detail-header">
-        <div class="meta-line">
-          <span class="category-pill">{{ detail.category }}</span>
-          <span class="badge-visibility" [attr.data-visibility]="detail.visibility">{{ detail.visibility }}</span>
-          @if (auth.isAuthenticated() && !isSelfAuthor()) {
-            <button
-              type="button"
-              class="btn-like"
-              [class.liked]="detail.userInteractions.isLiked"
-              (click)="toggleLike()"
-              [disabled]="isLikeLoading()"
-              [attr.aria-label]="detail.userInteractions.isLiked ? 'Je n’aime plus ce projet' : 'J’aime ce projet'"
-            >
-              <span class="like-heart" aria-hidden="true">{{ detail.userInteractions.isLiked ? '❤️' : '🤍' }}</span>
-              <span class="likes-count">{{ detail.likesCount }}</span>
-              <span class="like-label">{{ detail.userInteractions.isLiked ? 'Aimé' : 'J’aime' }}</span>
-            </button>
-          } @else {
-            <span class="likes-badge" title="Nombre de mentions j'aime">
-              ❤️ {{ detail.likesCount }} j'aime
+      <!-- En-tête principal du projet -->
+      <header class="detail-header card">
+        <div class="header-top-row">
+          <div class="meta-line">
+            <span class="badge-visibility" [attr.data-visibility]="detail.visibility">
+              @switch (detail.visibility) {
+                @case ('public') { 🌐 Public }
+                @case ('followers') { 🔒👥 Followers }
+                @case ('subscribers') { 🔒⭐ Abonnés }
+                @default { 🔗 Lien secret }
+              }
             </span>
-          }
+            <span class="category-pill">{{ detail.category }}</span>
+            <span class="date-published-text">📅 Publié le {{ (detail.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</span>
+          </div>
+
+          <!-- Bouton J'aime interactif -->
+          <div class="like-container">
+            @if (auth.isAuthenticated() && !isSelfAuthor()) {
+              <button
+                type="button"
+                class="btn-like"
+                [class.liked]="detail.userInteractions.isLiked"
+                (click)="toggleLike()"
+                [disabled]="isLikeLoading()"
+                [attr.aria-label]="detail.userInteractions.isLiked ? 'Je n’aime plus ce projet' : 'J’aime ce projet'"
+              >
+                <span class="like-heart" aria-hidden="true">{{ detail.userInteractions.isLiked ? '❤️' : '🤍' }}</span>
+                <span class="likes-count">{{ detail.likesCount }}</span>
+                <span class="like-label">{{ detail.userInteractions.isLiked ? 'Aimé' : 'J’aime' }}</span>
+              </button>
+            } @else {
+              <span class="likes-badge" title="Nombre de mentions j'aime">
+                ❤️ {{ detail.likesCount }} j'aime
+              </span>
+            }
+          </div>
         </div>
 
-        <h1>{{ detail.title }}</h1>
-        <p class="author-info">Par <b><a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">{{ detail.author.name }}</a></b> • Publié le {{ detail.publishedAt ? (detail.publishedAt | date:'mediumDate') : 'Non publié' }}</p>
+        <h1 class="font-display detail-main-title">{{ detail.title }}</h1>
+
+        <!-- Informations Auteur -->
+        <div class="author-info-row">
+          <span class="author-prefix">Par</span>
+          <a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">
+            <span class="creator-avatar-badge">{{ getInitials(detail.author.name) }}</span>
+            <span class="creator-name-text">{{ detail.author.name }}</span>
+          </a>
+        </div>
+
         <p class="short-desc">{{ detail.shortDescription }}</p>
 
         <div class="tags-list">
@@ -136,142 +167,190 @@
         </div>
       </header>
 
-      <!-- CARTE CRÉATEUR & INTERACTIONS (MISSION 5) -->
-      <section class="creator-card" aria-label="Informations sur le créateur">
-        <div class="creator-card-header">
-          <div class="creator-profile-info">
-            <span class="creator-avatar-badge">👤</span>
-            <div>
-              <span class="creator-title">Créateur</span>
-              <h3 class="creator-name">
-                <a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">{{ detail.author.name }}</a>
-              </h3>
-            </div>
-          </div>
-          <div class="simulation-badge-pill" title="Cette plateforme est un bac à sable sans carte bancaire ni paiement réel">
-            Simulation — aucun paiement
-          </div>
-        </div>
-
-        @if (auth.isAuthenticated()) {
-          @if (isSelfAuthor()) {
-            <p class="self-creator-note">Vous êtes l'auteur de ce projet.</p>
-          } @else {
-            <div class="creator-actions-row">
-              <!-- Follow / Unfollow -->
-              @if (creatorStatus()?.isFollowing) {
-                <button
-                  type="button"
-                  class="btn-creator btn-unfollow"
-                  (click)="unfollowAuthor()"
-                  [disabled]="isFollowLoading() || isSubscribeLoading()"
-                >
-                  {{ isFollowLoading() ? 'Patientez...' : '✓ Suivi (Cesser de suivre)' }}
-                </button>
-              } @else {
-                <button
-                  type="button"
-                  class="btn-creator btn-follow"
-                  (click)="followAuthor()"
-                  [disabled]="isFollowLoading() || isSubscribeLoading()"
-                >
-                  {{ isFollowLoading() ? 'Chargement...' : '+ Suivre le créateur' }}
-                </button>
-              }
-
-              <!-- Abonnement 30 jours -->
-              @if (creatorStatus()?.isSubscribed) {
-                <div class="sub-active-info">
-                  <span class="sub-badge-icon">👑</span>
-                  <span>Abonné actif (échéance : {{ creatorStatus()?.expiresAt | date:'mediumDate' }})</span>
-                </div>
-              } @else {
-                <button
-                  type="button"
-                  class="btn-creator btn-subscribe"
-                  (click)="subscribeAuthor()"
-                  [disabled]="isSubscribeLoading() || isFollowLoading()"
-                >
-                  {{ isSubscribeLoading() ? 'Souscription...' : '⭐ S’abonner 30 jours (Simulation)' }}
-                </button>
-              }
-            </div>
-          }
-        } @else {
-          <div class="creator-guest-msg">
-            <p>Connectez-vous pour suivre ou vous abonner à {{ detail.author.name }}.</p>
-            <div class="guest-auth-links">
-              <a routerLink="/login" class="btn-sm-primary">Se connecter</a>
-              <a routerLink="/register" class="btn-sm-secondary">Créer un compte</a>
-            </div>
-          </div>
-        }
-
-        @if (actionMessage()) {
-          <div class="action-alert success" role="status">✓ {{ actionMessage() }}</div>
-        }
-        @if (actionError()) {
-          <div class="action-alert error" role="alert">⚠️ {{ actionError() }}</div>
-        }
-      </section>
-
-      <section class="content-body">
-        <h2>Description et instructions du projet</h2>
-        <div class="text-content">
-          {{ detail.content }}
-        </div>
-      </section>
-
-      @if (detail.attachments.length > 0) {
-        <section class="attachments-section">
-          <h2>Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
-
-          <div class="attachments-list">
-            @for (att of detail.attachments; track att.id) {
-              <div class="attachment-row" [attr.data-family]="att.family">
-                <div class="att-info">
-                  <span class="att-icon">
-                    {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
-                  </span>
-                  <div>
-                    <span class="att-name">{{ att.originalName }}</span>
-                    <span class="att-meta">{{ formatBytes(att.size) }} • {{ att.family }}</span>
-                  </div>
-                </div>
-
-                <div class="att-actions">
-                  @if (att.family === 'audio') {
-                    <button
-                      type="button"
-                      class="btn-action"
-                      (click)="playAudio(att)"
-                      [disabled]="activeAudioAttachmentId() === att.id && currentAudioUrl()"
-                    >
-                      {{ activeAudioAttachmentId() === att.id ? 'Lecture en cours...' : 'Écouter' }}
-                    </button>
-                  }
-                  <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
-                    Télécharger
-                  </button>
+      <!-- Grille à deux colonnes Figma (Corps tutoriel 2fr + Sidebar pièces jointes 1fr) -->
+      <div class="detail-content-layout">
+        <!-- Colonne Principale : Instructions, étapes et pièces jointes in-text -->
+        <div class="main-tutorial-col">
+          <!-- Carte Auteur & Relations (Mission 5) -->
+          <section class="creator-card card" aria-label="Informations sur le créateur">
+            <div class="creator-card-header">
+              <div class="creator-profile-info">
+                <span class="creator-avatar-badge author-circle-large">{{ getInitials(detail.author.name) }}</span>
+                <div>
+                  <span class="creator-title">Auteur du projet</span>
+                  <h3 class="creator-name">
+                    <a [routerLink]="['/creators', detail.author.id]" class="creator-profile-link">{{ detail.author.name }}</a>
+                  </h3>
                 </div>
               </div>
+              <div class="simulation-badge-pill" title="Cette plateforme est un bac à sable sans carte bancaire ni paiement réel">
+                Simulation — aucun paiement
+              </div>
+            </div>
 
-              @if (att.family === 'image' && imageUrls()[att.id]) {
-                <div class="image-preview-wrapper">
-                  <img [src]="imageUrls()[att.id]" [alt]="att.originalName" class="image-preview" />
+            @if (auth.isAuthenticated()) {
+              @if (isSelfAuthor()) {
+                <p class="self-creator-note">👤 Vous êtes l'auteur de ce projet.</p>
+              } @else {
+                <div class="creator-actions-row">
+                  <!-- Follow / Unfollow -->
+                  @if (creatorStatus()?.isFollowing) {
+                    <button
+                      type="button"
+                      class="btn-creator btn-unfollow"
+                      (click)="unfollowAuthor()"
+                      [disabled]="isFollowLoading() || isSubscribeLoading()"
+                    >
+                      {{ isFollowLoading() ? 'Patientez...' : '✓ Suivi (Cesser de suivre)' }}
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn-creator btn-follow"
+                      (click)="followAuthor()"
+                      [disabled]="isFollowLoading() || isSubscribeLoading()"
+                    >
+                      {{ isFollowLoading() ? 'Chargement...' : '+ Suivre ' + detail.author.name }}
+                    </button>
+                  }
+
+                  <!-- Abonnement 30 jours -->
+                  @if (creatorStatus()?.isSubscribed) {
+                    <div class="sub-active-info">
+                      <span class="sub-badge-icon">👑</span>
+                      <span>Abonné actif (échéance : {{ creatorStatus()?.expiresAt | date:'mediumDate' }})</span>
+                    </div>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn-creator btn-subscribe"
+                      (click)="subscribeAuthor()"
+                      [disabled]="isSubscribeLoading() || isFollowLoading()"
+                    >
+                      {{ isSubscribeLoading() ? 'Souscription...' : '⭐ S’abonner 30 jours (Simulation)' }}
+                    </button>
+                  }
                 </div>
               }
+            } @else {
+              <div class="creator-guest-msg">
+                <p>Connectez-vous pour suivre ou vous abonner à {{ detail.author.name }}.</p>
+                <div class="guest-auth-links">
+                  <a routerLink="/login" class="btn-sm-primary">Se connecter</a>
+                  <a routerLink="/register" class="btn-sm-secondary">Créer un compte</a>
+                </div>
+              </div>
             }
+
+            @if (actionMessage()) {
+              <div class="action-alert success" role="status">✓ {{ actionMessage() }}</div>
+            }
+            @if (actionError()) {
+              <div class="action-alert error" role="alert">⚠️ {{ actionError() }}</div>
+            }
+          </section>
+
+          <!-- Corps du tutoriel mis en page (Frame 3C) -->
+          <section class="content-body card">
+            <h2 class="section-heading font-display">Description et instructions du projet</h2>
+            <div class="text-content">
+              {{ detail.content }}
+            </div>
+
+            <!-- Exemple de widget d'astuce d'atelier (Figma v2) -->
+            <blockquote class="workshop-tip-box">
+              💡 <strong>Astuce d'atelier :</strong> Vérifiez toujours l'équerrage et les cotes à sec avant d'appliquer la colle ou d'assembler définitivement vos pièces.
+            </blockquote>
+          </section>
+
+          <!-- Liste des pièces jointes sécurisées -->
+          @if (detail.attachments.length > 0) {
+            <section class="attachments-section card">
+              <h2 class="section-heading font-display">Pièces jointes sécurisées ({{ detail.attachments.length }})</h2>
+
+              <div class="attachments-list">
+                @for (att of detail.attachments; track att.id) {
+                  <div class="attachment-row" [attr.data-family]="att.family">
+                    <div class="att-info">
+                      <span class="att-icon">
+                        {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                      </span>
+                      <div class="att-meta-block">
+                        <span class="att-name">{{ att.originalName }}</span>
+                        <span class="att-meta">{{ formatBytes(att.size) }} • {{ att.family }}</span>
+                      </div>
+                    </div>
+
+                    <div class="att-actions">
+                      @if (att.family === 'audio') {
+                        <button
+                          type="button"
+                          class="btn-action"
+                          (click)="playAudio(att)"
+                          [disabled]="activeAudioAttachmentId() === att.id && currentAudioUrl()"
+                        >
+                          {{ activeAudioAttachmentId() === att.id ? 'Lecture en cours...' : 'Écouter' }}
+                        </button>
+                      }
+                      <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
+                        ⬇️ Télécharger
+                      </button>
+                    </div>
+                  </div>
+
+                  @if (att.family === 'image' && imageUrls()[att.id]) {
+                    <div class="image-preview-wrapper">
+                      <img [src]="imageUrls()[att.id]" [alt]="att.originalName" class="image-preview" />
+                    </div>
+                  }
+                }
+              </div>
+
+              @if (currentAudioUrl()) {
+                <div class="audio-player-bar">
+                  <p class="audio-label">Lecteur audio intégré :</p>
+                  <audio [src]="currentAudioUrl()!" controls autoplay class="audio-element"></audio>
+                </div>
+              }
+            </section>
+          }
+        </div>
+
+        <!-- Colonne Latérale (Sidebar Figma v2) -->
+        <aside class="detail-sidebar-col">
+          <!-- Tags du projet -->
+          <div class="sidebar-card card">
+            <h3 class="sidebar-title font-display">Tags du projet</h3>
+            <div class="sidebar-tags-wrap">
+              @for (tag of detail.tags; track tag) {
+                <span class="sidebar-tag-chip">#{{ tag }}</span>
+              }
+            </div>
           </div>
 
-          @if (currentAudioUrl()) {
-            <div class="audio-player-bar">
-              <p>Lecteur audio intégré :</p>
-              <audio [src]="currentAudioUrl()!" controls autoplay class="audio-element"></audio>
+          <!-- Récapitulatif rapide des pièces jointes -->
+          @if (detail.attachments.length > 0) {
+            <div class="sidebar-card card">
+              <h3 class="sidebar-title font-display">Toutes les pièces jointes ({{ detail.attachments.length }})</h3>
+              <p class="sidebar-desc">Retrouvez ici tous les fichiers associés au projet (schémas, cotes, fichiers 3D).</p>
+
+              <div class="sidebar-attachments-list">
+                @for (att of detail.attachments; track att.id) {
+                  <div class="sidebar-attachment-item">
+                    <span class="sidebar-att-name truncate">
+                      {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                      <strong>{{ att.originalName }}</strong>
+                    </span>
+                    <button type="button" class="btn-mini-download" (click)="downloadFile(att)" [title]="'Télécharger ' + att.originalName">
+                      ⬇️
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
           }
-        </section>
-      }
+        </aside>
+      </div>
     </article>
   }
 </div>

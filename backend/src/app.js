@@ -3,6 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
@@ -18,13 +19,15 @@ import { adminRouter } from "./routes/admin.js";
 // MongoDB ne conserve que leurs métadonnées : titre, nom, taille, etc.
 const UPLOADS = path.resolve("data/uploads");
 const UPLOADS_COVERS = path.resolve("data/uploads/covers");
+const UPLOADS_AVATARS = path.resolve("data/uploads/avatars");
 
 try {
   // mkdirSync est utilisé au démarrage : l'application doit disposer de ces
   // dossiers avant de pouvoir accepter le premier upload.
   fs.mkdirSync(UPLOADS, { recursive: true });
   fs.mkdirSync(UPLOADS_COVERS, { recursive: true });
-  console.log(`[startup] Dossiers des uploads prêts : ${UPLOADS} et ${UPLOADS_COVERS}`);
+  fs.mkdirSync(UPLOADS_AVATARS, { recursive: true });
+  console.log(`[startup] Dossiers des uploads prêts : ${UPLOADS}, ${UPLOADS_COVERS} et ${UPLOADS_AVATARS}`);
 } catch (error) {
   console.error("[startup] Impossible de créer les dossiers des uploads", error);
   throw error;
@@ -66,21 +69,31 @@ function token(user) {
 }
 
 /** Middleware Express qui protège les routes privées. */
-function auth(req, res, next) {
+async function auth(req, res, next) {
   const raw = req.headers.authorization;
 
-  // Le token est transmis dans l'en-tête Authorization sous la forme
-    // "Authorization: Bearer <token>". Le préfixe "Bearer " est obligatoire pour que
-    // le middleware sache qu'il s'agit d'un JWT et non d'un autre type de jeton.
   if (!raw?.startsWith("Bearer ")) {
     console.warn(`[auth] Authorization absente pour ${req.method} ${req.path}`);
     return res.status(401).json({ message: "Authentification requise" });
   }
 
   try {
-    // jwt.verify vérifie la signature et la date d'expiration du token.
-    // On ne logue jamais sa valeur, car un JWT permettrait une usurpation.
     req.auth = jwt.verify(raw.slice(7), SECRET);
+
+    // Si Mongoose est connecté, vérifier la validité de l'utilisateur et la révocation du token
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(req.auth.sub).select("status passwordChangedAt");
+      if (user) {
+        if (user.status === "suspended") {
+          return res.status(403).json({ message: "Compte suspendu" });
+        }
+        if (user.passwordChangedAt && req.auth.iat && req.auth.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+          return res.status(401).json({ message: "Jeton révoqué suite à une modification du mot de passe" });
+        }
+        req.user = user;
+      }
+    }
+
     console.log(`[auth] Token accepté pour ${req.auth.sub}`);
     next();
   } catch (error) {
@@ -157,6 +170,30 @@ const uploadCover = multer({
     }
     const error = new Error("Format image non accepté");
     console.error(`[multer] Type cover refusé : ${file.mimetype}`, error);
+    return callback(error);
+  },
+});
+
+const uploadAvatar = multer({
+  storage: multer.diskStorage({
+    destination: (_request, _file, callback) => {
+      callback(null, UPLOADS_AVATARS);
+    },
+    filename: (_request, file, callback) => {
+      const filename =
+        crypto.randomUUID() + path.extname(file.originalname).toLowerCase();
+      console.log(`[multer] Nom de stockage avatar généré pour ${file.originalname}`);
+      callback(null, filename);
+    },
+  }),
+  limits: { fileSize: MAX_COVER_SIZE },
+  fileFilter: (_request, file, callback) => {
+    if (ALLOWED_COVER_MIMES.has(file.mimetype)) {
+      console.log(`[multer] Type avatar accepté : ${file.mimetype}`);
+      return callback(null, true);
+    }
+    const error = new Error("Format image non accepté");
+    console.error(`[multer] Type avatar refusé : ${file.mimetype}`, error);
     return callback(error);
   },
 });
@@ -288,6 +325,12 @@ export function createApp() {
         console.warn(`[user] Profil introuvable : ${req.auth.sub}`);
         return res.status(404).json({ message: "Utilisateur inconnu" });
       }
+      if (user.status === "suspended") {
+        return res.status(403).json({ message: "Compte suspendu" });
+      }
+      if (user.passwordChangedAt && req.auth.iat && req.auth.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+        return res.status(401).json({ message: "Jeton révoqué suite à une modification du mot de passe" });
+      }
 
       console.log(`[user] Profil envoyé : ${user.id}`);
       res.json(user.toPublic());
@@ -297,24 +340,252 @@ export function createApp() {
     }
   });
 
-  /** Modifie uniquement le nom de l'utilisateur connecté. */
+  /** Modifie les informations du profil utilisateur connecté (nom, bio, profileTags, email). */
   app.put("/api/users/me", auth, async (req, res, next) => {
     try {
-      const user = await User.findByIdAndUpdate(
-        req.auth.sub,
-        { $set: { name: req.body?.name } },
-        { new: true, runValidators: true },
-      );
-
+      const user = await User.findById(req.auth.sub);
       if (!user) {
         console.warn(`[user] Mise à jour impossible : ${req.auth.sub}`);
         return res.status(404).json({ message: "Utilisateur inconnu" });
       }
 
-      console.log(`[user] Nom mis à jour : ${user.id}`);
-      res.json(user.toPublic());
+      let emailChanged = false;
+
+      // Nom (min 2 caractères)
+      if (req.body?.name !== undefined) {
+        const trimmedName = String(req.body.name).trim();
+        if (trimmedName.length < 2) {
+          return res.status(400).json({ message: "Le nom doit comporter au moins 2 caractères" });
+        }
+        user.name = trimmedName;
+      }
+
+      // Email (format et unicité)
+      if (req.body?.email !== undefined) {
+        const trimmedEmail = String(req.body.email).trim().toLowerCase();
+        if (!trimmedEmail || !/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+          return res.status(400).json({ message: "Format d'email invalide" });
+        }
+        if (trimmedEmail !== user.email) {
+          const emailExists = await User.exists({
+            _id: { $ne: user._id },
+            email: trimmedEmail,
+          });
+          if (emailExists) {
+            return res.status(409).json({ message: "Cet email est déjà utilisé" });
+          }
+          user.email = trimmedEmail;
+          emailChanged = true;
+        }
+      }
+
+      // Bio (max 500 caractères)
+      if (req.body?.bio !== undefined) {
+        const trimmedBio = String(req.body.bio).trim();
+        if (trimmedBio.length > 500) {
+          return res.status(400).json({ message: "La bio ne peut pas dépasser 500 caractères" });
+        }
+        user.bio = trimmedBio;
+      }
+
+      // Tags de profil (tableau ou chaîne séparée par virgules)
+      if (req.body?.profileTags !== undefined) {
+        let rawTags = req.body.profileTags;
+        if (typeof rawTags === "string") {
+          rawTags = rawTags.split(",").map((t) => t.trim());
+        }
+        if (!Array.isArray(rawTags)) {
+          return res.status(400).json({ message: "Format de tags invalide" });
+        }
+        const cleanedTags = [];
+        const seen = new Set();
+        for (const tag of rawTags) {
+          const norm = String(tag || "").trim().toLowerCase();
+          if (!norm) continue;
+          if (!/^[a-z0-9-]+$/.test(norm)) {
+            return res.status(400).json({
+              message: `Tag invalide : "${norm}". Caractères autorisés : minuscules, chiffres et tirets.`,
+            });
+          }
+          if (!seen.has(norm)) {
+            seen.add(norm);
+            cleanedTags.push(norm);
+          }
+        }
+        if (cleanedTags.length > 10) {
+          return res.status(400).json({ message: "Maximum 10 tags autorisés" });
+        }
+        user.profileTags = cleanedTags;
+      }
+
+      await user.save();
+      console.log(`[user] Profil mis à jour : ${user.id}`);
+
+      const publicUser = user.toPublic();
+      if (emailChanged) {
+        return res.json({ ...publicUser, token: token(user) });
+      }
+      res.json(publicUser);
     } catch (error) {
       console.error("[user] Erreur de mise à jour du profil", error);
+      next(error);
+    }
+  });
+
+  /** Modification du mot de passe avec invalidation des JWTs antérieurs */
+  app.put("/api/users/me/password", auth, async (req, res, next) => {
+    try {
+      const { currentPassword, newPassword } = req.body || {};
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Mot de passe actuel et nouveau mot de passe requis" });
+      }
+
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
+        return res.status(400).json({ message: "Le nouveau mot de passe doit comporter au moins 8 caractères" });
+      }
+
+      const user = await User.findById(req.auth.sub).select("+passwordHash");
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur inconnu" });
+      }
+
+      const isValid = await user.verifyPassword(currentPassword);
+      if (!isValid) {
+        // Renvoie 400 Bad Request et non 401 pour préserver la session utilisateur dans Angular
+        return res.status(400).json({ message: "Mot de passe actuel incorrect" });
+      }
+
+      user.passwordHash = await bcrypt.hash(newPassword, 10);
+      user.passwordChangedAt = new Date();
+      await user.save();
+
+      const newToken = token(user);
+      console.log(`[auth] Mot de passe mis à jour pour ${user.id}, JWTs antérieurs révoqués`);
+      res.json({
+        message: "Mot de passe mis à jour avec succès",
+        token: newToken,
+        user: user.toPublic(),
+      });
+    } catch (error) {
+      console.error("[auth] Erreur modification mot de passe", error);
+      next(error);
+    }
+  });
+
+  /** Upload et mise à jour de l'avatar du profil */
+  app.post(
+    "/api/users/me/avatar",
+    auth,
+    uploadAvatar.single("avatar"),
+    async (req, res, next) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "Fichier avatar requis" });
+        }
+
+        if (req.file.size > MAX_COVER_SIZE) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(400).json({ message: "L'avatar ne doit pas dépasser 2 Mo" });
+        }
+
+        const realMime = await detectRealImageMime(req.file.path);
+        if (!realMime) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(400).json({ message: "Contenu de l'image invalide (JPEG, PNG, WebP uniquement)" });
+        }
+
+        const user = await User.findById(req.auth.sub);
+        if (!user) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+          return res.status(404).json({ message: "Utilisateur inconnu" });
+        }
+
+        const previousAvatar = user.avatar?.storedName;
+
+        user.avatar = {
+          storedName: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: realMime,
+          size: req.file.size,
+        };
+
+        await user.save();
+
+        if (previousAvatar) {
+          try {
+            await fsPromises.unlink(path.join(UPLOADS_AVATARS, previousAvatar));
+            console.log(`[avatar] Ancien avatar supprimé : ${previousAvatar}`);
+          } catch (cleanupErr) {
+            console.error(`[avatar] Erreur suppression ancien avatar`, cleanupErr);
+          }
+        }
+
+        console.log(`[avatar] Nouvel avatar enregistré pour ${user.id}`);
+        res.json(user.toPublic());
+      } catch (error) {
+        if (req.file) {
+          try { await fsPromises.unlink(req.file.path); } catch {}
+        }
+        next(error);
+      }
+    }
+  );
+
+  /** Suppression de l'avatar utilisateur et du fichier physique sur disque */
+  app.delete("/api/users/me/avatar", auth, async (req, res, next) => {
+    try {
+      const user = await User.findById(req.auth.sub);
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur inconnu" });
+      }
+
+      if (user.avatar?.storedName) {
+        const storedName = user.avatar.storedName;
+        user.avatar = undefined;
+        await user.save();
+
+        try {
+          await fsPromises.unlink(path.join(UPLOADS_AVATARS, storedName));
+          console.log(`[avatar] Avatar supprimé sur disque : ${storedName}`);
+        } catch (cleanupErr) {
+          console.error(`[avatar] Erreur suppression fichier avatar`, cleanupErr);
+        }
+      }
+
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /** Envoie le flux binaire de l'avatar public d'un créateur */
+  app.get("/api/users/:id/avatar", async (req, res, next) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: "Identifiant invalide" });
+      }
+
+      const user = await User.findById(req.params.id);
+      if (!user || user.status === "suspended") {
+        return res.status(404).json({ message: "Utilisateur inconnu ou suspendu" });
+      }
+
+      if (!user.avatar?.storedName) {
+        return res.status(404).json({ message: "Aucun avatar pour cet utilisateur" });
+      }
+
+      const avatarPath = path.join(UPLOADS_AVATARS, user.avatar.storedName);
+      if (!fs.existsSync(avatarPath)) {
+        return res.status(404).json({ message: "Fichier avatar introuvable" });
+      }
+
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.type(user.avatar.mimeType || "image/jpeg");
+      res.sendFile(avatarPath, (err) => {
+        if (err && !res.headersSent) next(err);
+      });
+    } catch (error) {
       next(error);
     }
   });

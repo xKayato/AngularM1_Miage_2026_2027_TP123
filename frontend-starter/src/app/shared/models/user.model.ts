@@ -5,6 +5,10 @@ export interface User {
   email: string;
   role?: 'user' | 'admin';
   status?: 'active' | 'suspended';
+  bio?: string;
+  profileTags?: string[];
+  hasAvatar?: boolean;
+  avatarUrl?: string | null;
   createdAt: string;
 }
 
