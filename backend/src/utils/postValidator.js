@@ -20,6 +20,7 @@ const FORBIDDEN_CLIENT_FIELDS = [
   "attachments",
   "role",
   "user",
+  "seedBatch",
   "_id",
   "__v",
   "createdAt",

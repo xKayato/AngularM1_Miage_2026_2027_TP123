@@ -5,7 +5,9 @@
     "scripts": {
         "start": "node --env-file=.env src/server.js",
         "start:local": "node src/server.js",
-        "test": "node --test"
+        "test": "node --test",
+        "seed:demo": "node --env-file=.env scripts/seed-demo.js",
+        "seed:clean": "node --env-file=.env scripts/seed-demo.js --clean"
     },
     "dependencies": {
         "bcryptjs": "^3.0.2",

@@ -31,6 +31,12 @@ const schema = new mongoose.Schema(
       default: "active",
       index: true,
     },
+    // Marqueur technique optionnel pour les jeux de données de test/démonstration
+    seedBatch: {
+      type: String,
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true },
 );

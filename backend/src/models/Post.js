@@ -103,6 +103,8 @@ const postSchema = new mongoose.Schema(
     publishedAt: { type: Date, default: null },
     archivedAt: { type: Date, default: null },
     archiveReason: { type: String, default: null },
+    // Marqueur technique optionnel pour les jeux de données de test/démonstration
+    seedBatch: { type: String, default: null, index: true },
   },
   { timestamps: true },
 );
