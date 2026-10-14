@@ -16,6 +16,151 @@ function isValidObjectId(id) {
 }
 
 /**
+ * GET /api/creators/my/follows
+ * Retourne la liste paginée des créateurs suivis par l'utilisateur connecté.
+ * Exclut formellement les créateurs suspendus AVANT pagination et AVANT totalDocs.
+ */
+creatorsRouter.get("/my/follows", authMakerShare, async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const offset = (page - 1) * limit;
+
+    const pipeline = [
+      { $match: { followerId: req.user._id } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "creatorId",
+          foreignField: "_id",
+          as: "creatorDoc",
+        },
+      },
+      { $unwind: "$creatorDoc" },
+      { $match: { "creatorDoc.status": { $ne: "suspended" } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $skip: offset },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                id: { $toString: "$_id" },
+                creator: {
+                  id: { $toString: "$creatorDoc._id" },
+                  name: "$creatorDoc.name",
+                },
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = await Follow.aggregate(pipeline);
+    const totalDocs = result[0]?.totalDocs[0]?.count || 0;
+    const docs = result[0]?.docs || [];
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    res.json({
+      docs,
+      items: docs,
+      totalDocs,
+      total: totalDocs,
+      limit,
+      page,
+      totalPages,
+      pages: totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/creators/my/subscriptions
+ * Retourne la liste paginée des abonnements simulés actifs de l'utilisateur connecté.
+ * Exclut formellement les abonnements expirés, inactifs ou dont le créateur est suspendu AVANT pagination.
+ */
+creatorsRouter.get("/my/subscriptions", authMakerShare, async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const offset = (page - 1) * limit;
+    const now = new Date();
+
+    const pipeline = [
+      {
+        $match: {
+          subscriberId: req.user._id,
+          active: true,
+          expiresAt: { $gt: now },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "creatorId",
+          foreignField: "_id",
+          as: "creatorDoc",
+        },
+      },
+      { $unwind: "$creatorDoc" },
+      { $match: { "creatorDoc.status": { $ne: "suspended" } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $skip: offset },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                id: { $toString: "$_id" },
+                creator: {
+                  id: { $toString: "$creatorDoc._id" },
+                  name: "$creatorDoc.name",
+                },
+                active: 1,
+                expiresAt: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = await Subscription.aggregate(pipeline);
+    const totalDocs = result[0]?.totalDocs[0]?.count || 0;
+    const docs = result[0]?.docs || [];
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    res.json({
+      docs,
+      items: docs,
+      totalDocs,
+      total: totalDocs,
+      limit,
+      page,
+      totalPages,
+      pages: totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /api/creators/:id/follow
  * Permet à un utilisateur actif de suivre un créateur actif de manière unilatérale.
  * Interdit formellement l'auto-follow (400).

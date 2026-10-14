@@ -133,4 +133,64 @@ describe('CreatorService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(mockStatus);
   });
+
+  it('getMyFollows — appelle GET /api/creators/my/follows avec pagination', () => {
+    service.getMyFollows({ page: 2, limit: 5 }).subscribe((res) => {
+      expect(res.totalDocs).toBe(12);
+      expect(res.docs?.length).toBe(1);
+      expect(res.docs?.[0].creator.name).toBe('Alice');
+    });
+
+    const req = httpTesting.expectOne((r) => r.url === '/api/creators/my/follows');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('limit')).toBe('5');
+
+    req.flush({
+      docs: [{ id: 'f-1', creator: { id: 'c-1', name: 'Alice' }, createdAt: '2026-10-14' }],
+      items: [{ id: 'f-1', creator: { id: 'c-1', name: 'Alice' }, createdAt: '2026-10-14' }],
+      totalDocs: 12,
+      total: 12,
+      page: 2,
+      limit: 5,
+      totalPages: 3,
+      pages: 3,
+      hasPrevPage: true,
+      hasNextPage: true,
+    });
+  });
+
+  it('getMySubscriptions — appelle GET /api/creators/my/subscriptions avec pagination', () => {
+    service.getMySubscriptions({ page: 1, limit: 10 }).subscribe((res) => {
+      expect(res.totalDocs).toBe(1);
+      expect(res.docs?.[0].active).toBe(true);
+      expect(res.docs?.[0].creator.name).toBe('Bob');
+    });
+
+    const req = httpTesting.expectOne((r) => r.url === '/api/creators/my/subscriptions');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('1');
+    expect(req.request.params.get('limit')).toBe('10');
+
+    req.flush({
+      docs: [
+        {
+          id: 's-1',
+          creator: { id: 'c-2', name: 'Bob' },
+          active: true,
+          expiresAt: '2026-11-14T00:00:00.000Z',
+          createdAt: '2026-10-14',
+        },
+      ],
+      items: [],
+      totalDocs: 1,
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+      pages: 1,
+      hasPrevPage: false,
+      hasNextPage: false,
+    });
+  });
 });

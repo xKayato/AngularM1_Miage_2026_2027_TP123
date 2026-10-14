@@ -103,6 +103,29 @@ interface PostAuthorManagement extends PostDetail {
 }
 ```
 
+### D. `FollowItem` & `SubscriptionItem` (Espace Personnel & Dashboard)
+```typescript
+interface FollowItem {
+  id: string;
+  creator: {
+    id: string;
+    name: string;
+  };
+  createdAt: string;
+}
+
+interface SubscriptionItem {
+  id: string;
+  creator: {
+    id: string;
+    name: string;
+  };
+  active: boolean;
+  expiresAt: string;
+  createdAt: string;
+}
+```
+
 ---
 
 ## 3. Matrice d'Accès par Route et par Opération
@@ -132,6 +155,8 @@ interface PostAuthorManagement extends PostDetail {
 | `/api/posts/:id/share-link` | `POST` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 201 (secret 7j) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `GET` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 200 (état sans secret) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `DELETE` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 204 No Content | 403 Forbidden |
+| `/api/creators/my/follows` | `GET` | 401 Unauthorized | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> |
+| `/api/creators/my/subscriptions` | `GET` | 401 Unauthorized | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> |
 | `/api/creators/:id/follow` | `POST`/`DELETE` | 401 Unauthorized | 200 (si non-auteur) | 200 (toggle/unfollow) | 200 | 400 (auto-follow interdit) | 200 (si non-auteur) |
 | `/api/creators/:id/subscribe` | `POST` | 401 Unauthorized | 201 (30j) ou 409 si actif | 201 (30j) ou 409 si actif | 409 Conflict (déjà actif) | 400 (auto-sub interdit) | 201 ou 409 |
 | `/api/creators/:id/status` | `GET` | 401 Unauthorized | 200 Status | 200 Status | 200 Status | 200 Status | 200 Status |

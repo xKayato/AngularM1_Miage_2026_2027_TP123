@@ -359,3 +359,117 @@ test("Mission 5 — Deux souscriptions concurrentes simultanées sur base MongoD
   });
   assert.equal(totalDocs, 1, "Il doit exister exactement 1 document dans la collection Subscription");
 });
+
+test("Mission III — GET /api/creators/my/follows (authentification, pagination et exclusion suspendus)", async (t) => {
+  await t.test("Rejette si non authentifié (401)", async () => {
+    const res = await fetch(`${base}/api/creators/my/follows`);
+    assert.equal(res.status, 401);
+  });
+
+  await t.test("Rejette si utilisateur suspendu (403)", async () => {
+    const { token } = await createUser("user", "suspended");
+    const res = await fetch(`${base}/api/creators/my/follows`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(res.status, 403);
+  });
+
+  await t.test("Retourne la liste paginée et exclut les créateurs suspendus de totalDocs", async () => {
+    const { user: me, token } = await createUser();
+    const { user: c1 } = await createUser("user", "active");
+    const { user: c2 } = await createUser("user", "active");
+    const { user: suspendedCreator } = await createUser("user", "suspended");
+
+    // Création de 3 follows
+    await Follow.create({ followerId: me._id, creatorId: c1._id });
+    await Follow.create({ followerId: me._id, creatorId: c2._id });
+    await Follow.create({ followerId: me._id, creatorId: suspendedCreator._id });
+
+    const res = await fetch(`${base}/api/creators/my/follows?page=1&limit=10`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    // totalDocs doit être 2 (le créateur suspendu est exclu AVANT pagination)
+    assert.equal(body.totalDocs, 2);
+    assert.equal(body.docs.length, 2);
+    assert.equal(body.page, 1);
+    assert.equal(body.limit, 10);
+    assert.ok(body.docs[0].creator.id);
+    assert.ok(body.docs[0].creator.name);
+
+    // Vérifier pagination limit=1
+    const resPaged = await fetch(`${base}/api/creators/my/follows?page=1&limit=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const bodyPaged = await resPaged.json();
+    assert.equal(bodyPaged.totalDocs, 2);
+    assert.equal(bodyPaged.totalPages, 2);
+    assert.equal(bodyPaged.docs.length, 1);
+    assert.equal(bodyPaged.hasNextPage, true);
+  });
+});
+
+test("Mission III — GET /api/creators/my/subscriptions (abonnements actifs uniquement et exclusion suspendus)", async (t) => {
+  await t.test("Rejette si non authentifié (401)", async () => {
+    const res = await fetch(`${base}/api/creators/my/subscriptions`);
+    assert.equal(res.status, 401);
+  });
+
+  await t.test("Retourne uniquement les abonnements actifs et non expirés", async () => {
+    const { user: me, token } = await createUser();
+    const { user: activeCreator } = await createUser("user", "active");
+    const { user: expiredCreator } = await createUser("user", "active");
+    const { user: inactiveCreator } = await createUser("user", "active");
+    const { user: suspendedCreator } = await createUser("user", "suspended");
+
+    const future = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+    const past = new Date(Date.now() - 1000);
+
+    // 1. Abonnement actif valide
+    await Subscription.create({
+      subscriberId: me._id,
+      creatorId: activeCreator._id,
+      active: true,
+      expiresAt: future,
+    });
+
+    // 2. Abonnement expiré
+    await Subscription.create({
+      subscriberId: me._id,
+      creatorId: expiredCreator._id,
+      active: true,
+      expiresAt: past,
+    });
+
+    // 3. Abonnement désactivé
+    await Subscription.create({
+      subscriberId: me._id,
+      creatorId: inactiveCreator._id,
+      active: false,
+      expiresAt: future,
+    });
+
+    // 4. Abonnement actif mais créateur suspendu
+    await Subscription.create({
+      subscriberId: me._id,
+      creatorId: suspendedCreator._id,
+      active: true,
+      expiresAt: future,
+    });
+
+    const res = await fetch(`${base}/api/creators/my/subscriptions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    // Seul le premier abonnement doit être retourné
+    assert.equal(body.totalDocs, 1);
+    assert.equal(body.docs.length, 1);
+    assert.equal(body.docs[0].creator.id, String(activeCreator._id));
+    assert.equal(body.docs[0].active, true);
+    assert.ok(body.docs[0].expiresAt);
+  });
+});
