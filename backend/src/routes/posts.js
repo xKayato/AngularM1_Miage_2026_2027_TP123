@@ -9,6 +9,7 @@ import { User } from "../models/User.js";
 import { Follow } from "../models/Follow.js";
 import { Subscription } from "../models/Subscription.js";
 import { ShareLink } from "../models/ShareLink.js";
+import { Comment } from "../models/Comment.js";
 import { authMakerShare } from "../middlewares/authMakerShare.js";
 import { optionalAuthMakerShare } from "../middlewares/optionalAuthMakerShare.js";
 import {
@@ -763,6 +764,151 @@ postsRouter.delete("/:id/like", authMakerShare, async (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * GET /api/posts/:id/comments
+ * Consultation des commentaires d'un post.
+ * - Utilise optionalAuthMakerShare.
+ * - Respecte la matrice d'accès du post via canAccessPost (visiteur avec X-Share-Token autorisé sur post link).
+ * - Renvoie la liste chronologique des commentaires au format DTO.
+ */
+postsRouter.get("/:id/comments", optionalAuthMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    const post = await Post.findById(req.params.id).populate("author", "name status");
+    if (!post) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    const shareToken = req.headers["x-share-token"] || req.query.token || null;
+    const access = await canAccessPost(post, req.user, { shareToken });
+    if (!access.allowed) {
+      return res.status(access.status || 403).json({ message: access.message || "Accès non autorisé" });
+    }
+
+    const comments = await Comment.find({ postId: post._id }).sort({ createdAt: 1 });
+    const commentsDto = comments.map((c) => ({
+      id: c._id.toString(),
+      postId: c.postId.toString(),
+      author: {
+        id: c.author.id.toString(),
+        name: c.author.name,
+      },
+      text: c.text,
+      createdAt: c.createdAt ? c.createdAt.toISOString() : new Date().toISOString(),
+    }));
+
+    return res.status(200).json(commentsDto);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/posts/:id/comments
+ * Ajout d'un commentaire sur un post.
+ * - Authentification obligatoire (authMakerShare).
+ * - Refuse les comptes suspendus (403, géré par authMakerShare).
+ * - Refuse l'écriture sur les posts archivés (400 Bad Request).
+ * - Vérifie l'accès au post (un utilisateur connecté avec X-Share-Token peut commenter un post link).
+ * - Valide le texte (1 à 1000 caractères, non vide).
+ */
+postsRouter.post("/:id/comments", authMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    const post = await Post.findById(req.params.id).populate("author", "name status");
+    if (!post) {
+      return res.status(404).json({ message: "Post introuvable" });
+    }
+
+    // Interdiction stricte de commenter un post archivé
+    if (post.status === "archived") {
+      return res.status(400).json({ message: "Impossible de commenter un post archivé" });
+    }
+
+    const shareToken = req.headers["x-share-token"] || req.query.token || null;
+    const access = await canAccessPost(post, req.user, { shareToken });
+    if (!access.allowed) {
+      return res.status(access.status || 403).json({ message: access.message || "Accès non autorisé" });
+    }
+
+    const rawText = req.body?.text;
+    if (!rawText || typeof rawText !== "string" || !rawText.trim()) {
+      return res.status(400).json({ message: "Le texte du commentaire est requis" });
+    }
+
+    const trimmedText = rawText.trim();
+    if (trimmedText.length > 1000) {
+      return res.status(400).json({ message: "Le commentaire ne peut pas dépasser 1000 caractères" });
+    }
+
+    const newComment = await Comment.create({
+      postId: post._id,
+      author: {
+        id: req.user._id,
+        name: req.user.name,
+      },
+      text: trimmedText,
+    });
+
+    return res.status(201).json({
+      id: newComment._id.toString(),
+      postId: newComment.postId.toString(),
+      author: {
+        id: newComment.author.id.toString(),
+        name: newComment.author.name,
+      },
+      text: newComment.text,
+      createdAt: newComment.createdAt.toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * DELETE /api/posts/:id/comments/:cid
+ * Suppression d'un commentaire.
+ * - Authentification obligatoire (authMakerShare).
+ * - Autorisé pour l'auteur du commentaire ou un administrateur (role === 'admin').
+ * - Ne donne à l'administrateur aucun accès implicite au contenu ou aux fichiers privés du post.
+ */
+postsRouter.delete("/:id/comments/:cid", authMakerShare, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.cid)) {
+      return res.status(404).json({ message: "Commentaire introuvable" });
+    }
+
+    const comment = await Comment.findOne({
+      _id: req.params.cid,
+      postId: req.params.id,
+    });
+
+    if (!comment) {
+      return res.status(404).json({ message: "Commentaire introuvable" });
+    }
+
+    const isCommentAuthor = String(comment.author.id) === String(req.user._id);
+    const isAdmin = req.user.role === "admin";
+
+    if (!isCommentAuthor && !isAdmin) {
+      return res.status(403).json({ message: "Suppression non autorisée" });
+    }
+
+    await Comment.deleteOne({ _id: comment._id });
+
+    return res.status(200).json({ success: true, message: "Commentaire supprimé" });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 /**
  * PUT /api/posts/:id

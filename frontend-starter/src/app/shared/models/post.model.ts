@@ -130,3 +130,15 @@ export interface MyPostsFilterParams {
 export interface ApiErrorResponse {
   message: string;
 }
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  author: {
+    id: string;
+    name: string;
+  };
+  text: string;
+  createdAt: string;
+}
+

@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { describe, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { SharedPostPageComponent } from './shared-post-page';
 import { PostService } from '../../shared/services/post.service';
+import { AuthService } from '../../shared/services/auth.service';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { PostDetail } from '../../shared/models/post.model';
 
@@ -12,6 +13,9 @@ describe('SharedPostPageComponent', () => {
   let postServiceMock: {
     getSharedPost: ReturnType<typeof vi.fn>;
     getAttachmentBlob: ReturnType<typeof vi.fn>;
+    getComments: ReturnType<typeof vi.fn>;
+    addComment: ReturnType<typeof vi.fn>;
+    deleteComment: ReturnType<typeof vi.fn>;
   };
 
   const mockDetail: PostDetail = {
@@ -65,6 +69,14 @@ describe('SharedPostPageComponent', () => {
     postServiceMock = {
       getSharedPost: vi.fn().mockReturnValue(of(mockDetail)),
       getAttachmentBlob: vi.fn().mockReturnValue(of(new Blob(['data'], { type: 'text/plain' }))),
+      getComments: vi.fn().mockReturnValue(of([])),
+      addComment: vi.fn().mockReturnValue(of({ id: 'c-1', postId: 'post-99', author: { id: 'u-1', name: 'User' }, text: 'Comm', createdAt: new Date().toISOString() })),
+      deleteComment: vi.fn().mockReturnValue(of({ success: true })),
+    };
+
+    const authServiceMock = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      currentUser: vi.fn().mockReturnValue(null),
     };
 
     await TestBed.configureTestingModule({
@@ -72,6 +84,7 @@ describe('SharedPostPageComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PostService, useValue: postServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
         {
           provide: ActivatedRoute,
           useValue: {

@@ -685,3 +685,34 @@
   - **Pourquoi bloquer les images externes :** Les images externes (`![alt](https://...)`) permettent de traquer les utilisateurs via leur adresse IP lors de l'affichage du post et posent des risques de contenu mixte ou d'indisponibilité. En limitant les images aux pièces jointes autorisées (`attachment:<id>`), on garantit le respect de la vie privée et l'intégrité du contenu.
   - **Comment garantir l'unicité de la couverture sous concurrence :** En utilisant `findOneAndUpdate` avec des `arrayFilters` disjoints (`other._id: { $ne: targetId }` et `target._id: targetId`), MongoDB effectue la mise à zéro des anciennes couvertures et l'activation de la nouvelle en une transaction atomique au niveau du document, empêchant tout état incohérent avec plusieurs couvertures.
 
+---
+
+# Mission 4 — Commentaires Sécurisés et Lecteur PDF Natif avec Repli
+
+- **Objectif :**
+  - Ajouter la gestion des commentaires selon la matrice d'accès du post : lecture autorisée aux visiteurs disposant d'un `X-Share-Token` valide sur un post link, mais authentification active obligatoire pour commenter (`401 Unauthorized` pour un anonyme).
+  - Interdire l'écriture sur les posts archivés (`400 Bad Request`) et par les comptes suspendus (`403 Forbidden`).
+  - Permettre la suppression d'un commentaire par son auteur ou par un administrateur, sans donner à l'administrateur d'accès implicite aux fichiers privés du projet.
+  - Ajouter un lecteur PDF intégré conditionnel (`<object [data]="safePdfBlobUrl" type="application/pdf">`) utilisant exclusivement des Blob URLs créées depuis des fichiers autorisés (`getAttachmentBlob()`), avec bouton de téléchargement permanent, état de repli accessible (fallback si le navigateur ou la CSP restreint l'objet), et libération systématique des ObjectURLs en mémoire via `URL.revokeObjectURL()`.
+- **Prompt principal :**
+  > « Mission 4 — Commentaires sécurisés et lecteur PDF : Ajouter les commentaires en respectant les droits de lecture du post. Un visiteur disposant d’un X-Share-Token valide peut lire les commentaires d’un post link, mais doit être connecté pour commenter. Interdire l’écriture sur les posts archivés et par les comptes suspendus. Permettre la suppression par l’auteur du commentaire ou par un administrateur, sans donner à l’administrateur un accès implicite au contenu et aux fichiers privés. Ajouter un lecteur PDF intégré uniquement si la politique CSP et le navigateur le permettent, avec un bouton de téléchargement sécurisé toujours visible et un état de repli. N’utiliser pour le lecteur que des Blob URLs créées par l’application à partir de fichiers obtenus via les contrôles d’accès existants ; libérer ces URLs lorsqu’elles ne sont plus utilisées. Tester les variantes d’accès, notamment les posts link, les posts verrouillés, les archives et les comptes suspendus. »
+- **Fichiers modifiés :**
+  - `backend/src/models/Comment.js` : modèle Mongoose pour les commentaires avec validation de longueur (1-1000 caractères) et indexation chronologique.
+  - `backend/src/routes/posts.js` : routes `GET /api/posts/:id/comments`, `POST /api/posts/:id/comments` et `DELETE /api/posts/:id/comments/:cid`.
+  - `backend/test/comments.test.js` : 9 tests d'intégration backend (lecture anonyme post public, lecture post link avec token et refus sans token, obligation d'authentification pour commenter sur post link, rejet post archivé, rejet compte suspendu, validation texte, suppression auteur/admin, isolation stricte admin sur fichiers privés).
+  - `API_CONTRACT.md` : documentation de `PostComment` et des routes de commentaires dans la matrice d'accès.
+  - `frontend-starter/src/app/shared/models/post.model.ts` : interface `PostComment`.
+  - `frontend-starter/src/app/shared/services/post.service.ts` & `spec.ts` : méthodes `getComments()`, `addComment()`, et `deleteComment()`.
+  - `frontend-starter/src/app/components/post-detail-page/` : intégration des commentaires, du visualiseur PDF `<object>`, du bouton de téléchargement et de la révocation mémoire.
+  - `frontend-starter/src/app/components/post-detail-page/post-detail-page.spec.ts` : tests unitaires des fonctionnalités de commentaires et visualiseur PDF.
+  - `frontend-starter/src/app/components/shared-post-page/` & `spec.ts` : extension de la consultation partagée avec commentaires et visualiseur PDF.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **234 passants sur 234 (5 suites, 100% succès)** (`npm test` dans `backend/`).
+  - Tests Frontend : **259 passants sur 259 (19 suites, 100% succès)** (`npm test -- --watch=false` dans `frontend-starter/`).
+  - Compilation Frontend de production : **Build réussi sans erreur en 9.19s** (`npm run build` dans `frontend-starter/`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi un visiteur avec `X-Share-Token` doit être connecté pour commenter :** Le secret de partage confère un droit de consultation du contenu partagé, mais publier un commentaire engage l'identité d'un utilisateur et crée une entrée liée à un compte actif. Autoriser l'écriture anonyme sans session ouvrirait une faille majeure de spam et de harcèlement non attribuable.
+  - **Pourquoi l'archivage interdit l'écriture :** L'archivage est une mesure de retrait ou de gel suite à une modération. Permettre des ajouts de commentaires sur un contenu archivé contournerait le verrouillage de la modération.
+  - **Gestion de la mémoire avec les Blob URLs :** `URL.createObjectURL(blob)` crée une référence directe vers les données binaires en mémoire dans le navigateur. Ces références ne sont pas automatiquement nettoyées par le ramasse-miettes tant que le document est actif. L'invocation systématique de `URL.revokeObjectURL(url)` dans `ngOnDestroy()` et lors de la fermeture du visualiseur garantit l'absence de fuite mémoire lors d'une utilisation prolongée de l'application.
+
+

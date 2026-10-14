@@ -103,6 +103,20 @@ interface PostAuthorManagement extends PostDetail {
 }
 ```
 
+### D. `PostComment` (Commentaires de projet)
+```typescript
+interface PostComment {
+  id: string;
+  postId: string;
+  author: {
+    id: string;
+    name: string;
+  };
+  text: string;
+  createdAt: string;
+}
+```
+
 ### D. `FollowItem` & `SubscriptionItem` (Espace Personnel & Dashboard)
 ```typescript
 interface FollowItem {
@@ -156,6 +170,9 @@ interface SubscriptionItem {
 | `/api/posts/:id/share-link` | `POST` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 201 (secret 7j) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `GET` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 200 (état sans secret) | 403 Forbidden |
 | `/api/posts/:id/share-link` | `DELETE` | 401 Unauthorized | 403 Forbidden | 403 Forbidden | 403 Forbidden | 204 No Content | 403 Forbidden |
+| `/api/posts/:id/comments` | `GET` | 200 (si public ou `X-Share-Token` valide) | 200 PostComment[] (selon visibilité) | 200 PostComment[] | 200 PostComment[] | 200 PostComment[] | 200 PostComment[] |
+| `/api/posts/:id/comments` | `POST` | 401 Unauthorized (visiteur token doit être connecté) | 201 PostComment (400 si archivé) | 201 PostComment | 201 PostComment | 201 PostComment | 201 PostComment |
+| `/api/posts/:id/comments/:cid` | `DELETE` | 401 Unauthorized | 200 (si auteur du commentaire) sinon 403 | 200 (si auteur) sinon 403 | 200 (si auteur) sinon 403 | 200 (si auteur) sinon 403 | **200 (modération admin sans accès fichiers)** |
 | `/api/creators/my/follows` | `GET` | 401 Unauthorized | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> |
 | `/api/creators/my/subscriptions` | `GET` | 401 Unauthorized | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> |
 | `/api/creators/:id/follow` | `POST`/`DELETE` | 401 Unauthorized | 200 (si non-auteur) | 200 (toggle/unfollow) | 200 | 400 (auto-follow interdit) | 200 (si non-auteur) |

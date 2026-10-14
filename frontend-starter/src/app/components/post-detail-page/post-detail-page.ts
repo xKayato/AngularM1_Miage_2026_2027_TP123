@@ -1,17 +1,19 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PostService } from '../../shared/services/post.service';
 import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
 import { MarkdownService } from '../../shared/services/markdown.service';
-import { AttachmentInfo, PostDetail, PostPreview } from '../../shared/models/post.model';
+import { AttachmentInfo, PostComment, PostDetail, PostPreview } from '../../shared/models/post.model';
 import { CreatorStatusResponse } from '../../shared/models/creator.model';
 
 @Component({
   selector: 'app-post-detail-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   templateUrl: './post-detail-page.html',
   styleUrls: ['./post-detail-page.css'],
 })
@@ -20,6 +22,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   private readonly postService = inject(PostService);
   private readonly creatorService = inject(CreatorService);
   private readonly markdownService = inject(MarkdownService);
+  private readonly sanitizer = inject(DomSanitizer);
   readonly auth = inject(AuthService);
 
   readonly postId = signal<string>('');
@@ -54,6 +57,19 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
     const authorId = this.postDetail()?.author.id || this.postPreview()?.author.id;
     return Boolean(myId && authorId && myId === authorId);
   });
+
+  // Gestion des commentaires sécurisés (Mission 4)
+  readonly comments = signal<PostComment[]>([]);
+  readonly loadingComments = signal<boolean>(false);
+  readonly commentText = signal<string>('');
+  readonly isPostingComment = signal<boolean>(false);
+  readonly commentError = signal<string | null>(null);
+  readonly isDeletingCommentId = signal<string | null>(null);
+
+  // Gestion du lecteur PDF natif et sécurisé (Mission 4)
+  readonly activePdfAttachment = signal<AttachmentInfo | null>(null);
+  readonly safePdfBlobUrl = signal<SafeResourceUrl | null>(null);
+  readonly isPdfLoading = signal<boolean>(false);
 
   // Gestion des pièces jointes sécurisées
   readonly currentAudioUrl = signal<string | null>(null);
@@ -91,6 +107,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         this.preloadImages(detail);
         this.loadCreatorStatus(detail.author.id);
+        this.loadComments(detail.id);
       },
       error: (err) => {
         // En cas de 401 ou 403, on tente de récupérer l'aperçu PostPreview
@@ -327,6 +344,99 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
     const parts = name.trim().split(/\s+/);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  // --- Gestion des commentaires sécurisés (Mission 4) ---
+
+  loadComments(postId: string): void {
+    this.loadingComments.set(true);
+    this.postService.getComments(postId).subscribe({
+      next: (comments) => {
+        this.comments.set(comments);
+        this.loadingComments.set(false);
+      },
+      error: () => {
+        this.loadingComments.set(false);
+      },
+    });
+  }
+
+  submitComment(): void {
+    const detail = this.postDetail();
+    const text = this.commentText().trim();
+    if (!detail || !text || this.isPostingComment() || !this.auth.isAuthenticated()) return;
+
+    if (detail.status === 'archived') {
+      this.commentError.set('Impossible de commenter un projet archivé.');
+      return;
+    }
+
+    this.isPostingComment.set(true);
+    this.commentError.set(null);
+
+    this.postService.addComment(detail.id, text).subscribe({
+      next: (newComment) => {
+        this.isPostingComment.set(false);
+        this.commentText.set('');
+        this.comments.update((prev) => [...prev, newComment]);
+      },
+      error: (err) => {
+        this.isPostingComment.set(false);
+        this.commentError.set(err.error?.message || 'Erreur lors de l’envoi du commentaire.');
+      },
+    });
+  }
+
+  deleteComment(commentId: string): void {
+    const detail = this.postDetail();
+    if (!detail || this.isDeletingCommentId()) return;
+
+    this.isDeletingCommentId.set(commentId);
+    this.postService.deleteComment(detail.id, commentId).subscribe({
+      next: () => {
+        this.isDeletingCommentId.set(null);
+        this.comments.update((prev) => prev.filter((c) => c.id !== commentId));
+      },
+      error: (err) => {
+        this.isDeletingCommentId.set(null);
+        this.actionError.set(err.error?.message || 'Erreur lors de la suppression du commentaire.');
+      },
+    });
+  }
+
+  canDeleteComment(comment: PostComment): boolean {
+    const user = this.auth.currentUser();
+    if (!user) return false;
+    return user.id === comment.author.id || user.role === 'admin';
+  }
+
+  // --- Gestion du lecteur PDF natif et sécurisé (Mission 4) ---
+
+  viewPdf(att: AttachmentInfo): void {
+    const detail = this.postDetail();
+    if (!detail || att.family !== 'pdf') return;
+
+    this.activePdfAttachment.set(att);
+    this.safePdfBlobUrl.set(null);
+    this.isPdfLoading.set(true);
+
+    this.postService.getAttachmentBlob(detail.id, att.id).subscribe({
+      next: (blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        this.createdObjectUrls.push(blobUrl);
+        this.safePdfBlobUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(blobUrl));
+        this.isPdfLoading.set(false);
+      },
+      error: () => {
+        this.isPdfLoading.set(false);
+        this.actionError.set('Impossible de charger le document PDF sécurisé.');
+      },
+    });
+  }
+
+  closePdfViewer(): void {
+    this.activePdfAttachment.set(null);
+    this.safePdfBlobUrl.set(null);
   }
 }
 

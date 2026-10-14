@@ -435,4 +435,74 @@ describe('PostService', () => {
       req.flush({ ...mockDetail, id: 'post-1' });
     });
   });
+
+  describe('Commentaires (Mission 4)', () => {
+    it('getComments — appelle GET /api/posts/:id/comments sans header si pas de shareToken', () => {
+      service.getComments('post-1').subscribe((comments) => {
+        expect(comments.length).toBe(1);
+        expect(comments[0].text).toBe('Super projet');
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/comments');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.headers.has('x-share-token')).toBe(false);
+      req.flush([
+        {
+          id: 'c-1',
+          postId: 'post-1',
+          author: { id: 'u-1', name: 'Alice' },
+          text: 'Super projet',
+          createdAt: '2026-10-14T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('getComments — inclut l en-tête x-share-token si fourni', () => {
+      service.getComments('post-1', 'secret-tok').subscribe((comments) => {
+        expect(comments.length).toBe(1);
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/comments');
+      expect(req.request.headers.get('x-share-token')).toBe('secret-tok');
+      req.flush([
+        {
+          id: 'c-1',
+          postId: 'post-1',
+          author: { id: 'u-1', name: 'Alice' },
+          text: 'Super projet',
+          createdAt: '2026-10-14T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('addComment — appelle POST /api/posts/:id/comments avec le corps text et header shareToken si fourni', () => {
+      service.addComment('post-1', 'Nouveau comm', 'tok-123').subscribe((c) => {
+        expect(c.id).toBe('c-2');
+        expect(c.text).toBe('Nouveau comm');
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/comments');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ text: 'Nouveau comm' });
+      expect(req.request.headers.get('x-share-token')).toBe('tok-123');
+      req.flush({
+        id: 'c-2',
+        postId: 'post-1',
+        author: { id: 'u-2', name: 'Bob' },
+        text: 'Nouveau comm',
+        createdAt: '2026-10-14T10:05:00.000Z',
+      });
+    });
+
+    it('deleteComment — appelle DELETE /api/posts/:id/comments/:cid', () => {
+      service.deleteComment('post-1', 'c-2').subscribe((res) => {
+        expect(res.success).toBe(true);
+      });
+
+      const req = httpTesting.expectOne('/api/posts/post-1/comments/c-2');
+      expect(req.request.method).toBe('DELETE');
+      req.flush({ success: true, message: 'Commentaire supprimé' });
+    });
+  });
 });
+

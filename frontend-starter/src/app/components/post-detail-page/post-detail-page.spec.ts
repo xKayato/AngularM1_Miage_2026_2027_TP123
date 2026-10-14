@@ -17,6 +17,9 @@ describe('PostDetailPageComponent', () => {
     getAttachmentBlob: ReturnType<typeof vi.fn>;
     likePost: ReturnType<typeof vi.fn>;
     unlikePost: ReturnType<typeof vi.fn>;
+    getComments: ReturnType<typeof vi.fn>;
+    addComment: ReturnType<typeof vi.fn>;
+    deleteComment: ReturnType<typeof vi.fn>;
   };
   let creatorServiceMock: {
     getStatus: ReturnType<typeof vi.fn>;
@@ -65,6 +68,15 @@ describe('PostDetailPageComponent', () => {
         downloadUrl: '/api/posts/post-1/attachments/att-audio',
         isCover: false,
       },
+      {
+        id: 'att-pdf',
+        originalName: 'notice.pdf',
+        mimeType: 'application/pdf',
+        size: 4096,
+        family: 'pdf',
+        downloadUrl: '/api/posts/post-1/attachments/att-pdf',
+        isCover: false,
+      },
     ],
     publishedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
@@ -98,6 +110,17 @@ describe('PostDetailPageComponent', () => {
       getAttachmentBlob: vi.fn().mockReturnValue(of(new Blob(['dummy'], { type: 'text/plain' }))),
       likePost: vi.fn().mockReturnValue(of({ liked: true, likesCount: 16 })),
       unlikePost: vi.fn().mockReturnValue(of({ liked: false, likesCount: 15 })),
+      getComments: vi.fn().mockReturnValue(of([])),
+      addComment: vi.fn().mockReturnValue(
+        of({
+          id: 'c-1',
+          postId: 'post-1',
+          author: { id: 'u1', name: 'User 1' },
+          text: 'Superbe notice !',
+          createdAt: new Date().toISOString(),
+        })
+      ),
+      deleteComment: vi.fn().mockReturnValue(of({ success: true })),
     };
 
     creatorServiceMock = {
@@ -352,4 +375,120 @@ describe('PostDetailPageComponent', () => {
     expect(rendered).not.toContain('<script>');
     expect(rendered).toContain('&lt;script&gt;');
   });
+
+  describe('Commentaires & Lecteur PDF (Mission 4)', () => {
+    it('charge les commentaires à l initialisation du projet', () => {
+      postServiceMock.getComments.mockReturnValue(
+        of([
+          {
+            id: 'c-1',
+            postId: 'post-1',
+            author: { id: 'u2', name: 'Bob' },
+            text: 'Très clair, merci !',
+            createdAt: '2026-10-14T10:00:00.000Z',
+          },
+        ])
+      );
+
+      fixture.detectChanges();
+
+      expect(postServiceMock.getComments).toHaveBeenCalledWith('post-1');
+      expect(component.comments().length).toBe(1);
+      expect(component.comments()[0].text).toBe('Très clair, merci !');
+    });
+
+    it('envoie un nouveau commentaire et met à jour la liste', () => {
+      fixture.detectChanges();
+
+      component.commentText.set('Superbe tutoriel');
+      component.submitComment();
+
+      expect(postServiceMock.addComment).toHaveBeenCalledWith('post-1', 'Superbe tutoriel');
+      expect(component.comments().length).toBe(1);
+      expect(component.comments()[0].text).toBe('Superbe notice !');
+      expect(component.commentText()).toBe('');
+      expect(component.isPostingComment()).toBe(false);
+    });
+
+    it('interdit l envoi de commentaire si le projet est archivé', () => {
+      fixture.detectChanges();
+      component.postDetail.set({
+        ...mockDetail,
+        status: 'archived',
+      });
+
+      component.commentText.set('Tentative');
+      component.submitComment();
+
+      expect(postServiceMock.addComment).not.toHaveBeenCalled();
+      expect(component.commentError()).toContain('archivé');
+    });
+
+    it('supprime un commentaire avec succès', () => {
+      fixture.detectChanges();
+      component.comments.set([
+        {
+          id: 'c-1',
+          postId: 'post-1',
+          author: { id: 'u1', name: 'User 1' },
+          text: 'Commentaire à supprimer',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      component.deleteComment('c-1');
+
+      expect(postServiceMock.deleteComment).toHaveBeenCalledWith('post-1', 'c-1');
+      expect(component.comments().length).toBe(0);
+      expect(component.isDeletingCommentId()).toBe(null);
+    });
+
+    it('canDeleteComment retourne true pour l auteur du commentaire ou un admin', () => {
+      const comment1 = {
+        id: 'c-1',
+        postId: 'post-1',
+        author: { id: 'u1', name: 'User 1' },
+        text: 'Mon commentaire',
+        createdAt: new Date().toISOString(),
+      };
+      const comment2 = {
+        id: 'c-2',
+        postId: 'post-1',
+        author: { id: 'u-other', name: 'Other' },
+        text: 'Autre commentaire',
+        createdAt: new Date().toISOString(),
+      };
+
+      // Connecté en tant que u1
+      authServiceMock.currentUser.mockReturnValue({ id: 'u1', role: 'user' });
+      expect(component.canDeleteComment(comment1)).toBe(true);
+      expect(component.canDeleteComment(comment2)).toBe(false);
+
+      // Connecté en tant qu'admin
+      authServiceMock.currentUser.mockReturnValue({ id: 'u-admin', role: 'admin' });
+      expect(component.canDeleteComment(comment2)).toBe(true);
+    });
+
+    it('ouvre le lecteur PDF sécurisé avec Blob URL et le referme proprement', () => {
+      const pdfAtt = mockDetail.attachments.find((a) => a.family === 'pdf')!;
+      postServiceMock.getAttachmentBlob.mockReturnValue(
+        of(new Blob(['fake-pdf'], { type: 'application/pdf' }))
+      );
+
+      fixture.detectChanges();
+
+      component.viewPdf(pdfAtt);
+
+      expect(component.activePdfAttachment()).toEqual(pdfAtt);
+      expect(postServiceMock.getAttachmentBlob).toHaveBeenCalledWith('post-1', 'att-pdf');
+      expect(component.safePdfBlobUrl()).toBeTruthy();
+      expect(component.isPdfLoading()).toBe(false);
+
+      // Fermeture du visualiseur
+      component.closePdfViewer();
+      expect(component.activePdfAttachment()).toBe(null);
+      expect(component.safePdfBlobUrl()).toBe(null);
+    });
+  });
 });
+

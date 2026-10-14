@@ -7,6 +7,7 @@ import {
   CreatePostDto,
   MyPostsFilterParams,
   PostAuthorManagement,
+  PostComment,
   PostDetail,
   PostFilterParams,
   PostPreview,
@@ -247,4 +248,55 @@ export class PostService {
       { attachmentId },
     );
   }
+
+  /**
+   * Récupère la liste des commentaires d'un post.
+   * Transmet optionnellement le token de partage via X-Share-Token.
+   */
+  getComments(
+    postId: string,
+    shareToken?: string | null,
+  ): Observable<PostComment[]> {
+    let headers = new HttpHeaders();
+    if (shareToken) {
+      headers = headers.set('x-share-token', shareToken);
+    }
+    return this.http.get<PostComment[]>(
+      `${this.baseUrl}/${encodeURIComponent(postId)}/comments`,
+      { headers },
+    );
+  }
+
+  /**
+   * Ajoute un commentaire sur un post.
+   * Transmet optionnellement le token de partage via X-Share-Token si post link.
+   */
+  addComment(
+    postId: string,
+    text: string,
+    shareToken?: string | null,
+  ): Observable<PostComment> {
+    let headers = new HttpHeaders();
+    if (shareToken) {
+      headers = headers.set('x-share-token', shareToken);
+    }
+    return this.http.post<PostComment>(
+      `${this.baseUrl}/${encodeURIComponent(postId)}/comments`,
+      { text },
+      { headers },
+    );
+  }
+
+  /**
+   * Supprime un commentaire (par son auteur ou par un administrateur).
+   */
+  deleteComment(
+    postId: string,
+    commentId: string,
+  ): Observable<{ success: boolean; message?: string }> {
+    return this.http.delete<{ success: boolean; message?: string }>(
+      `${this.baseUrl}/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+    );
+  }
 }
+

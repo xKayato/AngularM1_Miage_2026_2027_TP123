@@ -289,6 +289,15 @@
                         >
                           {{ activeAudioAttachmentId() === att.id ? 'Lecture en cours...' : 'Écouter' }}
                         </button>
+                      } @else if (att.family === 'pdf') {
+                        <button
+                          type="button"
+                          class="btn-action"
+                          (click)="viewPdf(att)"
+                          [disabled]="isPdfLoading() && activePdfAttachment()?.id === att.id"
+                        >
+                          {{ isPdfLoading() && activePdfAttachment()?.id === att.id ? 'Ouverture...' : '👁️ Visualiser' }}
+                        </button>
                       }
                       <button type="button" class="btn-action secondary" (click)="downloadFile(att)">
                         ⬇️ Télécharger
@@ -304,6 +313,47 @@
                 }
               </div>
 
+              <!-- Visualiseur PDF intégré sécurisé avec repli (Mission 4) -->
+              @if (activePdfAttachment(); as pdfAtt) {
+                <div class="pdf-viewer-card card">
+                  <div class="pdf-viewer-header">
+                    <div class="pdf-header-title">
+                      <span class="pdf-icon">📄</span>
+                      <strong>Notice PDF : {{ pdfAtt.originalName }}</strong> ({{ formatBytes(pdfAtt.size) }})
+                    </div>
+                    <div class="pdf-header-actions">
+                      <button type="button" class="btn-action secondary" (click)="downloadFile(pdfAtt)">
+                        📥 Télécharger le PDF
+                      </button>
+                      <button type="button" class="btn-close-pdf" (click)="closePdfViewer()" aria-label="Fermer le visualiseur PDF">
+                        ✕ Fermer
+                      </button>
+                    </div>
+                  </div>
+
+                  @if (isPdfLoading()) {
+                    <div class="pdf-loading-state">
+                      <div class="spinner"></div>
+                      <p>Chargement sécurisé du document PDF...</p>
+                    </div>
+                  } @else if (safePdfBlobUrl(); as safeUrl) {
+                    <object
+                      [data]="safeUrl"
+                      type="application/pdf"
+                      class="pdf-object-viewer"
+                    >
+                      <!-- État de repli accessible (Fallback CSP / Navigateur) -->
+                      <div class="pdf-fallback-box">
+                        <p class="pdf-fallback-msg">La prévisualisation intégrée du document PDF n'est pas disponible dans votre navigateur ou est restreinte par la politique de sécurité.</p>
+                        <button type="button" class="btn-action primary" (click)="downloadFile(pdfAtt)">
+                          📥 Télécharger la notice PDF ({{ formatBytes(pdfAtt.size) }})
+                        </button>
+                      </div>
+                    </object>
+                  }
+                </div>
+              }
+
               @if (currentAudioUrl()) {
                 <div class="audio-player-bar">
                   <p class="audio-label">Lecteur audio intégré :</p>
@@ -312,6 +362,103 @@
               }
             </section>
           }
+
+          <!-- Section des Commentaires Sécurisés (Mission 4) -->
+          <section class="comments-section card">
+            <h2 class="section-heading font-display">
+              💬 Commentaires ({{ comments().length }})
+            </h2>
+
+            <!-- Formulaire d'ajout de commentaire -->
+            @if (detail.status === 'archived') {
+              <div class="alert alert-warning" role="status">
+                🔒 <strong>Projet archivé :</strong> Les commentaires sont fermés sur ce projet.
+              </div>
+            } @else if (!auth.isAuthenticated()) {
+              <div class="comment-login-prompt">
+                <p>Connectez-vous pour participer à la discussion et échanger avec la communauté.</p>
+                <a routerLink="/login" class="btn-action primary">Se connecter</a>
+              </div>
+            } @else {
+              <form class="comment-form" (ngSubmit)="submitComment()">
+                <div class="form-group">
+                  <label for="commentTextInput" class="form-label">Laisser un commentaire ou une question :</label>
+                  <textarea
+                    id="commentTextInput"
+                    name="commentTextInput"
+                    class="form-control comment-textarea"
+                    rows="3"
+                    maxlength="1000"
+                    placeholder="Partagez votre avis, vos questions techniques ou vos astuces d'atelier..."
+                    [ngModel]="commentText()"
+                    (ngModelChange)="commentText.set($event)"
+                    required
+                  ></textarea>
+                </div>
+
+                @if (commentError()) {
+                  <div class="action-alert error" role="alert">⚠️ {{ commentError() }}</div>
+                }
+
+                <div class="comment-form-footer">
+                  <span class="char-count">{{ commentText().length }}/1000</span>
+                  <button
+                    type="submit"
+                    class="btn-action primary"
+                    [disabled]="isPostingComment() || !commentText().trim()"
+                  >
+                    {{ isPostingComment() ? 'Envoi en cours...' : 'Envoyer le commentaire' }}
+                  </button>
+                </div>
+              </form>
+            }
+
+            <!-- Liste des commentaires -->
+            @if (loadingComments()) {
+              <div class="loading-state comments-loading">
+                <div class="spinner"></div>
+                <p>Chargement des commentaires...</p>
+              </div>
+            } @else if (comments().length === 0) {
+              <p class="empty-comments-msg">Aucun commentaire pour le moment. Soyez le premier à poser une question ou partager un retour d'expérience !</p>
+            } @else {
+              <div class="comments-list">
+                @for (c of comments(); track c.id) {
+                  <article class="comment-card">
+                    <div class="comment-header">
+                      <div class="comment-author-info">
+                        <div class="avatar-circle-sm">
+                          {{ getInitials(c.author.name) }}
+                        </div>
+                        <div class="comment-meta">
+                          <strong class="comment-author-name">{{ c.author.name }}</strong>
+                          <time class="comment-date" [attr.datetime]="c.createdAt">
+                            {{ c.createdAt | date:'dd MMM yyyy à HH:mm' }}
+                          </time>
+                        </div>
+                      </div>
+
+                      @if (canDeleteComment(c)) {
+                        <button
+                          type="button"
+                          class="btn-delete-comment"
+                          (click)="deleteComment(c.id)"
+                          [disabled]="isDeletingCommentId() === c.id"
+                          title="Supprimer ce commentaire"
+                        >
+                          {{ isDeletingCommentId() === c.id ? '...' : '🗑️ Supprimer' }}
+                        </button>
+                      }
+                    </div>
+
+                    <div class="comment-body">
+                      <p>{{ c.text }}</p>
+                    </div>
+                  </article>
+                }
+              </div>
+            }
+          </section>
         </div>
 
         <!-- Colonne Latérale (Sidebar Figma v2) -->
@@ -339,9 +486,26 @@
                       {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
                       <strong>{{ att.originalName }}</strong>
                     </span>
-                    <button type="button" class="btn-mini-download" (click)="downloadFile(att)" [title]="'Télécharger ' + att.originalName">
-                      ⬇️
-                    </button>
+                    <div class="sidebar-mini-actions">
+                      @if (att.family === 'pdf') {
+                        <button
+                          type="button"
+                          class="btn-mini-download"
+                          (click)="viewPdf(att)"
+                          [title]="'Visualiser ' + att.originalName"
+                        >
+                          👁️
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="btn-mini-download"
+                        (click)="downloadFile(att)"
+                        [title]="'Télécharger ' + att.originalName"
+                      >
+                        ⬇️
+                      </button>
+                    </div>
                   </div>
                 }
               </div>
