@@ -1,6 +1,6 @@
 # Index des Captures d'Écran — TP Angular M1 MIAGE
 
-Ce dossier regroupe les preuves d'exécution (DevTools Network et interface utilisateur) référencées dans le rapport `RAPPORT_IA_MODELE.md`.
+Ce dossier regroupe les preuves d'exécution (DevTools Network et interface utilisateur) référencées dans le rapport `RAPPORT_IA_TP1_A_3.md`.
 
 ---
 
