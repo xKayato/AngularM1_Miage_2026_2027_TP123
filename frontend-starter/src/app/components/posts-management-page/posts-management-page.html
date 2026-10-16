@@ -268,27 +268,24 @@
           <!-- Barre d'outils de mise en page -->
           <div class="editor-toolbar" role="toolbar" aria-label="Outils de mise en page et pièces jointes">
             <div class="toolbar-formatting-group">
-              <button type="button" class="btn-tool" (click)="formatEditor('**Texte en gras**')" title="Gras"><b>B</b></button>
-              <button type="button" class="btn-tool" (click)="formatEditor('*Texte en italique*')" title="Italique"><i>I</i></button>
-              <button type="button" class="btn-tool" (click)="formatEditor('<u>Texte souligné</u>')" title="Souligné"><u>U</u></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('**Texte en gras**')" title="Gras"><b>B</b></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('*Texte en italique*')" title="Italique"><i>I</i></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('<u>Texte souligné</u>')" title="Souligné"><u>U</u></button>
               <span class="tool-sep" aria-hidden="true">|</span>
-              <button type="button" class="btn-tool" (click)="formatEditor('\n## Nouveau sous-titre d\'étape\n')">Titre H2</button>
-              <button type="button" class="btn-tool" (click)="formatEditor('\n### Sous-section\n')">H3</button>
-              <button type="button" class="btn-tool" (click)="formatEditor('\n- Élément de liste')">• Liste</button>
-              <button type="button" class="btn-tool" (click)="formatEditor('\n1. Étape numérotée')">1. Étapes</button>
-              <button type="button" class="btn-tool" (click)="formatEditor('\n> 💡 Astuce d\'atelier : ')">❝ Citation</button>
-              <button type="button" class="btn-tool font-mono" (click)="formatEditor('`code / cote`')">&lt;/&gt;</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('## Nouveau sous-titre d\'étape')">Titre H2</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('### Sous-section')">H3</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('- Élément de liste')">• Liste</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('1. Étape numérotée')">1. Étapes</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('> 💡 Astuce d\'atelier : ')">❝ Citation</button>
+              <button type="button" class="btn-tool font-mono" (mousedown)="$event.preventDefault()" (click)="formatEditor('`code / cote`')">&lt;/&gt;</button>
             </div>
 
             <div class="toolbar-actions-group">
-              <button
-                type="button"
-                class="btn-insert-attachment"
-                (click)="insertAttachmentInText('schema-cablage-12v.pdf', 'PDF • 1,1 Mo')"
-                title="Insérer un repère de pièce jointe dans le tutoriel"
-              >
-                📎 + Insérer une PJ dans le texte
-              </button>
+              @if (insertionNotice()) {
+                <span class="insertion-notice-chip" role="status">
+                  ✓ {{ insertionNotice() }}
+                </span>
+              }
 
               <div class="editor-tabs-pill">
                 <button
@@ -311,17 +308,33 @@
             </div>
           </div>
 
-          <!-- Onglet 1 : Édition brute du texte -->
+          <!-- Onglet 1 : Édition brute du texte avec support Drag & Drop -->
           @if (editorTab() === 'edit') {
-            <div class="editor-edit-pane">
+            <div class="editor-edit-pane" style="position: relative;">
               <textarea
+                #editorTextarea
                 id="post-content"
                 formControlName="content"
-                rows="10"
-                placeholder="## 1. Liste du matériel nécessaire&#10;- 1 ventilateur PC 120mm&#10;- 1 filtre à charbon actif&#10;&#10;[📎 PIÈCE JOINTE DANS LE TEXTE : schema-cablage-12v.pdf (PDF • 1,1 Mo)]&#10;&#10;## 2. Assemblage..."
+                rows="11"
+                placeholder="## 1. Matériel nécessaire&#10;- 1 composant principal&#10;&#10;Glissez et déposez directement vos fichiers ici pour les insérer au curseur...&#10;&#10;## 2. Assemblage..."
                 class="form-control editor-textarea"
+                [class.drag-over]="isDragOverEditor()"
                 [class.is-invalid]="postForm.get('content')?.invalid && postForm.get('content')?.touched"
+                (select)="updateSelection()"
+                (keyup)="updateSelection()"
+                (mouseup)="updateSelection()"
+                (focus)="updateSelection()"
+                (blur)="updateSelection()"
+                (dragover)="onEditorDragOver($event)"
+                (dragleave)="onEditorDragLeave($event)"
+                (drop)="onEditorDrop($event)"
               ></textarea>
+              @if (isDragOverEditor()) {
+                <div class="drop-overlay-indicator" aria-hidden="true">
+                  <span style="font-size: 2rem;">📥</span>
+                  <span>Déposez le fichier ici pour l'insérer à la position du curseur</span>
+                </div>
+              }
               @if (postForm.get('content')?.invalid && postForm.get('content')?.touched) {
                 <small class="field-error">
                   Le contenu complet est requis (au moins 10 caractères).
@@ -329,7 +342,7 @@
               }
             </div>
           } @else {
-            <!-- Onglet 2 : Aperçu en direct du rendu mis en page (Figma Frame 3D) -->
+            <!-- Onglet 2 : Aperçu en direct du rendu mis en page -->
             <div class="editor-preview-pane">
               <div class="preview-notice-badge font-display">Aperçu en direct du tutoriel Markdown :</div>
               <div class="preview-rendered-body markdown-rendered-content" [innerHTML]="previewHtml()"></div>
@@ -344,9 +357,9 @@
               <span class="manager-title font-display">Pièces jointes du poste</span>
               <p class="manager-desc">
                 @if (editingPostId()) {
-                  Cliquez sur « ↵ Insérer dans le texte » pour placer la pièce jointe à votre position dans le tutoriel.
+                  Glissez-déposez un fichier directement dans le texte, ou cliquez sur « ↵ Insérer au curseur » pour le placer au point d'insertion souhaité.
                 } @else {
-                  Sélectionnez vos pièces jointes dès la création (images, PDF, audio). Elles seront téléversées automatiquement à l'enregistrement.
+                  Sélectionnez ou déposez vos fichiers (images, PDF, audio). Ils sont insérables au curseur dès maintenant et seront téléversés automatiquement à l'enregistrement.
                 }
               </p>
             </div>
@@ -368,7 +381,7 @@
                         {{ att.originalName }}
                       </span>
                       <span class="intext-status-line">
-                        @if (isAttachmentInContent(att.originalName)) {
+                        @if (isAttachmentInContent(att)) {
                           <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
                         } @else {
                           <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
@@ -378,17 +391,19 @@
                     <button
                       type="button"
                       class="btn-insert-inline"
-                      (click)="insertAttachmentInText(att.originalName, formatBytes(att.size))"
-                      title="Insérer dans le corps du texte"
+                      (mousedown)="$event.preventDefault()"
+                      (click)="insertAttachmentAtCursor(att)"
+                      tabindex="0"
+                      title="Insérer à la position actuelle du curseur"
                     >
-                      ↵ Insérer dans le texte
+                      ↵ Insérer au curseur
                     </button>
                   </div>
                 }
               </div>
             } @else {
               <div class="empty-attachments-inline">
-                <span>Aucune pièce jointe sur ce poste. Vous pourrez téléverser vos fichiers PDF, images et audio avec le bouton ci-dessus.</span>
+                <span>Aucune pièce jointe sur ce poste. Glissez-déposez un fichier dans l'éditeur ou utilisez le bouton ci-dessus pour téléverser vos documents.</span>
               </div>
             }
           } @else {
@@ -407,7 +422,7 @@
                   accept=".jpg,.jpeg,.png,.webp,.pdf,.mp3,.wav,.ogg,.m4a"
                 />
                 <span class="file-picker-hint">
-                  Formats acceptés : Images (max 5 Mo), PDF (max 10 Mo), Audio (max 25 Mo). Cumul max 50 Mo.
+                  Glissez-déposez vos fichiers dans le texte ou parcourez votre disque. Formats : Images (5 Mo), PDF (10 Mo), Audio (25 Mo). Cumul max 50 Mo.
                 </span>
               </div>
 
@@ -430,19 +445,35 @@
                           <span class="intext-file-title truncate">
                             {{ getFileIcon(file.name) }} {{ file.name }}
                           </span>
-                          <span class="intext-status-line text-muted">
-                            {{ formatBytes(file.size) }} • En attente
+                          <span class="intext-status-line">
+                            @if (isAttachmentInContent(file)) {
+                              <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(file.size) }})</span>
+                            } @else {
+                              <span class="text-muted">{{ formatBytes(file.size) }} • En attente d'envoi</span>
+                            }
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          class="btn-remove-creation-file"
-                          (click)="removeCreationFile(idx)"
-                          title="Retirer ce fichier de la sélection"
-                          [disabled]="loading()"
-                        >
-                          ✕ Retirer
-                        </button>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                          <button
+                            type="button"
+                            class="btn-insert-inline"
+                            (mousedown)="$event.preventDefault()"
+                            (click)="insertCreationFileAtCursor(file)"
+                            tabindex="0"
+                            title="Insérer ce fichier à la position actuelle du curseur"
+                          >
+                            ↵ Insérer au curseur
+                          </button>
+                          <button
+                            type="button"
+                            class="btn-remove-creation-file"
+                            (click)="removeCreationFile(idx)"
+                            title="Retirer ce fichier de la sélection"
+                            [disabled]="loading()"
+                          >
+                            ✕ Retirer
+                          </button>
+                        </div>
                       </div>
                     }
                   </div>

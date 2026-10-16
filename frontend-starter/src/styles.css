@@ -468,4 +468,182 @@ html.dark .alert-warning {
   pointer-events: auto !important;
 }
 
+/* --- ÉDITEUR RICHE : GLISSER-DÉPOSER & PIÈCES JOINTES IN-TEXT --- */
+.editor-textarea.drag-over {
+  border-color: var(--brand-primary) !important;
+  background-color: rgba(224, 86, 36, 0.05) !important;
+  outline: 2px dashed var(--brand-primary) !important;
+  outline-offset: -4px !important;
+  box-shadow: 0 0 0 4px rgba(224, 86, 36, 0.15) !important;
+}
+
+.drop-overlay-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.88);
+  border: 2px dashed var(--brand-primary);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 20;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+html.dark .drop-overlay-indicator {
+  background: rgba(20, 20, 25, 0.9);
+}
+
+.insertion-notice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  background-color: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  animation: fadeInNotice 0.2s ease-out;
+}
+
+html.dark .insertion-notice-chip {
+  background-color: #064E3B;
+  color: #A7F3D0;
+  border-color: #047857;
+}
+
+@keyframes fadeInNotice {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Rendu des pièces jointes Markdown dans le tutoriel */
+.tutorial-inline-image-box {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.tutorial-inline-image {
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.tutorial-image-caption {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.tutorial-inline-image-box.temp-pending {
+  border: 2px dashed var(--brand-primary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  background: rgba(224, 86, 36, 0.04);
+}
+
+.temp-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.temp-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background-color: var(--brand-primary);
+  color: #FFFFFF;
+}
+
+.intext-temp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px dashed #F59E0B;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+html.dark .intext-temp-badge {
+  background: #2D2005;
+  color: #FDE68A;
+  border-color: #B45309;
+}
+
+.tutorial-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  margin: 0.35rem 0;
+}
+
+.tutorial-attachment-link:hover {
+  background: var(--bg-subtle);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.tutorial-pdf-link {
+  border-left: 4px solid #EF4444;
+}
+
+.tutorial-inline-audio-box {
+  margin: 1rem 0;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--pine-primary);
+}
+
+.audio-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.audio-size {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.tutorial-audio-player {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+}
+
+
 

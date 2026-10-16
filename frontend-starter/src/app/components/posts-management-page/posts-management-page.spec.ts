@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { describe, beforeEach, it, expect, vi } from 'vitest';
 import { PostsManagementPageComponent } from './posts-management-page';
 import { PostService } from '../../shared/services/post.service';
-import { PostAuthorManagement } from '../../shared/models/post.model';
+import { AttachmentInfo, PostAuthorManagement } from '../../shared/models/post.model';
 import { Page } from '../../shared/models/page.model';
 
 describe('PostsManagementPageComponent', () => {
@@ -563,6 +563,195 @@ describe('PostsManagementPageComponent', () => {
       expect(component.currentView()).toBe('list');
       expect(component.creationSelectedFiles().length).toBe(0);
       expect(component.creationFilesError()).toBeNull();
+    });
+  });
+
+  describe('Amélioration — Insertion précise des pièces jointes, Drag-and-Drop et Curseur', () => {
+    beforeEach(() => {
+      component.startCreate();
+    });
+
+    it('insère un snippet au début du texte (position 0)', () => {
+      component.postForm.get('content')?.setValue('Deuxième partie du tutoriel.');
+      component.insertSnippetAtCursor('## 1. Introduction', 0, 0);
+
+      const content = component.postForm.get('content')?.value;
+      expect(content.startsWith('## 1. Introduction\n\nDeuxième partie')).toBe(true);
+      expect(component.lastSelectionStart).toBe('## 1. Introduction\n\n'.length);
+    });
+
+    it('insère un snippet au milieu du texte à la position exacte du curseur', () => {
+      component.postForm.get('content')?.setValue('Début du texte. Fin du texte.');
+      // Position 16 (juste après le point)
+      component.insertSnippetAtCursor('![Schéma](attachment:att-123)', 16, 16);
+
+      const content = component.postForm.get('content')?.value;
+      expect(content).toContain('![Schéma](attachment:att-123)');
+      expect(content.startsWith('Début du texte.')).toBe(true);
+      expect(content.endsWith('Fin du texte.')).toBe(true);
+    });
+
+    it('insère un snippet à la fin du texte sans duplication de retours chariot', () => {
+      component.postForm.get('content')?.setValue('Contenu complet déjà saisi.');
+      const len = 'Contenu complet déjà saisi.'.length;
+      component.insertSnippetAtCursor('## Étape finale', len, len);
+
+      const content = component.postForm.get('content')?.value;
+      expect(content.endsWith('\n\n## Étape finale')).toBe(true);
+    });
+
+    it('remplace le texte sélectionné par le snippet inséré', () => {
+      component.postForm.get('content')?.setValue('Cliquez sur [PLACEHOLDER] pour continuer.');
+      const start = 'Cliquez sur '.length;
+      const end = start + '[PLACEHOLDER]'.length;
+
+      component.insertSnippetAtCursor('[📄 Télécharger notice (PDF)](attachment:att-pdf-1)', start, end);
+
+      const content = component.postForm.get('content')?.value;
+      expect(content).not.toContain('[PLACEHOLDER]');
+      expect(content).toContain('[📄 Télécharger notice (PDF)](attachment:att-pdf-1)');
+    });
+
+    it('mémorise la sélection et résiste à la perte de focus', () => {
+      component.postForm.get('content')?.setValue('Premier paragraphe.\n\nDeuxième paragraphe.');
+      // Simule une sélection mémorisée avant le clic sur un bouton externe
+      component.lastSelectionStart = 19;
+      component.lastSelectionEnd = 19;
+
+      // Appel sans passer de position explicite (comme lors d'un clic sur la carte de PJ)
+      component.insertSnippetAtCursor('💡 Conseil d atelier');
+
+      const content = component.postForm.get('content')?.value;
+      expect(content).toContain('Premier paragraphe.\n\n💡 Conseil d atelier\n\nDeuxième paragraphe.');
+    });
+
+    it('distingue les types de fichiers : image, PDF, audio et archive', () => {
+      const imgSnippet = component.generateAttachmentSnippet({ name: 'photo.jpg', id: 'img-1' });
+      expect(imgSnippet).toBe('![photo.jpg](attachment:img-1)');
+
+      const pdfSnippet = component.generateAttachmentSnippet({ name: 'manuel.pdf', id: 'pdf-2' });
+      expect(pdfSnippet).toBe('[📄 Télécharger manuel.pdf (PDF)](attachment:pdf-2)');
+
+      const audioSnippet = component.generateAttachmentSnippet({ name: 'piste.mp3', id: 'audio-3' });
+      expect(audioSnippet).toBe('[🎵 Écouter piste.mp3 (Audio)](attachment:audio-3)');
+
+      const zipSnippet = component.generateAttachmentSnippet({ name: 'fichiers.zip', id: 'zip-4' });
+      expect(zipSnippet).toBe('[📎 fichiers.zip](attachment:zip-4)');
+    });
+
+    it('gère le dépôt glisser-déposer de plusieurs fichiers avec création de jetons temporaires', () => {
+      const file1 = new File(['img'], 'plan.png', { type: 'image/png' });
+      const file2 = new File(['pdf'], 'schema.pdf', { type: 'application/pdf' });
+
+      component.postForm.get('content')?.setValue('Voici les documents joints : ');
+      component.lastSelectionStart = 28;
+      component.lastSelectionEnd = 28;
+
+      component.handleDroppedFiles([file1, file2], 28);
+
+      expect(component.creationSelectedFiles().length).toBe(2);
+      const content = component.postForm.get('content')?.value;
+      expect(content).toContain('![plan.png](attachment:temp:');
+      expect(content).toContain('[📄 Télécharger schema.pdf (PDF)](attachment:temp:');
+      expect(component.insertionNotice()).toContain('2 pièce(s) jointe(s) sélectionnée(s) et insérée(s)');
+    });
+
+    it('remplace les jetons temporaires par les identifiants définitifs lors de la sauvegarde du post', () => {
+      const imgFile = new File(['bytes'], 'montage.png', { type: 'image/png' });
+      component.creationSelectedFiles.set([imgFile]);
+      const tempId = component.getTempIdForFile(imgFile);
+
+      component.postForm.setValue({
+        title: 'Tutoriel avec image locale',
+        shortDescription: 'Description valide de plus de 10 caractères.',
+        content: `Introduction\n\n![montage.png](attachment:temp:${tempId})\n\nConclusion`,
+        category: 'Lego',
+        tagsInput: 'diy, lego',
+      });
+
+      const createdPost = {
+        ...mockPost,
+        id: 'post-new-1',
+        title: 'Tutoriel avec image locale',
+        content: `Introduction\n\n![montage.png](attachment:temp:${tempId})\n\nConclusion`,
+      };
+      postServiceMock.createPost.mockReturnValue(of(createdPost));
+
+      const realAttachment: AttachmentInfo = {
+        id: 'real-att-999',
+        originalName: 'montage.png',
+        mimeType: 'image/png',
+        size: 1024,
+        family: 'image',
+        downloadUrl: '/api/posts/post-new-1/attachments/real-att-999',
+        isCover: false,
+      };
+      postServiceMock.uploadAttachments.mockReturnValue(of([realAttachment]));
+      postServiceMock.updatePost.mockReturnValue(of({ ...createdPost, content: 'updated' }));
+
+      component.onSubmit();
+
+      expect(postServiceMock.createPost).toHaveBeenCalled();
+      expect(postServiceMock.uploadAttachments).toHaveBeenCalledWith('post-new-1', [imgFile]);
+      // updatePost doit avoir été appelé avec le token définitif
+      expect(postServiceMock.updatePost).toHaveBeenCalledWith(
+        'post-new-1',
+        expect.objectContaining({
+          content: expect.stringContaining('![montage.png](attachment:real-att-999)'),
+        })
+      );
+      expect(component.successMessage()).toContain('créé avec succès avec 1 pièce(s) jointe(s)');
+    });
+
+    it('en mode édition d un brouillon, téléverse immédiatement les fichiers déposés et insère les identifiants réels', () => {
+      component.startEdit(mockPost);
+      const droppedFile = new File(['audio-data'], 'son.mp3', { type: 'audio/mpeg' });
+
+      const uploadedAtt: AttachmentInfo = {
+        id: 'att-audio-777',
+        originalName: 'son.mp3',
+        mimeType: 'audio/mpeg',
+        size: 5000,
+        family: 'audio',
+        downloadUrl: '/api/posts/post-1/attachments/att-audio-777',
+        isCover: false,
+      };
+      postServiceMock.uploadAttachments.mockReturnValue(of([uploadedAtt]));
+
+      component.handleDroppedFiles([droppedFile], 10);
+
+      expect(postServiceMock.uploadAttachments).toHaveBeenCalledWith(mockPost.id, [droppedFile]);
+      const content = component.postForm.get('content')?.value;
+      expect(content).toContain('[🎵 Écouter son.mp3 (Audio)](attachment:att-audio-777)');
+      expect(component.insertionNotice()).toContain('téléversée(s) et insérée(s)');
+    });
+
+    it('génère un aperçu fidèle dans previewHtml avec rendu des éléments in-text', () => {
+      const postWithAtt: PostAuthorManagement = {
+        ...mockPost,
+        attachments: [
+          {
+            id: 'att-1',
+            originalName: 'schema.png',
+            mimeType: 'image/png',
+            size: 1024,
+            family: 'image',
+            downloadUrl: '/api/posts/post-1/attachments/att-1',
+            isCover: true,
+          },
+        ],
+      };
+      component.posts.set([postWithAtt]);
+      component.startEdit(postWithAtt);
+
+      component.postForm.get('content')?.setValue(
+        '# Mon Projet\n\n![schema.png](attachment:att-1)\n\nFin.'
+      );
+
+      const html = component.previewHtml();
+      expect(html).toContain('<h2 class="tutorial-h2 font-display">Mon Projet</h2>');
+      expect(html).toContain('<figure class="tutorial-inline-image-box">');
+      expect(html).toContain('schema.png');
     });
   });
 });

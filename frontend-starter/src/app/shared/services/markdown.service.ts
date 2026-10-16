@@ -77,6 +77,11 @@ export class MarkdownService {
       const alt = rawAlt.trim() || 'Image du tutoriel';
       const src = rawSrc.trim();
 
+      // Jeton temporaire local (mode création)
+      if (src.startsWith('attachment:temp:')) {
+        return `<figure class="tutorial-inline-image-box temp-pending"><div class="temp-image-placeholder"><span class="temp-icon">🖼️</span> <span class="temp-image-name">${alt}</span> <span class="temp-badge">[Image en attente d'enregistrement]</span></div><figcaption class="tutorial-image-caption">${alt}</figcaption></figure>`;
+      }
+
       // Résolution par token attachment:<id> ou nom direct
       let targetAtt: AttachmentInfo | undefined;
       if (src.startsWith('attachment:')) {
@@ -101,14 +106,39 @@ export class MarkdownService {
     });
 
     // 5. Traiter les liens Markdown : [texte](url)
-    // Sécurité stricte : Protocoles limités à http:, https: et mailto:
+    // Sécurité stricte : Protocoles limités à http:, https:, mailto:, et attachment:
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, rawText, rawHref) => {
       const linkText = rawText.trim();
       const href = rawHref.trim();
-
-      // Détection des protocoles interdits (javascript:, data:, vbscript:, etc.)
-      // Note: href a déjà subi escapeHtml, donc '&' peut être '&amp;'
       const decodedHref = href.replace(/&amp;/g, '&');
+
+      // 5.a. Résolution des pièces jointes sous forme de lien ou bloc in-text : attachment:<id> ou attachment:temp:<id>
+      if (decodedHref.startsWith('attachment:')) {
+        if (decodedHref.startsWith('attachment:temp:')) {
+          return `<span class="intext-temp-badge"><span class="badge-icon">⏳</span> <span class="badge-name">${linkText}</span> <span class="badge-hint">[Pièce jointe en attente d'enregistrement]</span></span>`;
+        }
+
+        const attId = decodedHref.replace(/^attachment:/, '').trim();
+        const targetAtt = attachments.find((a) => a.id === attId || a.originalName === attId);
+
+        if (targetAtt) {
+          const resolvedUrl = getAttachmentUrl ? getAttachmentUrl(targetAtt) : targetAtt.downloadUrl;
+          if (targetAtt.family === 'pdf') {
+            return `<a href="${resolvedUrl || '#'}" target="_blank" rel="noopener noreferrer" class="tutorial-attachment-link tutorial-pdf-link" download="${targetAtt.originalName}"><span class="link-icon">📄</span> <span class="link-label">${linkText}</span> <span class="link-meta">(${this.formatBytes(targetAtt.size)})</span> ↗</a>`;
+          }
+          if (targetAtt.family === 'audio') {
+            return `<div class="tutorial-inline-audio-box"><div class="audio-header"><span class="audio-icon">🎵</span> <span class="audio-title">${linkText}</span> <span class="audio-size">(${this.formatBytes(targetAtt.size)})</span></div>${resolvedUrl ? `<audio controls src="${resolvedUrl}" preload="none" class="tutorial-audio-player"></audio>` : ''}</div>`;
+          }
+          if (targetAtt.family === 'image') {
+            return `<a href="${resolvedUrl || '#'}" target="_blank" rel="noopener noreferrer" class="tutorial-attachment-link tutorial-image-link"><span class="link-icon">🖼️</span> <span class="link-label">${linkText}</span> <span class="link-meta">(${this.formatBytes(targetAtt.size)})</span> ↗</a>`;
+          }
+          return `<a href="${resolvedUrl || '#'}" target="_blank" rel="noopener noreferrer" class="tutorial-attachment-link" download="${targetAtt.originalName}"><span class="link-icon">📎</span> <span class="link-label">${linkText}</span> <span class="link-meta">(${this.formatBytes(targetAtt.size)})</span> ↗</a>`;
+        }
+
+        return `<span class="intext-attachment-box missing"><span class="intext-badge">PJ</span><span class="intext-name">${linkText}</span> <span class="intext-status">[Fichier non disponible]</span></span>`;
+      }
+
+      // 5.b. Liens web externes avec protocoles autorisés (http, https, mailto)
       if (ALLOWED_PROTOCOLS.test(decodedHref)) {
         return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="tutorial-link">${linkText} ↗</a>`;
       }

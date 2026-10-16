@@ -1,4 +1,12 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  OnInit,
+  signal,
+  ViewChild,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -83,6 +91,16 @@ export class PostsManagementPageComponent implements OnInit {
   readonly totalPages = signal<number>(1);
   readonly totalDocs = signal<number>(0);
 
+  // Éditeur riche & suivi du curseur / drag-and-drop
+  @ViewChild('editorTextarea') editorTextarea?: ElementRef<HTMLTextAreaElement>;
+  lastSelectionStart = 0;
+  lastSelectionEnd = 0;
+  readonly isDragOverEditor = signal<boolean>(false);
+  readonly insertionNotice = signal<string | null>(null);
+  private noticeTimeout?: any;
+  private readonly fileTempIds = new WeakMap<File, string>();
+  private tempIdCounter = 0;
+
   // Formulaire réactif pour création / édition de brouillon
   readonly postForm: FormGroup = this.fb.group({
     title: [
@@ -151,6 +169,8 @@ export class PostsManagementPageComponent implements OnInit {
     this.creationSelectedFiles.set([]);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
+    this.lastSelectionStart = 0;
+    this.lastSelectionEnd = 0;
     this.postForm.reset({
       title: '',
       shortDescription: '',
@@ -173,6 +193,8 @@ export class PostsManagementPageComponent implements OnInit {
     this.creationSelectedFiles.set([]);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
+    this.lastSelectionStart = post.content ? post.content.length : 0;
+    this.lastSelectionEnd = this.lastSelectionStart;
     this.postForm.patchValue({
       title: post.title,
       shortDescription: post.shortDescription,
@@ -190,6 +212,8 @@ export class PostsManagementPageComponent implements OnInit {
     this.creationSelectedFiles.set([]);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
+    this.lastSelectionStart = 0;
+    this.lastSelectionEnd = 0;
   }
 
   onCreationFilesSelected(event: Event): void {
@@ -300,25 +324,56 @@ export class PostsManagementPageComponent implements OnInit {
         });
       } else {
         this.creationUploadProgress.set({
-          step: `Étape 1/2 : Enregistrement du brouillon...`,
+          step: `Étape 1/3 : Enregistrement du brouillon...`,
         });
 
         this.postService.createPost(dto).subscribe({
           next: (created) => {
             this.creationUploadProgress.set({
-              step: `Étape 2/2 : Téléversement automatique de ${filesToUpload.length} pièce(s) jointe(s)...`,
+              step: `Étape 2/3 : Téléversement automatique de ${filesToUpload.length} pièce(s) jointe(s)...`,
             });
 
             this.postService.uploadAttachments(created.id, filesToUpload).subscribe({
               next: (added) => {
-                this.loading.set(false);
-                this.creationUploadProgress.set(null);
-                this.creationSelectedFiles.set([]);
-                this.successMessage.set(
-                  `Projet "${created.title}" créé avec succès avec ${added.length} pièce(s) jointe(s) !`,
-                );
-                this.currentView.set('list');
-                this.loadPosts(1);
+                let finalContent = formVal.content.trim();
+                let contentChanged = false;
+
+                filesToUpload.forEach((file, index) => {
+                  const tempId = this.getTempIdForFile(file);
+                  const matchedAtt =
+                    added.find((a) => a.originalName === file.name) || added[index];
+                  if (matchedAtt) {
+                    const tempToken = `attachment:temp:${tempId}`;
+                    const realToken = `attachment:${matchedAtt.id}`;
+                    if (finalContent.includes(tempToken)) {
+                      finalContent = finalContent.replaceAll(tempToken, realToken);
+                      contentChanged = true;
+                    }
+                  }
+                });
+
+                if (contentChanged) {
+                  this.creationUploadProgress.set({
+                    step: `Étape 3/3 : Finalisation des références dans le tutoriel...`,
+                  });
+                  const updateDto: UpdatePostDto = {
+                    title: created.title,
+                    shortDescription: created.shortDescription,
+                    content: finalContent,
+                    category: created.category,
+                    tags,
+                  };
+                  this.postService.updatePost(created.id, updateDto).subscribe({
+                    next: () => {
+                      this.finalizePostCreation(created.title, added.length);
+                    },
+                    error: () => {
+                      this.finalizePostCreation(created.title, added.length);
+                    },
+                  });
+                } else {
+                  this.finalizePostCreation(created.title, added.length);
+                }
               },
               error: (uploadErr) => {
                 this.loading.set(false);
@@ -344,6 +399,17 @@ export class PostsManagementPageComponent implements OnInit {
         });
       }
     }
+  }
+
+  private finalizePostCreation(title: string, attachmentsCount: number): void {
+    this.loading.set(false);
+    this.creationUploadProgress.set(null);
+    this.creationSelectedFiles.set([]);
+    this.successMessage.set(
+      `Projet "${title}" créé avec succès avec ${attachmentsCount} pièce(s) jointe(s) !`,
+    );
+    this.currentView.set('list');
+    this.loadPosts(1);
   }
 
   openPublishModal(post: PostAuthorManagement): void {
@@ -628,7 +694,7 @@ export class PostsManagementPageComponent implements OnInit {
     });
   }
 
-  // --- Outils Éditeur Riche & Insertion Pièces Jointes in-text (Figma Frame 3D) ---
+  // --- Outils Éditeur Riche & Insertion Pièces Jointes in-text ---
   readonly editorTab = signal<'edit' | 'preview'>('edit');
 
   readonly currentEditingPost = computed(() => {
@@ -648,30 +714,274 @@ export class PostsManagementPageComponent implements OnInit {
     this.editorTab.set(tab);
   }
 
-  formatEditor(snippet: string): void {
-    const contentCtrl = this.postForm.get('content');
-    if (!contentCtrl) return;
-    const currentVal = contentCtrl.value || '';
-    contentCtrl.setValue(currentVal + (currentVal.endsWith('\n') ? '' : '\n') + snippet);
-    contentCtrl.markAsDirty();
-  }
-
-  insertAttachmentInText(filename: string, meta = ''): void {
-    const tag = `\n\n[📎 PIÈCE JOINTE DANS LE TEXTE : ${filename}${meta ? ' (' + meta + ')' : ''}]\n\n`;
-    this.formatEditor(tag);
-  }
-
-  insertAttachmentMarkdown(att: AttachmentInfo): void {
-    if (att.family === 'image') {
-      this.formatEditor(`\n\n![${att.originalName}](attachment:${att.id})\n\n`);
-    } else {
-      this.formatEditor(`\n\n[📎 PIÈCE JOINTE DANS LE TEXTE : ${att.originalName}]\n\n`);
+  updateSelection(): void {
+    if (this.editorTextarea?.nativeElement) {
+      const el = this.editorTextarea.nativeElement;
+      this.lastSelectionStart = el.selectionStart;
+      this.lastSelectionEnd = el.selectionEnd;
     }
   }
 
-  isAttachmentInContent(filename: string): boolean {
+  calculateDropPosition(textarea: HTMLTextAreaElement | undefined, event: DragEvent): number {
+    if (!textarea) return 0;
+    // 1. Standard W3C CSSOM View (Chromium, Firefox, Edge)
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const pos = document.caretPositionFromPoint(event.clientX, event.clientY);
+      if (pos && typeof pos.offset === 'number') {
+        return Math.min(pos.offset, textarea.value.length);
+      }
+    }
+    // 2. WebKit / Blink legacy
+    if (typeof (document as any).caretRangeFromPoint === 'function') {
+      const range = (document as any).caretRangeFromPoint(event.clientX, event.clientY);
+      if (range && typeof range.startOffset === 'number') {
+        return Math.min(range.startOffset, textarea.value.length);
+      }
+    }
+    // 3. Repli : dernière position mémorisée du curseur
+    if (this.lastSelectionStart >= 0 && this.lastSelectionStart <= textarea.value.length) {
+      return this.lastSelectionStart;
+    }
+    return textarea.value.length;
+  }
+
+  onEditorDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    this.isDragOverEditor.set(true);
+  }
+
+  onEditorDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOverEditor.set(false);
+  }
+
+  onEditorDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOverEditor.set(false);
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const dropIndex = this.calculateDropPosition(this.editorTextarea?.nativeElement, event);
+    this.lastSelectionStart = dropIndex;
+    this.lastSelectionEnd = dropIndex;
+
+    this.handleDroppedFiles(fileList, dropIndex);
+  }
+
+  getFileFamily(filename: string): 'image' | 'pdf' | 'audio' | 'archive' | 'file' {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'archive';
+    return 'file';
+  }
+
+  getTempIdForFile(file: File): string {
+    let id = this.fileTempIds.get(file);
+    if (!id) {
+      id = `temp_${Date.now()}_${++this.tempIdCounter}_${file.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+      this.fileTempIds.set(file, id);
+    }
+    return id;
+  }
+
+  generateAttachmentSnippet(fileOrAtt: {
+    name: string;
+    family?: string;
+    id?: string;
+    tempId?: string;
+  }): string {
+    const name = fileOrAtt.name;
+    const family = fileOrAtt.family || this.getFileFamily(name);
+    const token = fileOrAtt.id ? `attachment:${fileOrAtt.id}` : `attachment:temp:${fileOrAtt.tempId}`;
+
+    if (family === 'image') {
+      return `![${name}](${token})`;
+    } else if (family === 'pdf') {
+      return `[📄 Télécharger ${name} (PDF)](${token})`;
+    } else if (family === 'audio') {
+      return `[🎵 Écouter ${name} (Audio)](${token})`;
+    } else {
+      return `[📎 ${name}](${token})`;
+    }
+  }
+
+  showInsertionNotice(message: string): void {
+    this.insertionNotice.set(message);
+    if (this.noticeTimeout) {
+      clearTimeout(this.noticeTimeout);
+    }
+    this.noticeTimeout = setTimeout(() => {
+      this.insertionNotice.set(null);
+    }, 3500);
+  }
+
+  insertSnippetAtCursor(snippet: string, targetStart?: number, targetEnd?: number): void {
+    const textarea = this.editorTextarea?.nativeElement;
+    const contentCtrl = this.postForm.get('content');
+    if (!contentCtrl) return;
+
+    const currentVal: string = contentCtrl.value || '';
+    const start =
+      typeof targetStart === 'number'
+        ? Math.min(targetStart, currentVal.length)
+        : this.lastSelectionStart >= 0
+          ? Math.min(this.lastSelectionStart, currentVal.length)
+          : currentVal.length;
+    const end =
+      typeof targetEnd === 'number'
+        ? Math.min(targetEnd, currentVal.length)
+        : this.lastSelectionEnd >= start
+          ? Math.min(this.lastSelectionEnd, currentVal.length)
+          : start;
+
+    const before = currentVal.substring(0, start);
+    const after = currentVal.substring(end);
+
+    const needsLeadingNewline = before.length > 0 && !before.endsWith('\n');
+    const needsTrailingNewline = after.length > 0 && !after.startsWith('\n');
+    const formattedSnippet =
+      (needsLeadingNewline ? '\n\n' : '') + snippet + (needsTrailingNewline ? '\n\n' : '');
+
+    const newVal = before + formattedSnippet + after;
+    contentCtrl.setValue(newVal);
+    contentCtrl.markAsDirty();
+
+    const newCursorPos = before.length + formattedSnippet.length;
+    this.lastSelectionStart = newCursorPos;
+    this.lastSelectionEnd = newCursorPos;
+
+    if (textarea) {
+      textarea.focus();
+      setTimeout(() => {
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+  }
+
+  handleDroppedFiles(fileList: File[], dropIndex: number): void {
+    if (this.editingPostId()) {
+      // Mode Édition de brouillon existant
+      const existing = this.currentEditingPost()?.attachments || [];
+      const validation = this.validateSelectedFiles(fileList, existing);
+      if (!validation.valid) {
+        this.attachmentsError.set(validation.error);
+        return;
+      }
+
+      this.attachmentsError.set(null);
+      this.uploadingAttachments.set(true);
+
+      this.postService.uploadAttachments(this.editingPostId()!, fileList).subscribe({
+        next: (added) => {
+          this.uploadingAttachments.set(false);
+          this.posts.update((list) =>
+            list.map((p) => {
+              if (p.id === this.editingPostId()) {
+                return { ...p, attachments: [...p.attachments, ...added] };
+              }
+              return p;
+            })
+          );
+          const snippets = added.map((a) =>
+            this.generateAttachmentSnippet({
+              name: a.originalName,
+              family: a.family,
+              id: a.id,
+            })
+          );
+          this.insertSnippetAtCursor(snippets.join('\n\n'), dropIndex, dropIndex);
+          this.showInsertionNotice(
+            `${added.length} pièce(s) jointe(s) téléversée(s) et insérée(s) dans le texte.`
+          );
+        },
+        error: (err) => {
+          this.uploadingAttachments.set(false);
+          this.attachmentsError.set(
+            err.error?.message || "Erreur lors de l'envoi des pièces jointes déposées."
+          );
+        },
+      });
+    } else {
+      // Mode Création initiale
+      const existing = this.creationSelectedFiles();
+      const combined = [...existing, ...fileList];
+      const validation = this.validateSelectedFiles(combined, []);
+      if (!validation.valid) {
+        this.creationFilesError.set(validation.error);
+        return;
+      }
+
+      this.creationFilesError.set(null);
+      this.creationSelectedFiles.set(combined);
+
+      const snippets = fileList.map((f) => {
+        const tempId = this.getTempIdForFile(f);
+        return this.generateAttachmentSnippet({ name: f.name, tempId });
+      });
+
+      this.insertSnippetAtCursor(snippets.join('\n\n'), dropIndex, dropIndex);
+      this.showInsertionNotice(
+        `${fileList.length} pièce(s) jointe(s) sélectionnée(s) et insérée(s) dans le texte.`
+      );
+    }
+  }
+
+  formatEditor(snippet: string): void {
+    this.insertSnippetAtCursor(snippet);
+  }
+
+  insertAttachmentAtCursor(att: AttachmentInfo): void {
+    const snippet = this.generateAttachmentSnippet({
+      name: att.originalName,
+      family: att.family,
+      id: att.id,
+    });
+    this.insertSnippetAtCursor(snippet);
+    this.showInsertionNotice(`"${att.originalName}" inséré à la position du curseur.`);
+  }
+
+  insertCreationFileAtCursor(file: File): void {
+    const tempId = this.getTempIdForFile(file);
+    const snippet = this.generateAttachmentSnippet({ name: file.name, tempId });
+    this.insertSnippetAtCursor(snippet);
+    this.showInsertionNotice(`"${file.name}" inséré à la position du curseur.`);
+  }
+
+  insertAttachmentInText(filename: string, meta = ''): void {
+    const tag = `[📎 PIÈCE JOINTE DANS LE TEXTE : ${filename}${meta ? ' (' + meta + ')' : ''}]`;
+    this.insertSnippetAtCursor(tag);
+  }
+
+  insertAttachmentMarkdown(att: AttachmentInfo): void {
+    this.insertAttachmentAtCursor(att);
+  }
+
+  isAttachmentInContent(fileOrAtt: AttachmentInfo | File | string): boolean {
     const content = this.postForm.get('content')?.value || '';
-    return content.includes(filename);
+    if (typeof fileOrAtt === 'string') {
+      return content.includes(fileOrAtt);
+    }
+    if ('originalName' in fileOrAtt) {
+      return (
+        content.includes(`attachment:${fileOrAtt.id}`) ||
+        content.includes(fileOrAtt.originalName)
+      );
+    }
+    const tempId = this.getTempIdForFile(fileOrAtt);
+    return (
+      content.includes(`attachment:temp:${tempId}`) ||
+      content.includes(fileOrAtt.name)
+    );
   }
 }
 

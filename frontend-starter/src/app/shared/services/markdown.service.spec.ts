@@ -24,6 +24,15 @@ describe('MarkdownService (Mission 3 — Rendu Markdown Sécurisé)', () => {
       downloadUrl: '/api/posts/p1/attachments/att-pdf-1',
       isCover: false,
     },
+    {
+      id: 'att-audio-1',
+      originalName: 'ambiance.mp3',
+      mimeType: 'audio/mpeg',
+      size: 5242880,
+      family: 'audio',
+      downloadUrl: '/api/posts/p1/attachments/att-audio-1',
+      isCover: false,
+    },
   ];
 
   beforeEach(() => {
@@ -117,6 +126,48 @@ describe('MarkdownService (Mission 3 — Rendu Markdown Sécurisé)', () => {
       const result = service.render(md, mockAttachments);
       expect(result).not.toContain('<img src="https://evil-analytics.com');
       expect(result).toContain('[Image externe non autorisée : Tracker]');
+    });
+
+    it('affiche un placeholder soigné pour une image locale temporaire en attente de sauvegarde', () => {
+      const md = '![Montage](attachment:temp:temp-img-1)';
+      const result = service.render(md, mockAttachments);
+      expect(result).toContain('<figure class="tutorial-inline-image-box temp-pending">');
+      expect(result).toContain("Image en attente d'enregistrement");
+      expect(result).toContain('Montage');
+    });
+  });
+
+  describe('Pièces jointes riches (PDF, Audio, Archive & Liens in-text)', () => {
+    it('génère un lien de téléchargement accessible pour un document PDF via token attachment:<id>', () => {
+      const md = 'Consultez la [Notice technique](attachment:att-pdf-1) pour démarrer.';
+      const result = service.render(md, mockAttachments);
+      expect(result).toContain('<a href="/api/posts/p1/attachments/att-pdf-1" target="_blank" rel="noopener noreferrer" class="tutorial-attachment-link tutorial-pdf-link" download="notice.pdf">');
+      expect(result).toContain('Notice technique');
+      expect(result).toContain('2.0 Mo');
+    });
+
+    it('génère un bloc lecteur audio intégré pour un fichier audio via token attachment:<id>', () => {
+      const md = 'Écoutez le son : [Exemple sonore](attachment:att-audio-1)';
+      const result = service.render(md, mockAttachments);
+      expect(result).toContain('<div class="tutorial-inline-audio-box">');
+      expect(result).toContain('<span class="audio-title">Exemple sonore</span>');
+      expect(result).toContain('<audio controls src="/api/posts/p1/attachments/att-audio-1"');
+    });
+
+    it('affiche un badge en attente pour un lien de pièce jointe temporaire', () => {
+      const md = 'Téléchargez [Fichier en cours](attachment:temp:temp-file-2)';
+      const result = service.render(md, mockAttachments);
+      expect(result).toContain('<span class="intext-temp-badge">');
+      expect(result).toContain('Fichier en cours');
+      expect(result).toContain("Pièce jointe en attente d'enregistrement");
+    });
+
+    it('affiche un message d\'erreur sécurisé pour un lien pointant vers une pièce jointe inexistante', () => {
+      const md = 'Voir [Document supprimé](attachment:att-deleted-99)';
+      const result = service.render(md, mockAttachments);
+      expect(result).toContain('<span class="intext-attachment-box missing">');
+      expect(result).toContain('Document supprimé');
+      expect(result).toContain('[Fichier non disponible]');
     });
   });
 

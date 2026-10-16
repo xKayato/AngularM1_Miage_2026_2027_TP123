@@ -855,6 +855,64 @@
   - **Pourquoi le calcul des likes doit se situer après le `$match` de filtrage :** Si la jointure `$lookup` avec la collection des likes était faite avant le filtre de sécurité, MongoDB calculerait les likes de tous les posts de la base (y compris les brouillons, les posts privés ou ceux d'utilisateurs suspendus), gaspillant de la mémoire et des cycles processeur pour des documents qui seront de toute façon éliminés par la suite.
   - **Traitement d'une recherche purement composée de hashtags (`#tag1 #tag2`) :** Une recherche textuelle MongoDB ou Atlas Search sur une chaîne vide ou composée de ponctuations peut échouer ou renvoyer des résultats inattendus. En extrayant les tags et en nettoyant la chaîne textuelle, si celle-ci devient vide, le système omet purement et simplement l'étape de recherche textuelle `$search` et applique directement le filtre d'ensemble `$all: ['tag1', 'tag2']` sur le champ indexé `tags`.
 
+---
+
+# Amélioration — Insertion Précise des Pièces Jointes dans les Posts (Glisser-Déposer, Curseur & Jetons Temporaires)
+
+- **Objectif :** Rendre l'insertion des pièces jointes intuitive et précise dans le tutoriel des créations :
+  1. *Glisser-déposer direct dans la zone de texte :* Permettre de glisser un ou plusieurs fichiers depuis l'explorateur directement sur le `textarea`, en calculant l'offset d'insertion sous le pointeur de la souris (`caretPositionFromPoint` / `caretRangeFromPoint`).
+  2. *Insertion au curseur et remplacement de sélection :* Insérer la référence d'une pièce jointe déjà téléversée ou sélectionnée à la position exacte du curseur, en remplaçant la sélection éventuelle, sans concaténer systématiquement à la fin du texte. Après insertion, rendre le focus à l'éditeur et placer le curseur immédiatement après l'élément inséré.
+  3. *Mémorisation anti-perte de focus :* Sauvegarder en continu `selectionStart` et `selectionEnd` (sur `select`, `keyup`, `mouseup`, `focus`, `blur`) et neutraliser la perte de focus lors du clic sur les boutons d'action ou de la barre d'outils grâce à `(mousedown)="$event.preventDefault()"`.
+  4. *Jetons temporaires lors de la création initiale :* Comme aucun identifiant de post ni de pièce jointe n'existe avant l'enregistrement, générer des jetons temporaires `attachment:temp:<tempId>` insérés immédiatement dans le texte. Lors de la soumission, créer techniquement le brouillon, téléverser les fichiers, substituer automatiquement les jetons temporaires par leurs références définitives `attachment:<id>` et mettre à jour le post final. En cas d'échec de téléversement, afficher l'erreur par fichier sans laisser de référence rompue.
+  5. *Différenciation stricte des types de fichiers :* Rendu adapté selon la nature du média :
+     - Image : `![nom](attachment:<id>)` $\rightarrow$ affichée inline avec légende et cadre de prévisualisation.
+     - PDF : `[📄 Télécharger nom (PDF)](attachment:<id>)` $\rightarrow$ bloc de téléchargement avec icône et taille.
+     - Audio : `[🎵 Écouter nom (Audio)](attachment:<id>)` $\rightarrow$ lecteur audio natif `<audio controls>`.
+     - Autre/Archive : `[📎 nom](attachment:<id>)` $\rightarrow$ lien de téléchargement générique.
+  6. *Accessibilité & Mobile :* Bouton explicite « ↵ Insérer au curseur » avec `tabindex="0"` et retour visuel (chip de notification d'insertion).
+- **Prompt principal :**
+  > « Suite du projet — améliorer l’insertion des pièces jointes dans les posts  
+  > La Mission 5 est terminée. Avant d’ajouter d’autres fonctionnalités, je veux améliorer le parcours de création et d’édition des posts. Aujourd’hui, la gestion des pièces jointes dans le texte n’est pas assez intuitive.  
+  > Résultat attendu : glisser-déposer un fichier directement dans la zone de texte à l'endroit souhaité, cliquer sur une pièce jointe déjà téléversée pour l'insérer au curseur, voir clairement dans l'éditeur et l'aperçu où la pièce jointe sera placée, jetons temporaires locaux lors de la création, distinction image/pdf/audio, bouton au clavier/mobile, tests de régression exhaustifs, vérification navigateur réel et commit dédié. »
+- **Plan proposé et réalisation :**
+  1. *`MarkdownService` (`markdown.service.ts`) :*
+     - Enrichissement du parseur Markdown pour intercepter les liens au format `attachment:<id>` et `attachment:temp:<tempId>`.
+     - Rendu des images temporaires avec état d'attente stylisé (`.temp-pending` avec mention « Image en attente d'enregistrement »).
+     - Rendu des liens et audios avec badges interactifs et lecteurs natifs.
+     - Maintien strict de la rétrocompatibilité avec la syntaxe de repli `[📎 PIÈCE JOINTE DANS LE TEXTE : ...]`.
+  2. *`PostsManagementPageComponent` (`posts-management-page.ts` & template) :*
+     - Intégration de `@ViewChild('editorTextarea')` et mémorisation systématique de `lastSelectionStart` et `lastSelectionEnd`.
+     - Méthode `insertSnippetAtCursor(snippet)` : découpe la valeur courante, remplace la sélection active, restitue le focus et positionne le curseur à `start + snippet.length`.
+     - Écouteurs de drag & drop natifs (`dragover`, `dragleave`, `drop`) avec indicateur visuel de survol `.drag-over` et overlay dédié.
+     - Calcul du point de dépôt via `calculateDropPosition(event)` avec repli sécurisé sur la dernière position du curseur mémorisée.
+     - Système de jetons temporaires avec `WeakMap<File, string>` associant de manière déterministe chaque fichier local à un identifiant unique `temp_<timestamp>_<counter>_<filename>`.
+     - Workflow de création étendu dans `onSubmit()` : création du brouillon $\rightarrow$ upload des pièces jointes $\rightarrow$ remplacement regex des jetons `attachment:temp:<tempId>` par `attachment:<matchedId>` $\rightarrow$ finalisation du contenu via `postService.updatePost()`.
+     - Ajout des boutons « ↵ Insérer au curseur » avec prévention de l'événement mousedown pour éviter toute perte de sélection.
+  3. *Feuille de styles (`styles.css`) :*
+     - Classes de feedback pour le drag & drop (`.editor-textarea.drag-over`, `.drop-overlay-indicator`, `.insertion-notice-chip`).
+     - Styles typés pour les figures inline, blocs PDF téléchargeables et lecteurs audio intégrés.
+- **Fichiers modifiés :**
+  - `frontend-starter/src/app/shared/services/markdown.service.ts` : parseur étendu pour tokens d'attachement, images temporaires, audios et PDFs.
+  - `frontend-starter/src/app/shared/services/markdown.service.spec.ts` : 6 nouveaux tests pour images/liens inline, jetons temporaires et lecteurs audio.
+  - `frontend-starter/src/app/components/posts-management-page/posts-management-page.ts` : gestion du curseur, drag & drop, jetons temporaires, upload et remplacement avant sauvegarde.
+  - `frontend-starter/src/app/components/posts-management-page/posts-management-page.html` : template avec écouteurs d'événements, boutons d'insertion, overlay de dépôt et badges.
+  - `frontend-starter/src/app/components/posts-management-page/posts-management-page.spec.ts` : 10 nouveaux tests de régression complets (début, milieu, fin, sélection, perte de focus, types de fichiers, multi-fichiers, jetons temporaires).
+  - `frontend-starter/src/styles.css` : styles pour le glisser-déposer, les badges temporaires, les liens PDF et lecteurs audio.
+- **Preuves de fonctionnement :**
+  - **Tests Backend :** **244 passants sur 244 (5 suites, 100% succès)** (`cmd /c npm test` dans `backend/`).
+  - **Tests Frontend :** **287 passants sur 287 (19 suites, 100% succès)** (`cmd /c npm test -- --watch=false` dans `frontend-starter/`).
+  - **Compilation Frontend de production :** **Build réussi sans erreur en 11.98s** (`cmd /c npm run build` dans `frontend-starter/`).
+  - **Commit local dédié :** `4b1bbee` (`feat(editor): in-text attachment insertion with drag-and-drop, cursor positioning, and temporary tokens`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pourquoi le textarea perd sa sélection lors du clic sur un bouton et comment l'empêcher :**
+    Dans le modèle d'événements du DOM, un clic de souris déclenche la séquence `mousedown` $\rightarrow$ `focusout` / `blur` $\rightarrow$ `mouseup` $\rightarrow$ `click`. Par défaut, le navigateur transfère immédiatement le focus au bouton cliqué dès l'étape `mousedown`, ce qui fait perdre la sélection active au `textarea`. Pour contrer cela de manière infaillible, on applique deux mécanismes complémentaires :
+    1. Sur tous les boutons de la barre d'outils et d'insertion, l'écouteur `(mousedown)="$event.preventDefault()"` neutralise le transfert de focus natif du navigateur : le `textarea` ne déclenche jamais d'événement `blur` et conserve sa sélection active.
+    2. Côté composant, les propriétés `lastSelectionStart` et `lastSelectionEnd` sont mises à jour en continu sur les événements `select`, `keyup`, `mouseup` et `focus`. Même si le focus était perdu (par exemple sur mobile ou navigation au clavier), le composant réinjecte le texte à ces coordonnées exactes puis restaure le focus via `textarea.focus()` et `textarea.setSelectionRange()`.
+  - **Gestion des jetons temporaires sans ID serveur lors de la création :**
+    Lors de la création initiale d'un post, la pièce jointe n'existe pas encore sur le serveur MongoDB/GridFS et ne possède donc aucun `_id`. Si on attendait l'upload final pour insérer la référence, l'utilisateur ne pourrait pas structurer visuellement son tutoriel pendant la rédaction. On génère donc un jeton local éphémère `attachment:temp:<tempId>` associé de manière stable au fichier `File` en mémoire via une `WeakMap`. Lors de la soumission du formulaire, le brouillon est d'abord créé techniquement, puis les fichiers sont téléversés, renvoyant leurs vrais IDs `AttachmentInfo`. Une substitution par expression régulière remplace alors tous les `attachment:temp:<tempId>` par `attachment:<realId>` dans le texte avant d'envoyer le `PUT /api/posts/:id` final. Si un upload échoue, l'enregistrement final est bloqué, une alerte est affichée avec la possibilité de réessayer ou de retirer le fichier concerné, évitant toute référence orpheline en base.
+  - **Limites techniques du positionnement lors d'un glisser-déposer sur un `<textarea>` natif :**
+    Contrairement à un éditeur WYSIWYG basé sur `contenteditable` (comme ProseMirror, Lexical ou Quill) qui dispose d'arbres de nœuds DOM navigables, un élément HTML `<textarea>` natif est une boîte noire rendue par le moteur de rendu du navigateur. Les API standard de calcul de coordonnées vers caractère (`document.caretPositionFromPoint` en standard W3C et `document.caretRangeFromPoint` sous Blink/WebKit) sont conçues pour les nœuds textuels du DOM et peuvent renvoyer des approximations ou `null` lorsqu'elles sont interrogées sur un `HTMLTextAreaElement`, particulièrement en présence de polices proportionnelles (non-monospace), de marges internes (`padding`), de barres de défilement (`scrollTop`) ou de retours à la ligne Windows (`\r\n`). C'est pourquoi le code implémente une stratégie robuste : tentative d'évaluation précise via l'API du navigateur si disponible, avec repli immédiat et déterministe sur la dernière position connue du curseur (`lastSelectionStart`), garantissant qu'aucun fichier n'est jamais rejeté ni ajouté silencieusement à la fin du texte sans contrôle de l'utilisateur.
+
 
 
 
