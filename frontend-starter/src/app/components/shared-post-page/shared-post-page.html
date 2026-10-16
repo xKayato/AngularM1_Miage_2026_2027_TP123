@@ -29,8 +29,22 @@
           <span class="likes-badge">❤️ {{ detail.likesCount }} j'aime</span>
         </div>
 
-        <h1 class="font-display detail-title">{{ detail.title }}</h1>
-        <p class="author-info">Par <b>{{ detail.author.name }}</b></p>
+        <div class="author-info-row">
+          <span class="author-prefix">Par</span>
+          <div class="author-link">
+            @if (detail.author.hasAvatar && detail.author.avatarUrl && !isAvatarFailed(detail.author.id)) {
+              <img
+                [src]="detail.author.avatarUrl"
+                (error)="markAvatarFailed(detail.author.id)"
+                class="author-avatar-img"
+                [alt]="detail.author.name"
+              />
+            } @else {
+              <span class="author-avatar">{{ getInitials(detail.author.name) }}</span>
+            }
+            <span class="author-name">{{ detail.author.name }}</span>
+          </div>
+        </div>
         <p class="short-desc">{{ detail.shortDescription }}</p>
 
         <div class="tags-list">
@@ -205,9 +219,18 @@
               <article class="comment-card">
                 <div class="comment-header">
                   <div class="comment-author-info">
-                    <div class="avatar-circle-sm">
-                      {{ getInitials(c.author.name) }}
-                    </div>
+                    @if (c.author.hasAvatar && c.author.avatarUrl && !isAvatarFailed(c.author.id)) {
+                      <img
+                        [src]="c.author.avatarUrl"
+                        (error)="markAvatarFailed(c.author.id)"
+                        class="avatar-circle-sm avatar-img-sm"
+                        [alt]="c.author.name"
+                      />
+                    } @else {
+                      <div class="avatar-circle-sm">
+                        {{ getInitials(c.author.name) }}
+                      </div>
+                    }
                     <div class="comment-meta">
                       <strong class="comment-author-name">{{ c.author.name }}</strong>
                       <time class="comment-date" [attr.datetime]="c.createdAt">

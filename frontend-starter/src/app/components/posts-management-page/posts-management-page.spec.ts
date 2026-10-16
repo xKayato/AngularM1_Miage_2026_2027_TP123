@@ -753,6 +753,54 @@ describe('PostsManagementPageComponent', () => {
       expect(html).toContain('<figure class="tutorial-inline-image-box">');
       expect(html).toContain('schema.png');
     });
+
+    describe('calculateDropPosition & replis de placement', () => {
+      it('utilise caretPositionFromPoint si le noeud ciblé est le textarea', () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = 'Ligne 1\nLigne 2\nLigne 3';
+
+        const mockCaretPos = {
+          offsetNode: textarea,
+          offset: 14,
+        };
+        (document as any).caretPositionFromPoint = vi.fn().mockReturnValue(mockCaretPos);
+
+        const mockDragEvent = { clientX: 120, clientY: 80 } as DragEvent;
+        const pos = component.calculateDropPosition(textarea, mockDragEvent);
+
+        expect(pos).toBe(14);
+        delete (document as any).caretPositionFromPoint;
+      });
+
+      it('ignore caretPositionFromPoint si le noeud ciblé n\'est pas le textarea et utilise le repli du curseur', () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = 'Texte initial';
+        component.lastSelectionStart = 6;
+
+        const mockCaretPosOther = {
+          offsetNode: document.body,
+          offset: 2,
+        };
+        (document as any).caretPositionFromPoint = vi.fn().mockReturnValue(mockCaretPosOther);
+
+        const mockDragEvent = { clientX: 50, clientY: 50 } as DragEvent;
+        const pos = component.calculateDropPosition(textarea, mockDragEvent);
+
+        expect(pos).toBe(6);
+        delete (document as any).caretPositionFromPoint;
+      });
+
+      it('replie sur la fin du texte si aucune position de curseur n\'est disponible', () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = 'Fin du projet';
+        component.lastSelectionStart = -1;
+
+        const mockDragEvent = { clientX: 0, clientY: 0 } as DragEvent;
+        const pos = component.calculateDropPosition(textarea, mockDragEvent);
+
+        expect(pos).toBe('Fin du projet'.length);
+      });
+    });
   });
 });
 

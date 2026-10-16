@@ -383,37 +383,39 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     const posts = facetResult[0]?.docs || [];
     const totalPages = Math.ceil(totalDocs / limit) || 1;
 
-    // 7. Calcul dynamique des likes et commentaires via collections dédiées
+    // 7. Calcul dynamique et parallèle des likes et commentaires via collections dédiées
     const postIds = posts.map((p) => p._id);
-    const likeCounts = await Like.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    const [likeCounts, commentCounts] = await Promise.all([
+      Like.aggregate([
+        { $match: { postId: { $in: postIds } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]),
+      Comment.aggregate([
+        { $match: { postId: { $in: postIds } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]),
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
-
-    const commentCounts = await Comment.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
-    ]);
     const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
 
-    // 8. Résolution des relations de l'utilisateur connecté (follows et abonnements actifs)
+    // 8. Résolution parallèle des relations de l'utilisateur connecté (follows et abonnements actifs)
     let followingSet = new Set();
     let subSet = new Set();
     if (req.user) {
       const creatorIds = posts.map((p) => p.authorDoc?._id || p.author?._id || p.author);
-      const userFollows = await Follow.find({
-        followerId: req.user._id,
-        creatorId: { $in: creatorIds },
-      }).select("creatorId");
+      const [userFollows, userSubs] = await Promise.all([
+        Follow.find({
+          followerId: req.user._id,
+          creatorId: { $in: creatorIds },
+        }).select("creatorId"),
+        Subscription.find({
+          subscriberId: req.user._id,
+          creatorId: { $in: creatorIds },
+          active: true,
+          expiresAt: { $gt: new Date() },
+        }).select("creatorId"),
+      ]);
       followingSet = new Set(userFollows.map((f) => String(f.creatorId)));
-
-      const userSubs = await Subscription.find({
-        subscriberId: req.user._id,
-        creatorId: { $in: creatorIds },
-        active: true,
-        expiresAt: { $gt: new Date() },
-      }).select("creatorId");
       subSet = new Set(userSubs.map((s) => String(s.creatorId)));
     }
 
@@ -431,10 +433,11 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
         isLocked = !subSet.has(authorIdStr);
       }
 
-      // Attribuer l'auteur pour toPostPreview
+      // Attribuer l'auteur pour toPostPreview avec son avatar sécurisé
       post.author = {
         _id: post.authorDoc?._id || post.author?._id || post.author,
         name: post.authorDoc?.name || post.author?.name || "Auteur inconnu",
+        avatar: post.authorDoc?.avatar || post.author?.avatar,
       };
 
       return toPostPreview(post, {
@@ -660,7 +663,7 @@ postsRouter.get("/shared/:token", optionalAuthMakerShare, async (req, res, next)
  */
 postsRouter.get("/:id/preview", optionalAuthMakerShare, async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id).populate("author", "name status");
+    const post = await Post.findById(req.params.id).populate("author", "name status avatar");
     if (!post) {
       return res.status(404).json({ message: "Post introuvable" });
     }
@@ -684,8 +687,10 @@ postsRouter.get("/:id/preview", optionalAuthMakerShare, async (req, res, next) =
       return res.status(404).json({ message: "Post introuvable" });
     }
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+    ]);
 
     let isLocked = true;
     if (post.visibility === "public" || isAuthor) {
@@ -725,7 +730,7 @@ postsRouter.get("/:id/preview", optionalAuthMakerShare, async (req, res, next) =
  */
 postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id).populate("author", "name status");
+    const post = await Post.findById(req.params.id).populate("author", "name status avatar");
     if (!post) {
       return res.status(404).json({ message: "Post introuvable" });
     }
@@ -736,8 +741,10 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       return res.status(access.status || 403).json({ message: access.message });
     }
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+    ]);
 
     let userInteractions = {
       isLiked: false,
@@ -747,25 +754,24 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     };
 
     if (req.user) {
-      const isLiked = Boolean(
-        await Like.exists({ postId: post._id, userId: req.user._id })
-      );
-      const isFollowing = Boolean(
-        await Follow.exists({
+      const authorId = post.author?._id || post.author;
+      const [isLiked, isFollowing, sub] = await Promise.all([
+        Like.exists({ postId: post._id, userId: req.user._id }),
+        Follow.exists({
           followerId: req.user._id,
-          creatorId: post.author._id || post.author,
-        })
-      );
-      const sub = await Subscription.findOne({
-        subscriberId: req.user._id,
-        creatorId: post.author._id || post.author,
-        active: true,
-        expiresAt: { $gt: new Date() },
-      });
+          creatorId: authorId,
+        }),
+        Subscription.findOne({
+          subscriberId: req.user._id,
+          creatorId: authorId,
+          active: true,
+          expiresAt: { $gt: new Date() },
+        }),
+      ]);
 
       userInteractions = {
-        isLiked,
-        isFollowingAuthor: isFollowing,
+        isLiked: Boolean(isLiked),
+        isFollowingAuthor: Boolean(isFollowing),
         isSubscribedToAuthor: Boolean(sub),
         subscriptionExpiresAt: sub?.expiresAt ? new Date(sub.expiresAt).toISOString() : null,
       };
@@ -907,17 +913,26 @@ postsRouter.get("/:id/comments", optionalAuthMakerShare, async (req, res, next) 
       return res.status(access.status || 403).json({ message: access.message || "Accès non autorisé" });
     }
 
-    const comments = await Comment.find({ postId: post._id }).sort({ createdAt: 1 });
-    const commentsDto = comments.map((c) => ({
-      id: c._id.toString(),
-      postId: c.postId.toString(),
-      author: {
-        id: c.author.id.toString(),
-        name: c.author.name,
-      },
-      text: c.text,
-      createdAt: c.createdAt ? c.createdAt.toISOString() : new Date().toISOString(),
-    }));
+    const comments = await Comment.find({ postId: post._id })
+      .populate("author.id", "name avatar")
+      .sort({ createdAt: 1 });
+    const commentsDto = comments.map((c) => {
+      const authorDoc = c.author.id && typeof c.author.id === "object" ? c.author.id : null;
+      const authorIdStr = authorDoc ? String(authorDoc._id || authorDoc.id) : String(c.author.id);
+      const hasAvatar = Boolean(authorDoc?.avatar?.storedName);
+      return {
+        id: c._id.toString(),
+        postId: c.postId.toString(),
+        author: {
+          id: authorIdStr,
+          name: c.author.name,
+          hasAvatar,
+          avatarUrl: hasAvatar ? `/api/users/${authorIdStr}/avatar` : null,
+        },
+        text: c.text,
+        createdAt: c.createdAt ? c.createdAt.toISOString() : new Date().toISOString(),
+      };
+    });
 
     return res.status(200).json(commentsDto);
   } catch (err) {
@@ -975,12 +990,17 @@ postsRouter.post("/:id/comments", authMakerShare, async (req, res, next) => {
       text: trimmedText,
     });
 
+    const hasAvatar = Boolean(req.user.avatar?.storedName);
+    const authorIdStr = newComment.author.id.toString();
+
     return res.status(201).json({
       id: newComment._id.toString(),
       postId: newComment.postId.toString(),
       author: {
-        id: newComment.author.id.toString(),
+        id: authorIdStr,
         name: newComment.author.name,
+        hasAvatar,
+        avatarUrl: hasAvatar ? `/api/users/${authorIdStr}/avatar` : null,
       },
       text: newComment.text,
       createdAt: newComment.createdAt.toISOString(),

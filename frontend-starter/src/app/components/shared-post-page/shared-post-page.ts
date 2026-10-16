@@ -32,6 +32,17 @@ export class SharedPostPageComponent implements OnInit, OnDestroy {
   readonly isPostingComment = signal<boolean>(false);
   readonly commentError = signal<string | null>(null);
   readonly isDeletingCommentId = signal<string | null>(null);
+  readonly failedAvatars = signal<Set<string>>(new Set<string>());
+
+  markAvatarFailed(id: string): void {
+    const current = new Set(this.failedAvatars());
+    current.add(id);
+    this.failedAvatars.set(current);
+  }
+
+  isAvatarFailed(id: string): boolean {
+    return this.failedAvatars().has(id);
+  }
 
   // Gestion du lecteur PDF natif et sécurisé (Mission 4)
   readonly activePdfAttachment = signal<AttachmentInfo | null>(null);

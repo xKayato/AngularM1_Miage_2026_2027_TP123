@@ -657,4 +657,69 @@ test("Mission 5 — Recherche avec syntaxe #tag dans le champ query", async (t) 
   });
 });
 
+test("Mission 7 — Affichage des avatars auteurs sur les cartes et étanchéité des données", async (t) => {
+  const { user: authorWithAvatar } = await createUser();
+  authorWithAvatar.avatar = {
+    storedName: "author_photo.jpg",
+    mimeType: "image/jpeg",
+    size: 2048,
+  };
+  await authorWithAvatar.save();
+
+  const { user: authorWithoutAvatar } = await createUser();
+
+  const postWithAvatar = await createPost(authorWithAvatar._id, {
+    title: "Projet avec avatar réel",
+    tags: ["avatar-real-test"],
+  });
+
+  const postNoAvatar = await createPost(authorWithoutAvatar._id, {
+    title: "Projet sans avatar",
+    tags: ["avatar-none-test"],
+  });
+
+  await t.test("GET /api/posts projette hasAvatar et avatarUrl sur chaque carte sans fuite privée", async () => {
+    const res = await fetch(`${base}/api/posts?tags=avatar-real-test`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.totalDocs, 1);
+
+    const card = data.docs[0];
+    assert.equal(card.author.id, String(authorWithAvatar._id));
+    assert.equal(card.author.name, authorWithAvatar.name);
+    assert.equal(card.author.hasAvatar, true);
+    assert.equal(card.author.avatarUrl, `/api/users/${authorWithAvatar._id}/avatar`);
+
+    // Sécurité stricte : aucune fuite d'email, rôle ou secret
+    assert.equal(card.author.email, undefined);
+    assert.equal(card.author.role, undefined);
+    assert.equal(card.author.password, undefined);
+    assert.equal(card.author.passwordHash, undefined);
+  });
+
+  await t.test("GET /api/posts gère proprement l'absence d'avatar (hasAvatar: false, avatarUrl: null)", async () => {
+    const res = await fetch(`${base}/api/posts?tags=avatar-none-test`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.totalDocs, 1);
+
+    const card = data.docs[0];
+    assert.equal(card.author.hasAvatar, false);
+    assert.equal(card.author.avatarUrl, null);
+    assert.equal(card.author.email, undefined);
+  });
+
+  await t.test("GET /api/posts/:id projette également l'avatar sans fuite de champs privés", async () => {
+    const res = await fetch(`${base}/api/posts/${postWithAvatar._id}`);
+    assert.equal(res.status, 200);
+    const detail = await res.json();
+
+    assert.equal(detail.author.hasAvatar, true);
+    assert.equal(detail.author.avatarUrl, `/api/users/${authorWithAvatar._id}/avatar`);
+    assert.equal(detail.author.email, undefined);
+    assert.equal(detail.author.role, undefined);
+  });
+});
+
+
 

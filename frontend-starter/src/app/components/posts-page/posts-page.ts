@@ -117,6 +117,16 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  readonly failedAvatars = signal<Record<string, boolean>>({});
+
+  isAvatarFailed(id: string): boolean {
+    return Boolean(this.failedAvatars()[id]);
+  }
+
+  markAvatarFailed(id: string): void {
+    this.failedAvatars.update((map) => ({ ...map, [id]: true }));
+  }
+
   getInitials(name?: string | null): string {
     if (!name || !name.trim()) return 'CL';
     const parts = name.trim().split(/\s+/);

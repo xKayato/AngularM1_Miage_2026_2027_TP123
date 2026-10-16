@@ -272,10 +272,20 @@
               }
             </div>
 
-            <!-- Pied de carte : Auteur avec avatar & Likes & Commentaires -->
+            <!-- Pied de carte : Auteur avec avatar réel & Likes & Commentaires -->
             <div class="card-footer">
               <a [routerLink]="['/creators', post.author.id]" class="author-link card-interactive-element" [title]="'Voir le profil de ' + post.author.name">
-                <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
+                @if (post.author.hasAvatar && post.author.avatarUrl && !isAvatarFailed(post.author.id)) {
+                  <img
+                    [src]="post.author.avatarUrl"
+                    (error)="markAvatarFailed(post.author.id)"
+                    class="author-avatar-img"
+                    [alt]="post.author.name"
+                    loading="lazy"
+                  />
+                } @else {
+                  <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
+                }
                 <span class="author-name">{{ post.author.name }}</span>
               </a>
 

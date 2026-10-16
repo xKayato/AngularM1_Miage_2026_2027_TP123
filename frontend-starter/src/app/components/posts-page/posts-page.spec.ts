@@ -475,6 +475,69 @@ describe('PostsPageComponent', () => {
     expect(combinedText).toContain('2026');
   });
 
+  it('affiche l\'image de l\'avatar réel de l\'auteur si hasAvatar et avatarUrl sont présents', () => {
+    const postWithAvatar: PostPreview = {
+      ...mockPostPreview1,
+      author: {
+        id: 'user-42',
+        name: 'Alice Builder',
+        hasAvatar: true,
+        avatarUrl: '/api/users/user-42/avatar',
+      },
+    };
+    component.posts.set([postWithAvatar]);
+    fixture.detectChanges();
+
+    const avatarImg = fixture.nativeElement.querySelector('.author-avatar-img') as HTMLImageElement;
+    expect(avatarImg).not.toBeNull();
+    expect(avatarImg.getAttribute('src')).toBe('/api/users/user-42/avatar');
+    expect(avatarImg.getAttribute('alt')).toBe('Alice Builder');
+  });
+
+  it('bascule sur les initiales de l\'auteur en cas d\'absence d\'avatar ou d\'erreur de chargement', () => {
+    const postWithoutAvatar: PostPreview = {
+      ...mockPostPreview1,
+      author: {
+        id: 'user-99',
+        name: 'Bob Artisan',
+        hasAvatar: false,
+        avatarUrl: null,
+      },
+    };
+    component.posts.set([postWithoutAvatar]);
+    fixture.detectChanges();
+
+    let avatarImg = fixture.nativeElement.querySelector('.author-avatar-img');
+    let initialsSpan = fixture.nativeElement.querySelector('.author-avatar');
+    expect(avatarImg).toBeNull();
+    expect(initialsSpan?.textContent?.trim()).toBe('BA');
+
+    // Test de l'erreur de chargement
+    const postWithBrokenAvatar: PostPreview = {
+      ...mockPostPreview1,
+      author: {
+        id: 'user-broken',
+        name: 'Charlie Broken',
+        hasAvatar: true,
+        avatarUrl: '/api/users/user-broken/avatar',
+      },
+    };
+    component.posts.set([postWithBrokenAvatar]);
+    fixture.detectChanges();
+
+    avatarImg = fixture.nativeElement.querySelector('.author-avatar-img');
+    expect(avatarImg).not.toBeNull();
+
+    // Déclenchement de l'erreur
+    component.markAvatarFailed('user-broken');
+    fixture.detectChanges();
+
+    avatarImg = fixture.nativeElement.querySelector('.author-avatar-img');
+    initialsSpan = fixture.nativeElement.querySelector('.author-avatar');
+    expect(avatarImg).toBeNull();
+    expect(initialsSpan?.textContent?.trim()).toBe('CB');
+  });
+
   it('nettoie les abonnements lors de la destruction (ngOnDestroy)', () => {
     expect(() => fixture.destroy()).not.toThrow();
   });

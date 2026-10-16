@@ -85,35 +85,33 @@ creatorsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
 
     const creatorIds = rawDocs.map((d) => new mongoose.Types.ObjectId(d.id));
 
-    // Comptage des followers par créateur
-    const followCounts = await Follow.aggregate([
-      { $match: { creatorId: { $in: creatorIds } } },
-      { $group: { _id: "$creatorId", count: { $sum: 1 } } },
-    ]);
-    const followMap = new Map(followCounts.map((f) => [String(f._id), f.count]));
-
-    // Comptage des créations publiques/découvrables par créateur
-    const postCounts = await Post.aggregate([
-      {
-        $match: {
-          author: { $in: creatorIds },
-          status: "published",
-          visibility: { $in: ["public", "followers", "subscribers"] },
+    // Comptage parallèle des followers et des créations par créateur
+    const [followCounts, postCounts, userFollows] = await Promise.all([
+      Follow.aggregate([
+        { $match: { creatorId: { $in: creatorIds } } },
+        { $group: { _id: "$creatorId", count: { $sum: 1 } } },
+      ]),
+      Post.aggregate([
+        {
+          $match: {
+            author: { $in: creatorIds },
+            status: "published",
+            visibility: { $in: ["public", "followers", "subscribers"] },
+          },
         },
-      },
-      { $group: { _id: "$author", count: { $sum: 1 } } },
+        { $group: { _id: "$author", count: { $sum: 1 } } },
+      ]),
+      req.user
+        ? Follow.find({
+            followerId: req.user._id,
+            creatorId: { $in: creatorIds },
+          }).select("creatorId")
+        : Promise.resolve([]),
     ]);
-    const postMap = new Map(postCounts.map((p) => [String(p._id), p.count]));
 
-    // Relations de l'utilisateur connecté si présent
-    let followingSet = new Set();
-    if (req.user) {
-      const userFollows = await Follow.find({
-        followerId: req.user._id,
-        creatorId: { $in: creatorIds },
-      }).select("creatorId");
-      followingSet = new Set(userFollows.map((f) => String(f.creatorId)));
-    }
+    const followMap = new Map(followCounts.map((f) => [String(f._id), f.count]));
+    const postMap = new Map(postCounts.map((p) => [String(p._id), p.count]));
+    const followingSet = new Set((userFollows || []).map((f) => String(f.creatorId)));
 
     const docs = rawDocs.map((c) => ({
       ...c,
@@ -311,60 +309,59 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     let subscriptionExpiresAt = null;
 
     if (req.user && !isSelf) {
-      isFollowing = Boolean(
-        await Follow.exists({
+      const [followingFound, sub] = await Promise.all([
+        Follow.exists({
           followerId: req.user._id,
           creatorId: creator._id,
-        })
-      );
-
-      const sub = await Subscription.findOne({
-        subscriberId: req.user._id,
-        creatorId: creator._id,
-        active: true,
-        expiresAt: { $gt: new Date() },
-      });
+        }),
+        Subscription.findOne({
+          subscriberId: req.user._id,
+          creatorId: creator._id,
+          active: true,
+          expiresAt: { $gt: new Date() },
+        }),
+      ]);
+      isFollowing = Boolean(followingFound);
       if (sub) {
         isSubscribed = true;
         subscriptionExpiresAt = sub.expiresAt ? new Date(sub.expiresAt).toISOString() : null;
       }
     }
 
-    // Compteurs réels du créateur
-    const followersCount = await Follow.countDocuments({ creatorId: creator._id });
-    // Compteur d'abonnés : compteurs UNIQUEMENT actifs non expirés
-    const subscribersCount = await Subscription.countDocuments({
-      creatorId: creator._id,
-      active: true,
-      expiresAt: { $gt: new Date() },
-    });
-
-    // Créations découvrables du créateur :
-    // - Strictement exclure les drafts (sauf si auteur connecté)
-    // - Strictement exclure les posts link (non répertoriés)
-    // - Posts followers/subscribers : inclus avec isLocked: true si pas les droits
+    // Créations découvrables du créateur
     const postFilter = {
       author: creator._id,
       status: "published",
       visibility: { $in: ["public", "followers", "subscribers"] },
     };
 
-    const creatorPosts = await Post.find(postFilter)
-      .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
-      .limit(30)
-      .lean();
+    // Parallélisation massive : compteurs réels et récupération des posts en 1 seul round-trip
+    const [followersCount, subscribersCount, creatorPosts] = await Promise.all([
+      Follow.countDocuments({ creatorId: creator._id }),
+      Subscription.countDocuments({
+        creatorId: creator._id,
+        active: true,
+        expiresAt: { $gt: new Date() },
+      }),
+      Post.find(postFilter)
+        .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
+        .limit(30)
+        .lean(),
+    ]);
 
+    // Parallélisation des agrégations likes et commentaires pour les créations du créateur
     const postIds = creatorPosts.map((p) => p._id);
-    const likeCounts = await Like.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    const [likeCounts, commentCounts] = await Promise.all([
+      Like.aggregate([
+        { $match: { postId: { $in: postIds } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]),
+      Comment.aggregate([
+        { $match: { postId: { $in: postIds } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]),
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
-
-    const commentCounts = await Comment.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
-    ]);
     const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
 
     const creations = creatorPosts.map((post) => {

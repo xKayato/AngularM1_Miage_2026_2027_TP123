@@ -15,6 +15,8 @@ export type AttachmentFamily = 'image' | 'audio' | 'pdf';
 export interface PostAuthor {
   id: string;
   name: string;
+  hasAvatar?: boolean;
+  avatarUrl?: string | null;
 }
 
 /** DTO d'aperçu d'un post (catalogue et recherche). Omet strictement content et storedName. */
@@ -140,6 +142,8 @@ export interface PostComment {
   author: {
     id: string;
     name: string;
+    hasAvatar?: boolean;
+    avatarUrl?: string | null;
   };
   text: string;
   createdAt: string;

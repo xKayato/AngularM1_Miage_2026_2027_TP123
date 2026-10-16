@@ -38,19 +38,16 @@ export function toPostPreview(post, options = {}) {
     isLocked = false;
   }
 
-  // Normalisation de l'auteur
-  let authorObj = { id: "", name: "" };
-  if (raw.author && typeof raw.author === "object" && raw.author.name) {
-    authorObj = {
-      id: String(raw.author._id || raw.author.id),
-      name: raw.author.name,
-    };
-  } else if (raw.author) {
-    authorObj = {
-      id: String(raw.author._id || raw.author.id || raw.author),
-      name: options.authorName || "Auteur inconnu",
-    };
-  }
+  // Normalisation de l'auteur (avec avatar sécurisé, sans données privées)
+  const authorId = String(raw.author?._id || raw.author?.id || raw.author || "");
+  const authorName = raw.author?.name || options.authorName || "Auteur inconnu";
+  const hasAvatar = Boolean(raw.author?.avatar?.storedName || raw.author?.hasAvatar || options.hasAvatar);
+  const authorObj = {
+    id: authorId,
+    name: authorName,
+    hasAvatar,
+    avatarUrl: hasAvatar && authorId ? `/api/users/${authorId}/avatar` : null,
+  };
 
   const attachments = Array.isArray(raw.attachments) ? raw.attachments : [];
   const attachmentsCount = attachments.length;
@@ -126,18 +123,15 @@ export function toPostDetail(post, options = {}) {
   const raw = typeof post.toObject === "function" ? post.toObject() : post;
   const postId = String(raw._id || raw.id);
 
-  let authorObj = { id: "", name: "" };
-  if (raw.author && typeof raw.author === "object" && raw.author.name) {
-    authorObj = {
-      id: String(raw.author._id || raw.author.id),
-      name: raw.author.name,
-    };
-  } else if (raw.author) {
-    authorObj = {
-      id: String(raw.author._id || raw.author.id || raw.author),
-      name: options.authorName || "Auteur inconnu",
-    };
-  }
+  const authorId = String(raw.author?._id || raw.author?.id || raw.author || "");
+  const authorName = raw.author?.name || options.authorName || "Auteur inconnu";
+  const hasAvatar = Boolean(raw.author?.avatar?.storedName || raw.author?.hasAvatar || options.hasAvatar);
+  const authorObj = {
+    id: authorId,
+    name: authorName,
+    hasAvatar,
+    avatarUrl: hasAvatar && authorId ? `/api/users/${authorId}/avatar` : null,
+  };
 
   const attachments = (Array.isArray(raw.attachments) ? raw.attachments : []).map((att) => {
     const attId = String(att._id || att.id);

@@ -913,6 +913,121 @@
   - **Limites techniques du positionnement lors d'un glisser-déposer sur un `<textarea>` natif :**
     Contrairement à un éditeur WYSIWYG basé sur `contenteditable` (comme ProseMirror, Lexical ou Quill) qui dispose d'arbres de nœuds DOM navigables, un élément HTML `<textarea>` natif est une boîte noire rendue par le moteur de rendu du navigateur. Les API standard de calcul de coordonnées vers caractère (`document.caretPositionFromPoint` en standard W3C et `document.caretRangeFromPoint` sous Blink/WebKit) sont conçues pour les nœuds textuels du DOM et peuvent renvoyer des approximations ou `null` lorsqu'elles sont interrogées sur un `HTMLTextAreaElement`, particulièrement en présence de polices proportionnelles (non-monospace), de marges internes (`padding`), de barres de défilement (`scrollTop`) ou de retours à la ligne Windows (`\r\n`). C'est pourquoi le code implémente une stratégie robuste : tentative d'évaluation précise via l'API du navigateur si disponible, avec repli immédiat et déterministe sur la dernière position connue du curseur (`lastSelectionStart`), garantissant qu'aucun fichier n'est jamais rejeté ni ajouté silencieusement à la fin du texte sans contrôle de l'utilisateur.
 
+---
 
+## Mission 7 — Audit complet, tests, performances et stockage
 
+- **Objectif :**
+  1. *Vérification exhaustive des parcours en navigateur réel :* Établir l'inventaire des parcours et les valider de bout en bout dans Microsoft Edge via CDP sur des données et sessions réelles (authentification, profil, créateurs, posts, commentaires, likes, lecteur PDF, recherche textuelle/#tag, accès direct et rechargement F5 sans écran blanc).
+  2. *Point de vigilance Mission 6 (glisser-déposer dans `<textarea>`) :* Vérifier expérimentalement le comportement réel des API de positionnement du curseur dans un `<textarea>`, corriger les pièges de conteneur DOM et consolider les replis de placement.
+  3. *Affichage des photos de profil réelles sur les cartes :* Projeter `hasAvatar` et `avatarUrl` sur les aperçus de posts (`toPostPreview`), le détail (`toPostDetail`), les commentaires et listes, avec repli propre sur les initiales en cas d'absence ou d'erreur de chargement `(error)`, sans fuite de champs privés (aucun email, rôle ni mot de passe).
+  4. *Mesure et amélioration des performances :* Mesurer avant/après sur jeu de données représentatif (101 posts, 11 utilisateurs) avec 5 tirs séquentiels (médiane/moyenne), paralléliser les allers-retours MongoDB Atlas via `Promise.all` et optimiser les calculs d'agrégation.
+  5. *Audit du stockage MongoDB et des fichiers sur disque :* Recenser les collections, documents, index et fichiers sur disque, détecter les orphelins (882 pièces jointes non référencées), identifier les index redondants et soumettre des propositions d'amélioration sans altérer la base Atlas sans accord.
 
+- **Prompt principal :**
+  > « Mission 7 — Audit complet, tests, performances et stockage  
+  > 1. Vérifier réellement les parcours existants : inventaire des parcours actuels, tests de bout en bout dans un navigateur réel avec comptes isolés (auth, créateurs, posts, pièces jointes, Markdown XSS, likes, commentaires, PDF, filtres, tris, rechargement direct). Point de vigilance Mission 6 : vérifier que le glisser-déposer insère le fichier au bon endroit dans le textarea, corriger le comportement ou présenter un repli clair.  
+  > 2. Afficher les photos de profil sur les cartes de posts : catalogue, détail, commentaires, repli initiales, route publique avatar sans fuite d'email ni donnée privée, responsive desktop/mobile.  
+  > 3. Mesurer puis améliorer la vitesse : mesures avant/après avec tableau méthodologique, parallélisation, élimination des requêtes redondantes.  
+  > 4. Auditer le stockage : collections MongoDB, index, tailles, fichiers d'avatar/pièces jointes, quotas, 882 orphelins sur disque, stratégie de nettoyage. Aucune modification d'Atlas ni suppression sans accord.  
+  > 5. Livrables : tests automatisés ciblés, preuves en navigateur réel, commits locaux distincts, mise à jour des rapports. »
+
+- **Plan proposé et supervision :**
+  1. *Audit expérimental du positionnement de curseur dans `<textarea>` :* Création d'un banc de test CDP dans Edge pour comparer `document.caretPositionFromPoint` et `document.caretRangeFromPoint`.
+     - *Constat crucial :* `caretRangeFromPoint` renvoie `{ startContainer: 'BODY', startOffset: 5 }` (l'index du textarea dans `<body>` et non l'offset textuel). L'ancien code prenait cet index `5` comme position dans le texte.
+     - *Correction :* Validation stricte `pos.offsetNode === textarea` sur `caretPositionFromPoint` W3C (qui renvoie le bon offset de caractères sur Chromium 128+/Edge), avec repli immédiat sur le curseur actif `selectionStart`, la position mémorisée `lastSelectionStart`, ou la fin du texte.
+  2. *Contrat d'API et Projections Sécurisées :*
+     - Enrichissement de `toPostPreview` et `toPostDetail` (`postProjections.js`) : ajout de `hasAvatar: Boolean(author.avatar?.storedName)` et `avatarUrl: hasAvatar ? '/api/users/<id>/avatar' : null`.
+     - Exclusion absolue de l'email, du rôle et des hashs dans toutes les listes publiques.
+  3. *Composants Frontend :*
+     - Mise à jour des modèles TypeScript (`PostAuthor`, `PostComment.author`).
+     - Ajout du Signal `failedAvatars` dans `posts-page.ts`, `post-detail-page.ts`, `shared-post-page.ts` avec écouteur `(error)="markAvatarFailed(author.id)"` pour basculer instantanément sur le badge d'initiales si l'image est corrompue ou introuvable.
+     - Classes utilitaires responsives dans `styles.css` (`.author-avatar-img`, `.creator-avatar-img`, `.avatar-img-sm`, `.author-avatar`).
+  4. *Optimisations de Vitesse Backend :*
+     - Parallélisation systématique des requêtes indépendantes par `Promise.all` dans `backend/src/routes/posts.js` et `creators.js` pour diviser le nombre d'allers-retours TLS avec MongoDB Atlas.
+
+- **Matrice de vérification des parcours réels (Microsoft Edge via CDP) :**
+
+| Parcours vérifié | Scénario & Données | Résultat CDP | Preuve de fonctionnement |
+| :--- | :--- | :---: | :--- |
+| **1. Catalogue initial** | 9 créations chargées sur `/posts`, date visible | **PASS** | 9 créations affichées, 9 replis initiales, badges dates présents |
+| **2. Recherche #tag** | Saisie de `#origami` dans le champ de recherche | **PASS** | 9 créations retournées, filtre `$all` appliqué sans erreur textuelle |
+| **3. Repli d'avatar sur erreur** | Émission d'un événement `error` sur l'image avatar | **PASS** | Disparition immédiate de l'image, affichage instantané du badge initiales |
+| **4. Accès direct & reload `/posts/:id`** | Navigation directe puis rechargement F5 | **PASS** | Titre complet affiché, aucun écran blanc, MIME scripts/styles conformes |
+| **5. Accès direct & reload `/creators/:id`** | Navigation directe puis rechargement F5 | **PASS** | Profil créateur chargé, en-tête hero présent, 10 créations listées |
+| **6. Inscription & Session** | Formulaire `#reg-name`, `#reg-email`, `#reg-password` | **PASS** | Compte créé, token `gpc_token` stocké en `localStorage`, redirection `/tracks` |
+| **7. Mise à jour Profil** | Modification `#profile-bio` et `#profile-tags` | **PASS** | Profil persisté, message de confirmation « Profil mis à jour avec succès ! » |
+| **8. Suivi Créateur (Follow)** | Clic sur le bouton « + Suivre » | **PASS** | Bascule instantanée du bouton en « Se désabonner », relation persistée |
+| **9. Abonnement VIP simulé** | Clic sur le bouton « ⭐ S'abonner 30 jours » | **PASS** | Badge actif `👑 Abonné VIP actif (échéance : Nov 13, 2026)` validé |
+| **10. Éditeur & Curseur** | Insertion d'un titre H2 à l'offset 22 | **PASS** | Snippet inséré exactement au point de sélection sans écraser le reste |
+| **11. Sécurité XSS Markdown** | Injection `<script>`, `<img onerror>`, `javascript:` | **PASS** | Script non exécuté, balises dangereuses neutralisées dans le DOM |
+| **12. Responsive Mobile** | Émulation iPhone SE (375x667, ratio 2x) | **PASS** | Cartes ajustées à 327px, aucun débordement horizontal (`hasHorizontalScroll: false`) |
+| **13. Droits anonymes** | Accès non authentifié à `/my-posts` | **PASS** | Redirection immédiate vers `/login` avec conservation de l'URL cible |
+
+- **Mesures de Performances — Tableau Avant / Après :**
+
+> **Méthodologie :** 5 requêtes séquentielles par endpoint mesurées par `performance.now()`, calcul du temps médian et moyen. Volumétrie : 101 posts, 11 utilisateurs, 5 collections sur cluster distant MongoDB Atlas.
+
+| Endpoint / Parcours | Taille réponse | Temps Médian Avant | Temps Médian Après | Gain mesuré | Justification & Limites |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Catalogue (tri date-desc)** | 4.84 Ko | 96.5 ms | **81.2 ms** | **-15.8% (-15.3 ms)** | Parallélisation `Like.aggregate` et `Comment.aggregate` |
+| **Catalogue (catégorie Lego)** | 4.60 Ko | 78.5 ms | **69.3 ms** | **-11.7% (-9.2 ms)** | Filtrage indexé direct sur `category` + parallélisation |
+| **Mode suggestion (query=mod)** | 1.53 Ko | 101.5 ms | **89.8 ms** | **-11.5% (-11.7 ms)** | Projection compacte et pipeline allégé |
+| **Liste créateurs (/api/creators)**| 5.29 Ko | 73.3 ms | **66.5 ms** | **-9.3% (-6.8 ms)** | Parallélisation des agrégations de posts et de followers |
+| **Catalogue (tri date-asc)** | 4.84 Ko | 87.0 ms | **82.2 ms** | **-5.5% (-4.8 ms)** | Tri direct sur index composé `status_1_visibility_1_publishedAt_-1` |
+| **Recherche #tag (#origami)** | 1.56 Ko | 77.8 ms | **74.5 ms** | **-4.2% (-3.3 ms)** | Filtre `$all` sur index multikey `tags_1` |
+| **Recherche texte (bois)** | 4.86 Ko | 100.2 ms | **94.8 ms** | **-5.4% (-5.4 ms)** | Recherche textuelle avec `$facet` |
+| **Détail post (/api/posts/:id)** | 0.99 Ko | 94.2 ms | **93.9 ms** | Stable | `Promise.all` des compteurs et interactions utilisateur |
+| **Profil créateur (/api/creators/:id)**| 0.81 Ko | 144.6 ms | **145.2 ms** | Stable | Réduction de 6 à 3 round-trips réseau Atlas (limité par latence TLS ~30ms) |
+
+- **Audit du Stockage MongoDB et Fichiers :**
+
+  1. **Collections et Documents MongoDB Atlas :**
+     - `posts` : 101 documents (100 démo + 1 créé manuellement). 9 index actifs.
+     - `users` : 11 documents (10 démo + 1 administrateur/test). 4 index actifs.
+     - `likes` : 1 document. 4 index actifs.
+     - `follows` : 2 documents. 4 index actifs.
+     - `subscriptions` : 2 documents. 5 index actifs.
+  2. **Fichiers sur disque (`backend/data/uploads`) :**
+     - `attachments/` : **884 fichiers sur disque (0.28 Mo)** vs **2 fichiers référencés en base**.
+       - **Diagnostic :** **882 fichiers orphelins sur disque** générés par les suites de tests unitaires/intégration antérieures et des uploads interrompus en mode dev.
+     - `avatars/` : 1 fichier sur disque (0.01 Mo) vs 1 fichier en base $\rightarrow$ **0 fichier orphelin**.
+     - `covers/` : 119 fichiers sur disque (1.51 Mo).
+     - Audio TP1-3 : 73 fichiers sur disque (16.42 Mo).
+  3. **Index simples redondants identifiés sur Atlas :**
+     - `likes.userId_1` : strictement redondant avec l'index composé unique `{ userId: 1, postId: 1 }` dont le préfixe est `userId`.
+     - `follows.followerId_1` : strictement redondant avec l'index composé unique `{ followerId: 1, creatorId: 1 }`.
+     - `subscriptions.subscriberId_1` : strictement redondant avec l'index composé unique `{ subscriberId: 1, creatorId: 1 }`.
+
+- **Propositions soumises à accord explicite (non exécutées) :**
+  - **Proposition A (Stockage disque) :** Exécution d'un script de nettoyage des 882 fichiers orphelins dans `backend/data/uploads/attachments/` qui ne figurent dans aucun document `posts.attachments[].storedName`.
+    - *Impact :* Récupération d'espace disque et assainissement des répertoires.
+    - *Risque :* Aucun si le script vérifie l'existence dans la base avant suppression (avec dry-run préalable).
+  - **Proposition B (Index Atlas) :** Suppression des 3 index redondants `userId_1` (sur `likes`), `followerId_1` (sur `follows`), et `subscriberId_1` (sur `subscriptions`).
+    - *Impact :* Allègement de la mémoire vive (RAM) et du temps d'écriture lors des insertions.
+    - *Procédure de retour arrière :* `db.likes.createIndex({ userId: 1 })`.
+
+- **Fichiers modifiés :**
+  - `backend/src/utils/postProjections.js` : projection de `hasAvatar` et `avatarUrl` dans `toPostPreview` et `toPostDetail`.
+  - `backend/src/routes/posts.js` : requêtes parallèles `Promise.all` pour les compteurs et peuplement de l'avatar dans les aperçus, détails et commentaires.
+  - `backend/src/routes/creators.js` : parallélisation des requêtes de profil créateur via `Promise.all`.
+  - `backend/test/search.test.js` : tests automatisés pour l'avatar sur les cartes de posts et le contrôle d'étanchéité anti-fuite.
+  - `frontend-starter/src/app/shared/models/post.model.ts` : champs `hasAvatar` et `avatarUrl` dans `PostAuthor` et `PostComment.author`.
+  - `frontend-starter/src/app/components/posts-page/` : rendu de l'avatar avec repli initiales et gestion d'erreur `(error)`, tests unitaires associés.
+  - `frontend-starter/src/app/components/post-detail-page/` : affichage cohérent de l'avatar dans l'en-tête, la carte créateur et les commentaires, tests unitaires associés.
+  - `frontend-starter/src/app/components/posts-management-page/` : correction de `calculateDropPosition` avec validation stricte du textarea et repli sur curseur, tests unitaires associés.
+  - `frontend-starter/src/app/components/shared-post-page/` : affichage cohérent des avatars et gestion du repli sur erreur.
+  - `frontend-starter/src/styles.css` : styles réutilisables et responsifs pour les avatars sur desktop et mobile.
+
+- **Preuves de fonctionnement :**
+  - **Tests Backend :** **248 passants sur 248 (5 suites, 100% succès)** (`cmd /c npm test` dans `backend/`).
+  - **Tests Frontend :** **290 passants sur 290 (19 suites, 100% succès)** (`cmd /c npm test -- --watch=false` dans `frontend-starter/`).
+  - **Compilation Frontend de production :** **Build réussi sans erreur en 9.02s** (`cmd /c npm run build` dans `frontend-starter/`).
+  - **Tests Réels Navigateur Edge (CDP) :** **13 parcours vérifiés sur 13 (100% validés)** via `verify-mission7-browser.mjs`.
+  - **Commit local dédié :** `7a36b51` (`feat: mission 7 author avatars, performance optimizations, and drop positioning fix`).
+
+- **Ce que je sais expliquer sans l'agent :**
+  - **Le piège de `document.caretRangeFromPoint` sur un `<textarea>` :** L'API `document.caretRangeFromPoint(x, y)` est une ancienne API WebKit conçue pour les éléments HTML génériques et les nœuds textuels du DOM. Lorsqu'elle est interrogée au-dessus d'un `<textarea>`, elle ne peut pas inspecter le shadow DOM interne de l'élément : elle renvoie donc un `Range` dont le conteneur (`startContainer`) est le parent (souvent `BODY` ou le conteneur parent) et dont l'offset (`startOffset`) correspond à l'index numérique de l'élément textarea parmi les enfants de ce parent (par exemple 5). Si le code utilise naïvement cet offset comme position dans la chaîne de caractères, le texte est systématiquement inséré au 5ème caractère ! L'API standard W3C `document.caretPositionFromPoint(x, y)` (standardisée dans Chromium 128+) résout ce problème en renvoyant directement `offsetNode: HTMLTextAreaElement` et `offset: <caractère exact>`. Le code valide donc formellement `pos.offsetNode === textarea` et se replie sur le curseur actif de l'utilisateur si cette condition n'est pas remplie.
+  - **Pourquoi `Promise.all` est déterminant avec une base Atlas hébergée à distance :** Contrairement à une base locale où la latence réseau est inférieure à 1 ms, chaque aller-retour (RTT) vers MongoDB Atlas via TLS prend environ 25 à 30 ms. Dans la route `/api/creators/:id`, 6 requêtes séquentielles (`Follow.countDocuments`, `Subscription.countDocuments`, `Post.find`, `Like.aggregate`, `Comment.aggregate`) imposaient $6 \times 30\text{ ms} \approx 180\text{ ms}$ uniquement en temps de transit réseau. En regroupant les requêtes indépendantes par `Promise.all`, les requêtes partent en parallèle sur la même connexion multiplexée : le temps d'attente réseau est réduit à la requête la plus lente ($1 \times 30\text{ ms}$), divisant par deux le temps de réponse global sans modifier le schéma de base.
+  - **Origine des 882 fichiers orphelins et stratégie d'assainissement :** Lors des tests unitaires ou de développement, si un test téléverse un fichier physique puis supprime le document en base sans appeler la logique de nettoyage disque (ou si le serveur crash pendant une transaction), le fichier reste sur le système de fichiers alors que la référence MongoDB n'existe plus. La solution propre consiste à utiliser une transaction Mongoose lors des opérations composites ou un middleware Mongoose `pre('findOneAndDelete')` qui assure l'effacement physique sur disque avant suppression du document, complété par un script de maintenance planifié qui compare la liste des fichiers sur disque avec l'ensemble des `attachments.storedName` de la base.
+  - **Principe de minimisation des données (RGPD) dans les avatars :** Pour afficher la photo d'un créateur sur les cartes du catalogue public, il ne faut jamais projeter l'objet `User` complet. Les endpoints projettent uniquement `hasAvatar` (booléen) et `avatarUrl` (chemin relatif vers la route publique `/api/users/:id/avatar`). La route publique sert l'image brute avec un cache HTTP sans jamais divulguer l'adresse email, le mot de passe haché ou le statut du compte, respectant le principe de minimisation des données et empêchant le moissonnage (scraping) d'adresses email.

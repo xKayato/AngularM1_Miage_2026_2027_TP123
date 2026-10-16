@@ -724,24 +724,27 @@ export class PostsManagementPageComponent implements OnInit {
 
   calculateDropPosition(textarea: HTMLTextAreaElement | undefined, event: DragEvent): number {
     if (!textarea) return 0;
-    // 1. Standard W3C CSSOM View (Chromium, Firefox, Edge)
+
+    // 1. Standard W3C CSSOM View (Chromium 128+, Edge, Firefox)
+    // Valide strictement que le nœud retourné est bien l'élément TEXTAREA pour obtenir l'offset de caractères exact
     if (typeof document.caretPositionFromPoint === 'function') {
       const pos = document.caretPositionFromPoint(event.clientX, event.clientY);
-      if (pos && typeof pos.offset === 'number') {
+      if (pos && pos.offsetNode === textarea && typeof pos.offset === 'number') {
         return Math.min(pos.offset, textarea.value.length);
       }
     }
-    // 2. WebKit / Blink legacy
-    if (typeof (document as any).caretRangeFromPoint === 'function') {
-      const range = (document as any).caretRangeFromPoint(event.clientX, event.clientY);
-      if (range && typeof range.startOffset === 'number') {
-        return Math.min(range.startOffset, textarea.value.length);
-      }
+
+    // 2. Repli : si le textarea a le focus ou un curseur actif utilisateur
+    if (document.activeElement === textarea && typeof textarea.selectionStart === 'number' && textarea.selectionStart >= 0) {
+      return textarea.selectionStart;
     }
-    // 3. Repli : dernière position mémorisée du curseur
+
+    // 3. Repli : dernière position mémorisée du curseur dans l'éditeur
     if (this.lastSelectionStart >= 0 && this.lastSelectionStart <= textarea.value.length) {
       return this.lastSelectionStart;
     }
+
+    // 4. Repli de sécurité : fin du texte
     return textarea.value.length;
   }
 

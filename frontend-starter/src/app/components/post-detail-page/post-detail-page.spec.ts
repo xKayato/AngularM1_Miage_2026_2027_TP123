@@ -536,6 +536,33 @@ describe('PostDetailPageComponent', () => {
       expect(compiled.querySelector('.alert-error')).not.toBeNull();
       expect(compiled.textContent).toContain('Ce projet a été archivé par la modération');
     });
+
+    it('affiche l\'avatar de l\'auteur avec repli sur les initiales dans le détail du post et les commentaires', () => {
+      const detailWithAvatar: PostDetail = {
+        ...mockDetail,
+        author: {
+          id: 'author-avatar-id',
+          name: 'Sarah Connor',
+          hasAvatar: true,
+          avatarUrl: '/api/users/author-avatar-id/avatar',
+        },
+      };
+      postServiceMock.getPostDetail.mockReturnValue(of(detailWithAvatar));
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const avatarImg = compiled.querySelector('.author-avatar-img') as HTMLImageElement;
+      expect(avatarImg).not.toBeNull();
+      expect(avatarImg.getAttribute('src')).toBe('/api/users/author-avatar-id/avatar');
+
+      // Test de repli d'avatar sur erreur
+      component.markAvatarFailed('author-avatar-id');
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('.author-avatar-img')).toBeNull();
+      const initials = compiled.querySelector('.creator-avatar-badge');
+      expect(initials?.textContent?.trim()).toBe('SC');
+    });
   });
 });
 

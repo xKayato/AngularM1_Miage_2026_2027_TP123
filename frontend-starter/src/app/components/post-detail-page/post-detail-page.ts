@@ -344,6 +344,18 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   }
 
+  readonly failedAvatars = signal<Record<string, boolean>>({});
+
+  isAvatarFailed(id?: string | null): boolean {
+    if (!id) return false;
+    return Boolean(this.failedAvatars()[id]);
+  }
+
+  markAvatarFailed(id?: string | null): void {
+    if (!id) return;
+    this.failedAvatars.update((map) => ({ ...map, [id]: true }));
+  }
+
   getInitials(name?: string | null): string {
     if (!name || !name.trim()) return 'CL';
     const parts = name.trim().split(/\s+/);
