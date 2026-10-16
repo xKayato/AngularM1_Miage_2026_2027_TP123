@@ -7,6 +7,7 @@
         "start:local": "node src/server.js",
         "test": "node --test --test-concurrency=1",
         "seed:demo": "node --env-file=.env scripts/seed-demo.js",
+        "seed:enrich": "node --env-file=.env scripts/seed-enrich-media.js",
         "seed:clean": "node --env-file=.env scripts/seed-demo.js --clean"
     },
     "dependencies": {
