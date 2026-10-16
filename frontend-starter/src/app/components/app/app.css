@@ -151,6 +151,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .btn-logout {
@@ -265,6 +276,12 @@
     text-decoration: none;
     background-color: var(--bg-canvas);
     border: 1px solid var(--border-color);
+  }
+
+  .mobile-profile-link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
   }
 
   .mobile-link:hover {

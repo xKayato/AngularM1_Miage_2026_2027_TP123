@@ -13,7 +13,6 @@
         <a routerLink="/creators" routerLinkActive="active-nav-link" class="nav-link">Créateurs</a>
         @if (auth.isAuthenticated()) {
           <a routerLink="/my-posts" routerLinkActive="active-nav-link" class="nav-link">Mes créations</a>
-          <a routerLink="/tracks" routerLinkActive="active-nav-link" class="nav-link">Backing tracks</a>
           @if (auth.isAdmin()) {
             <a routerLink="/admin" routerLinkActive="active-nav-link" class="nav-link admin-link">Administration</a>
           }
@@ -37,7 +36,16 @@
 
       @if (auth.isAuthenticated()) {
         <a routerLink="/profile" class="user-profile-badge" aria-label="Mon espace profil">
-          <span class="avatar-circle">{{ getInitials(auth.currentUser()?.name) }}</span>
+          @if (auth.currentUser()?.hasAvatar && !avatarFailed() && auth.currentUser()?.avatarUrl) {
+            <img
+              [src]="auth.currentUser()?.avatarUrl"
+              (error)="onAvatarError()"
+              alt="Photo de profil"
+              class="avatar-img"
+            />
+          } @else {
+            <span class="avatar-circle">{{ getInitials(auth.currentUser()?.name) }}</span>
+          }
           <span class="user-display-name">{{ auth.currentUser()?.name || 'Mon espace' }}</span>
         </a>
         <button
@@ -75,8 +83,19 @@
         <a routerLink="/creators" (click)="toggleMobileMenu()" class="mobile-link">Recherche de créateurs</a>
         @if (auth.isAuthenticated()) {
           <a routerLink="/my-posts" (click)="toggleMobileMenu()" class="mobile-link">Mes créations</a>
-          <a routerLink="/tracks" (click)="toggleMobileMenu()" class="mobile-link">Backing tracks</a>
-          <a routerLink="/profile" (click)="toggleMobileMenu()" class="mobile-link">Mon espace (/profile)</a>
+          <a routerLink="/profile" (click)="toggleMobileMenu()" class="mobile-link mobile-profile-link">
+            @if (auth.currentUser()?.hasAvatar && !avatarFailed() && auth.currentUser()?.avatarUrl) {
+              <img
+                [src]="auth.currentUser()?.avatarUrl"
+                (error)="onAvatarError()"
+                alt="Photo de profil"
+                class="avatar-img"
+              />
+            } @else {
+              <span class="avatar-circle">{{ getInitials(auth.currentUser()?.name) }}</span>
+            }
+            <span>Mon espace ({{ auth.currentUser()?.name || 'Profil' }})</span>
+          </a>
           @if (auth.isAdmin()) {
             <a routerLink="/admin" (click)="toggleMobileMenu()" class="mobile-link">Administration</a>
           }

@@ -48,7 +48,7 @@ export class RegisterPageComponent {
     this.auth.register(values.name, values.email, values.password).subscribe({
       next: () => {
         this.submitting.set(false);
-        void this.router.navigateByUrl('/tracks');
+        void this.router.navigateByUrl('/posts');
       },
       error: (err: unknown) => {
         this.submitting.set(false);

@@ -63,7 +63,7 @@ describe('LoginPageComponent', () => {
     expect(mockAuthService.login).not.toHaveBeenCalled();
   });
 
-  it('should call auth.login and navigate to /tracks on successful submission', () => {
+  it('should call auth.login and navigate to /posts on successful submission', () => {
     mockAuthService.login.mockReturnValue(of(mockResponse));
     component.form.setValue({
       email: 'demo@example.com',
@@ -74,7 +74,7 @@ describe('LoginPageComponent', () => {
 
     expect(mockAuthService.login).toHaveBeenCalledWith('demo@example.com', 'Demo1234!');
     expect(component.submitting()).toBe(false);
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/tracks');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/posts');
     expect(component.error()).toBe('');
   });
 

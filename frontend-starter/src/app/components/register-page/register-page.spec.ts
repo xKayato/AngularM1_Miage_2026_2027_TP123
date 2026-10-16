@@ -72,7 +72,7 @@ describe('RegisterPageComponent', () => {
     expect(component.form.controls.password.touched).toBe(true);
   });
 
-  it('should call auth.register and navigate to /tracks upon successful registration', () => {
+  it('should call auth.register and navigate to /posts upon successful registration', () => {
     mockAuthService.register.mockReturnValue(of(mockResponse));
     component.form.setValue({
       name: 'Bob',
@@ -88,7 +88,7 @@ describe('RegisterPageComponent', () => {
       'StrongPassword123',
     );
     expect(component.submitting()).toBe(false);
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/tracks');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/posts');
   });
 
   it('should display friendly error when email is already taken (409 Conflict)', () => {

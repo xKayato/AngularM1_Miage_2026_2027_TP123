@@ -44,7 +44,7 @@ export class LoginPageComponent {
     this.auth.login(values.email, values.password).subscribe({
       next: () => {
         this.submitting.set(false);
-        void this.router.navigateByUrl('/tracks');
+        void this.router.navigateByUrl('/posts');
       },
       error: (err: unknown) => {
         this.submitting.set(false);
