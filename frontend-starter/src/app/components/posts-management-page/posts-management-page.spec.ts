@@ -30,6 +30,7 @@ describe('PostsManagementPageComponent', () => {
     visibility: 'public',
     status: 'draft',
     likesCount: 0,
+    commentsCount: 0,
     attachments: [],
     userInteractions: {
       isLiked: false,
@@ -463,6 +464,105 @@ describe('PostsManagementPageComponent', () => {
       expect(html).toContain('<strong>gras</strong>');
       expect(html).not.toContain('<script>');
       expect(html).toContain('&lt;script&gt;');
+    });
+
+    it('permet la sélection et le retrait de fichiers dans le formulaire initial de création', () => {
+      component.startCreate();
+      expect(component.creationSelectedFiles().length).toBe(0);
+
+      const fakeFile = new File(['content'], 'notice.pdf', { type: 'application/pdf' });
+      const event = {
+        target: { files: [fakeFile], value: '' },
+      } as unknown as Event;
+
+      component.onCreationFilesSelected(event);
+      expect(component.creationSelectedFiles().length).toBe(1);
+      expect(component.creationSelectedFiles()[0].name).toBe('notice.pdf');
+      expect(component.getFileIcon('notice.pdf')).toBe('📄');
+
+      component.removeCreationFile(0);
+      expect(component.creationSelectedFiles().length).toBe(0);
+    });
+
+    it('enchaîne création de post et téléversement transparent des pièces jointes avec succès', () => {
+      component.startCreate();
+      component.postForm.setValue({
+        title: 'Nouveau projet avec PJ',
+        shortDescription: 'Description valide de plus de dix caractères',
+        content: 'Contenu complet avec étapes de fabrication...',
+        category: 'Lego',
+        tagsInput: 'diy, tuto',
+      });
+
+      const fakeFile = new File(['image-bytes'], 'photo.png', { type: 'image/png' });
+      component.creationSelectedFiles.set([fakeFile]);
+
+      const createdPost = { ...mockPost, id: 'created-123', title: 'Nouveau projet avec PJ' };
+      postServiceMock.createPost.mockReturnValue(of(createdPost));
+      postServiceMock.uploadAttachments.mockReturnValue(
+        of([
+          {
+            id: 'att-created',
+            originalName: 'photo.png',
+            mimeType: 'image/png',
+            size: fakeFile.size,
+            family: 'image',
+            downloadUrl: '/api/posts/created-123/attachments/att-created',
+            isCover: false,
+          },
+        ])
+      );
+
+      component.onSubmit();
+
+      expect(postServiceMock.createPost).toHaveBeenCalled();
+      expect(postServiceMock.uploadAttachments).toHaveBeenCalledWith('created-123', [fakeFile]);
+      expect(component.successMessage()).toContain('créé avec succès avec 1 pièce(s) jointe(s)');
+      expect(component.currentView()).toBe('list');
+      expect(component.creationSelectedFiles().length).toBe(0);
+    });
+
+    it('gère l échec de l upload après création du brouillon sans fausse réussite', () => {
+      component.startCreate();
+      component.postForm.setValue({
+        title: 'Projet avec upload échoué',
+        shortDescription: 'Description valide de plus de dix caractères',
+        content: 'Contenu complet avec étapes...',
+        category: 'Lego',
+        tagsInput: 'diy, test',
+      });
+
+      const fakeFile = new File(['fail-bytes'], 'broken.pdf', { type: 'application/pdf' });
+      component.creationSelectedFiles.set([fakeFile]);
+
+      const createdPost = { ...mockPost, id: 'post-fail', title: 'Projet avec upload échoué' };
+      postServiceMock.createPost.mockReturnValue(of(createdPost));
+      postServiceMock.uploadAttachments.mockReturnValue(
+        throwError(() => ({ error: { message: 'Stockage temporairement indisponible' } }))
+      );
+
+      component.onSubmit();
+
+      expect(postServiceMock.createPost).toHaveBeenCalled();
+      expect(postServiceMock.uploadAttachments).toHaveBeenCalled();
+      // Ne doit pas afficher de message de plein succès
+      expect(component.successMessage()).toBeNull();
+      // Doit afficher un avertissement clair précisant que le brouillon existe mais que l'upload a échoué
+      expect(component.error()).toContain('a bien été créé, mais l\'envoi des pièces jointes a échoué');
+      expect(component.error()).toContain('Stockage temporairement indisponible');
+      expect(component.currentView()).toBe('list');
+    });
+
+    it('réinitialise les fichiers sélectionnés lors de l annulation de l éditeur', () => {
+      component.startCreate();
+      const fakeFile = new File(['content'], 'schema.png', { type: 'image/png' });
+      component.creationSelectedFiles.set([fakeFile]);
+
+      component.cancelEditor();
+
+      expect(component.currentView()).toBe('list');
+      expect(component.creationSelectedFiles().length).toBe(0);
+      expect(component.creationFilesError()).toBeNull();
     });
   });
 });

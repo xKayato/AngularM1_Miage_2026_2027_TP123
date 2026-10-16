@@ -185,24 +185,21 @@
                 <span class="meta-date-info">
                   Ajouté le {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
                 </span>
-                <span class="likes-tag">❤️ {{ post.likesCount }}</span>
+                <div class="meta-stats card-interactive-element">
+                  <span class="comments-tag" title="Commentaires">💬 {{ post.commentsCount }}</span>
+                  <span class="likes-tag" title="Mentions J'aime">❤️ {{ post.likesCount }}</span>
+                </div>
               </div>
 
               <h3 class="post-title font-display">
-                <a [routerLink]="['/posts', post.id]">{{ post.title }}</a>
+                <a [routerLink]="['/posts', post.id]" class="card-stretched-link">{{ post.title }}</a>
               </h3>
               <p class="post-desc">{{ post.shortDescription }}</p>
 
-              <div class="tags-row">
+              <div class="tags-row card-interactive-element">
                 @for (tag of post.tags; track tag) {
                   <span class="tag-item">#{{ tag }}</span>
                 }
-              </div>
-
-              <div class="card-footer">
-                <a [routerLink]="['/posts', post.id]" class="btn-consult">
-                  {{ post.isLocked ? 'Voir l’aperçu →' : 'Consulter le projet →' }}
-                </a>
               </div>
             </div>
           </article>

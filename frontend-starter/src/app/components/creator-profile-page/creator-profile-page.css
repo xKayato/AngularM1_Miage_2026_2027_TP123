@@ -336,6 +336,7 @@ html.dark .vip-badge-active {
 }
 
 .post-preview-card {
+  position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -472,6 +473,18 @@ html.dark .vip-badge-active {
   justify-content: space-between;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.meta-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.comments-tag {
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
 }
 
 .likes-tag {

@@ -329,6 +329,7 @@
 }
 
 .post-card {
+  position: relative;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 16px;
@@ -354,6 +355,7 @@
   justify-content: space-between;
   padding: 0.85rem;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .cover-top-badges {
@@ -586,6 +588,7 @@
   gap: 0.5rem;
 }
 
+.comments-pill,
 .likes-pill {
   font-size: 0.75rem;
   font-weight: 700;
@@ -597,6 +600,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+.comments-pill {
+  color: var(--text-secondary);
 }
 
 .heart-icon {

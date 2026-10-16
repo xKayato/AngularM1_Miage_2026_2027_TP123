@@ -5,6 +5,7 @@ import { Follow } from "../models/Follow.js";
 import { Subscription } from "../models/Subscription.js";
 import { Post } from "../models/Post.js";
 import { Like } from "../models/Like.js";
+import { Comment } from "../models/Comment.js";
 import { toPostPreview } from "../utils/postProjections.js";
 import { authMakerShare } from "../middlewares/authMakerShare.js";
 import { optionalAuthMakerShare } from "../middlewares/optionalAuthMakerShare.js";
@@ -360,6 +361,12 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
 
+    const commentCounts = await Comment.aggregate([
+      { $match: { postId: { $in: postIds } } },
+      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    ]);
+    const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
+
     const creations = creatorPosts.map((post) => {
       let isLocked = true;
       if (post.visibility === "public" || isSelf) {
@@ -373,6 +380,7 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       return toPostPreview(post, {
         isLocked,
         likesCount: likesMap.get(String(post._id)) || 0,
+        commentsCount: commentsMap.get(String(post._id)) || 0,
         authorName: creator.name,
       });
     });

@@ -715,4 +715,50 @@
   - **Pourquoi l'archivage interdit l'écriture :** L'archivage est une mesure de retrait ou de gel suite à une modération. Permettre des ajouts de commentaires sur un contenu archivé contournerait le verrouillage de la modération.
   - **Gestion de la mémoire avec les Blob URLs :** `URL.createObjectURL(blob)` crée une référence directe vers les données binaires en mémoire dans le navigateur. Ces références ne sont pas automatiquement nettoyées par le ramasse-miettes tant que le document est actif. L'invocation systématique de `URL.revokeObjectURL(url)` dans `ngOnDestroy()` et lors de la fermeture du visualiseur garantit l'absence de fuite mémoire lors d'une utilisation prolongée de l'application.
 
+---
+
+# Mission Corrective — Parcours de Création et Consultation des Posts
+
+- **Objectif :** Corriger de manière exhaustive cinq anomalies fonctionnelles, ergonomiques et d'accessibilité avant d'entamer la Mission 5 :
+  1. *Téléversement direct des pièces jointes dès la création :* Sélection des fichiers directement dans le formulaire initial (`PostsManagementPageComponent`), enchaînement transparent `createPost` puis `uploadAttachments`, retour d'état pas-à-pas, gestion granulaire des erreurs et interdiction de déclarer un succès complet si l'envoi de fichiers échoue après la création du brouillon.
+  2. *Suppression du doublon du contrôle d'avatar sur `/profile` :* Remplacement des deux contrôles (bouton natif « Browse / Parcourir » et bouton personnalisé) par un unique contrôle accessible (`.sr-only` sur l'input natif, label bouton stylé avec `tabindex="0"`, focus visible et gestion des touches Clavier Entrée/Espace).
+  3. *Cartes de posts intégralement cliquables :* Dans le catalogue (`PostsPageComponent`) et les profils créateurs (`CreatorProfilePageComponent`), application du pattern accessible `.card-stretched-link`, suppression du bouton redondant « Voir le post / Consulter », et préservation des interactions indépendantes (profil créateur, tags) avec `.card-interactive-element`.
+  4. *Compteur de commentaires avant ouverture du post :* Fourniture par le backend du champ `commentsCount: number` calculé par agrégation sur toutes les listes de posts (`GET /api/posts`, `/api/posts/my`, `/api/creators/:id/posts`, `/posts/:id`, etc.) sans fuite sur les posts verrouillés, affichage d'un badge 💬 sur les cartes et actualisation réactive dynamique lors de l'ajout ou de la suppression d'un commentaire sur la page de détail.
+  5. *Correction de l'ouverture directe de `/posts/:id` :* Résolution du problème d'écran blanc en accès direct (nouvel onglet, session vierge, F5) via la souscription réactive à `route.paramMap`, l'ajout d'une route canonique de redirection (`post/:id` vers `posts/:id`), l'ajout d'un bloc de repli explicite `@else` en cas d'erreur ou d'état inattendu, et la configuration du middleware Express SPA fallback pour les routes Angular.
+- **Prompt principal :**
+  > « Mission corrective — parcours de création et consultation des posts  
+  > Avant de commencer la Mission 5, corrige les cinq problèmes ci-dessous. Ne lance pas la Mission 5 dans cette intervention.  
+  > 1. Téléverser les pièces jointes dès la création (transparent, étapes, gestion erreurs sans faux succès).  
+  > 2. Supprimer le doublon du contrôle d’avatar (/profile, un seul contrôle visible et accessible).  
+  > 3. Rendre toute la carte de post cliquable (stretched link, supprimer bouton redondant, préserver liens auteur/tags).  
+  > 4. Afficher le nombre de commentaires avant l’ouverture du post (backend count sans fuite, badge UI, refresh direct).  
+  > 5. Corriger l’ouverture directe de /posts/:id (aucun écran blanc, route canonique, repli d'erreur, SPA fallback).  
+  > Validation attendue : tests de régression pertinents, tests backend/frontend passants et build. »
+- **Fichiers modifiés :**
+  - `backend/src/utils/postProjections.js` : enrichissement des projections `toPostPreview`, `toPostDetail` et `toPostAuthorManagement` avec `commentsCount`.
+  - `backend/src/routes/posts.js` : calcul des compteurs de commentaires via pipeline d'agrégation `Comment.aggregate` et `Comment.countDocuments` sur l'ensemble des routes catalogue, posts personnels, détail, aperçu verrouillé, création, mise à jour, publication et couverture.
+  - `backend/src/routes/creators.js` : agrégation des compteurs de commentaires sur `GET /api/creators/:id/posts`.
+  - `backend/src/routes/admin.js` : comptage documentaire des commentaires sur la modération.
+  - `backend/src/app.js` : middleware Express 5 compatible pour le repli SPA vers `index.html` pour tout accès direct en GET non-API.
+  - `backend/package.json` : fiabilisation de l'exécution séquentielle des tests sous Windows (`node --test --test-concurrency=1`).
+  - `backend/test/posts.test.js` & `backend/test/comments.test.js` : mocks Mongoose pour isoler les tests unitaires purs et tests de régression d'intégration sur `commentsCount`.
+  - `frontend-starter/src/app/shared/models/post.model.ts` : ajout de `commentsCount: number` aux modèles `PostPreview` et `PostDetail`.
+  - `frontend-starter/src/app/routes.ts` : redirection canonique `post/:id` vers `posts/:id`.
+  - `frontend-starter/src/styles.css` : classes utilitaires `.sr-only`, `.card-stretched-link::after`, et `.card-interactive-element`.
+  - `frontend-starter/src/app/components/profile-page/` : suppression du doublon d'avatar, input `.sr-only` lié par `id`/`for`, navigation clavier.
+  - `frontend-starter/src/app/components/posts-page/` : titre en `.card-stretched-link`, badge `💬 {{ post.commentsCount }}`, suppression du bouton redondant `btn-view`.
+  - `frontend-starter/src/app/components/creator-profile-page/` : titre en `.card-stretched-link`, badge `💬 {{ post.commentsCount }}`, suppression de `btn-consult`.
+  - `frontend-starter/src/app/components/post-detail-page/` : souscription réactive à `this.route.paramMap`, mise à jour réactive de `commentsCount` lors de l'ajout/suppression de commentaire, bloc de repli explicite `@else` garantissant l'absence de page blanche.
+  - `frontend-starter/src/app/components/posts-management-page/` : sélection de pièces jointes dès la création, suivi par signaux (`creationUploadProgress`, `creationSelectedFiles`), enchaînement `createPost` puis `uploadAttachments`, avertissement clair sans faux succès si l'upload échoue, réinitialisation à l'annulation.
+  - `frontend-starter/src/app/components/**/*.spec.ts` : mise à jour des mocks stricts et ajout de tests de régression dédiés pour chacun des 5 points.
+- **Preuves de fonctionnement :**
+  - Tests Backend : **235 passants sur 235 (5 suites, 100% succès)** (`cmd /c npm test` dans `backend/`).
+  - Tests Frontend : **269 passants sur 269 (19 suites, 100% succès)** (`cmd /c npm test -- --watch=false` dans `frontend-starter/`).
+  - Compilation Frontend de production : **Build réussi sans erreur en 16.5s** (`cmd /c npm run build` dans `frontend-starter/`).
+- **Ce que je sais expliquer sans l'agent :**
+  - **Pattern `.card-stretched-link` vs gestionnaire de clic sur `<div>` :** Un simple `(click)` sur un conteneur `<div>` casse l'accessibilité : l'élément n'est pas focalisable au clavier par défaut, n'a pas de sémantique de lien pour les lecteurs d'écran et empêche l'action native du navigateur « Clic droit → Ouvrir dans un nouvel onglet ». Le pseudo-élément CSS `::after` positionné en `absolute` sur le lien du titre recouvre toute la carte (`position: relative`), rendant la carte cliquable tout en conservant une sémantique HTML `<a>` irréprochable. Les éléments interactifs secondaires (profil de l'auteur, boutons de tags) sont isolés grâce à `.card-interactive-element` (`position: relative; z-index: 2`).
+  - **Gestion de l'accès direct `/posts/:id` sans écran blanc :** Un écran blanc provient généralement soit d'un serveur de fichiers qui renvoie 404 sur les URLs de deep-linking SPA (résolu par le repli Express vers `index.html`), soit d'un composant Angular qui utilise un snapshot figé non réactif ou une condition `@if/@else if` dont aucune branche n'est satisfaite quand les données sont nulles ou en erreur. La souscription à `route.paramMap`, combinée à un état explicite de chargement, d'erreur et un bloc `@else` d'ultime recours, garantit un rendu visuel utile en toute circonstance.
+  - **Comptage des commentaires et posts verrouillés :** Le décompte est réalisé par agrégation MongoDB `$lookup`/`$group` au niveau du document post sans exposer les documents de la collection `comments`. Ainsi, un visiteur peut savoir qu'un post restreint fait l'objet de 12 commentaires sans qu'aucune fuite de métadonnée (texte, auteur du commentaire) ne soit possible.
+
+
 

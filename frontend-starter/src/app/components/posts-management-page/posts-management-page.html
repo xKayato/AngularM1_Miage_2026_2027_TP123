@@ -342,7 +342,13 @@
           <div class="manager-header">
             <div>
               <span class="manager-title font-display">Pièces jointes du poste</span>
-              <p class="manager-desc">Cliquez sur « ↵ Insérer dans le texte » pour placer la pièce jointe à votre position dans le tutoriel.</p>
+              <p class="manager-desc">
+                @if (editingPostId()) {
+                  Cliquez sur « ↵ Insérer dans le texte » pour placer la pièce jointe à votre position dans le tutoriel.
+                } @else {
+                  Sélectionnez vos pièces jointes dès la création (images, PDF, audio). Elles seront téléversées automatiquement à l'enregistrement.
+                }
+              </p>
             </div>
             @if (currentEditingPost(); as post) {
               <button type="button" class="btn btn-secondary btn-sm" (click)="openAttachmentsModal(post)">
@@ -351,37 +357,97 @@
             }
           </div>
 
-          @if (currentEditingPost()?.attachments?.length) {
-            <div class="attachments-intext-grid">
-              @for (att of currentEditingPost()!.attachments; track att.id) {
-                <div class="intext-item-card">
-                  <div class="truncate">
-                    <span class="intext-file-title truncate">
-                      {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
-                      {{ att.originalName }}
-                    </span>
-                    <span class="intext-status-line">
-                      @if (isAttachmentInContent(att.originalName)) {
-                        <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
-                      } @else {
-                        <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
-                      }
-                    </span>
+          @if (editingPostId()) {
+            @if (currentEditingPost()?.attachments?.length) {
+              <div class="attachments-intext-grid">
+                @for (att of currentEditingPost()!.attachments; track att.id) {
+                  <div class="intext-item-card">
+                    <div class="truncate">
+                      <span class="intext-file-title truncate">
+                        {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                        {{ att.originalName }}
+                      </span>
+                      <span class="intext-status-line">
+                        @if (isAttachmentInContent(att.originalName)) {
+                          <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
+                        } @else {
+                          <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
+                        }
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-insert-inline"
+                      (click)="insertAttachmentInText(att.originalName, formatBytes(att.size))"
+                      title="Insérer dans le corps du texte"
+                    >
+                      ↵ Insérer dans le texte
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    class="btn-insert-inline"
-                    (click)="insertAttachmentInText(att.originalName, formatBytes(att.size))"
-                    title="Insérer dans le corps du texte"
-                  >
-                    ↵ Insérer dans le texte
-                  </button>
+                }
+              </div>
+            } @else {
+              <div class="empty-attachments-inline">
+                <span>Aucune pièce jointe sur ce poste. Vous pourrez téléverser vos fichiers PDF, images et audio avec le bouton ci-dessus.</span>
+              </div>
+            }
+          } @else {
+            <!-- Parcours direct de création : sélection préalable des pièces jointes -->
+            <div class="creation-attachments-box">
+              <div class="creation-file-picker">
+                <label for="creation-file-input" class="btn btn-outline btn-sm file-picker-label" tabindex="0">
+                  📁 Sélectionner des pièces jointes (max 10)
+                </label>
+                <input
+                  id="creation-file-input"
+                  type="file"
+                  multiple
+                  class="sr-only"
+                  (change)="onCreationFilesSelected($event)"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,.mp3,.wav,.ogg,.m4a"
+                />
+                <span class="file-picker-hint">
+                  Formats acceptés : Images (max 5 Mo), PDF (max 10 Mo), Audio (max 25 Mo). Cumul max 50 Mo.
+                </span>
+              </div>
+
+              @if (creationFilesError()) {
+                <div class="alert alert-error inline-alert" role="alert">
+                  ⚠️ {{ creationFilesError() }}
                 </div>
               }
-            </div>
-          } @else {
-            <div class="empty-attachments-inline">
-              <span>Aucune pièce jointe sur ce poste. Vous pourrez téléverser vos fichiers PDF, images et audio après avoir enregistré le brouillon.</span>
+
+              @if (creationSelectedFiles().length > 0) {
+                <div class="selected-files-list">
+                  <div class="selected-files-header">
+                    <strong>{{ creationSelectedFiles().length }} fichier{{ creationSelectedFiles().length > 1 ? 's' : '' }} prêt{{ creationSelectedFiles().length > 1 ? 's' : '' }} pour l'envoi :</strong>
+                    <span class="total-size">({{ formatBytes(totalCreationFilesSize()) }} au total)</span>
+                  </div>
+                  <div class="attachments-intext-grid">
+                    @for (file of creationSelectedFiles(); track file.name; let idx = $index) {
+                      <div class="intext-item-card creation-file-item">
+                        <div class="truncate">
+                          <span class="intext-file-title truncate">
+                            {{ getFileIcon(file.name) }} {{ file.name }}
+                          </span>
+                          <span class="intext-status-line text-muted">
+                            {{ formatBytes(file.size) }} • En attente
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          class="btn-remove-creation-file"
+                          (click)="removeCreationFile(idx)"
+                          title="Retirer ce fichier de la sélection"
+                          [disabled]="loading()"
+                        >
+                          ✕ Retirer
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
             </div>
           }
         </div>
@@ -417,6 +483,13 @@
           }
         </div>
 
+        @if (creationUploadProgress(); as progress) {
+          <div class="upload-progress-banner" role="status" aria-live="polite">
+            <div class="spinner-sm"></div>
+            <span>{{ progress.step }}</span>
+          </div>
+        }
+
         <div class="form-actions">
           <button
             type="button"
@@ -434,7 +507,7 @@
             @if (editingPostId()) {
               Enregistrer les modifications
             } @else {
-              Enregistrer le brouillon
+              {{ creationSelectedFiles().length > 0 ? 'Créer le post et téléverser les fichiers (' + creationSelectedFiles().length + ')' : 'Enregistrer le brouillon' }}
             }
           </button>
         </div>

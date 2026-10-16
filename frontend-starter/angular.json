@@ -10,6 +10,8 @@
                     "builder": "@angular/build:application",
                     "options": {
                         "browser": "src/main.ts",
+                        "index": "src/index.html",
+                        "baseHref": "/",
                         "tsConfig": "tsconfig.app.json",
                         "assets": [
                             {

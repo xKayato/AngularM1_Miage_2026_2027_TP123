@@ -17,6 +17,7 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'posts' },
   { path: 'posts', component: PostsPageComponent },
   { path: 'posts/:id', component: PostDetailPageComponent },
+  { path: 'post/:id', redirectTo: 'posts/:id' },
   { path: 'creators', component: CreatorsSearchPageComponent },
   { path: 'creators/:id', component: CreatorProfilePageComponent },
   { path: 'share/:token', component: SharedPostPageComponent },

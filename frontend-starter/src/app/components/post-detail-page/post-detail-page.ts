@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 import { PostService } from '../../shared/services/post.service';
 import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
@@ -24,6 +25,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   private readonly markdownService = inject(MarkdownService);
   private readonly sanitizer = inject(DomSanitizer);
   readonly auth = inject(AuthService);
+  private routeSub?: Subscription;
 
   readonly postId = signal<string>('');
   readonly postDetail = signal<PostDetail | null>(null);
@@ -78,18 +80,21 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   private readonly createdObjectUrls: string[] = [];
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (!id) {
-      this.error.set('Identifiant de projet manquant.');
-      this.loading.set(false);
-      return;
-    }
+    this.routeSub = this.route.paramMap.subscribe((params) => {
+      const id = params.get('id');
+      if (!id) {
+        this.error.set('Identifiant de projet manquant.');
+        this.loading.set(false);
+        return;
+      }
 
-    this.postId.set(id);
-    this.loadPost(id);
+      this.postId.set(id);
+      this.loadPost(id);
+    });
   }
 
   ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
     // Nettoyage impératif de toutes les URLs Blob créées en mémoire
     for (const url of this.createdObjectUrls) {
       URL.revokeObjectURL(url);
@@ -379,6 +384,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
         this.isPostingComment.set(false);
         this.commentText.set('');
         this.comments.update((prev) => [...prev, newComment]);
+        this.postDetail.update((p) => p ? { ...p, commentsCount: (p.commentsCount ?? 0) + 1 } : null);
       },
       error: (err) => {
         this.isPostingComment.set(false);
@@ -396,6 +402,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
       next: () => {
         this.isDeletingCommentId.set(null);
         this.comments.update((prev) => prev.filter((c) => c.id !== commentId));
+        this.postDetail.update((p) => p ? { ...p, commentsCount: Math.max(0, (p.commentsCount ?? 1) - 1) } : null);
       },
       error: (err) => {
         this.isDeletingCommentId.set(null);

@@ -46,6 +46,7 @@ describe('CreatorProfilePageComponent (Mission 1 — Profil Public Créateur)', 
         tags: ['dragon', 'stl'],
         visibility: 'public',
         likesCount: 15,
+        commentsCount: 4,
         attachmentsCount: 2,
         hasAudio: false,
         coverUrl: '/api/posts/post-1/attachments/att-1',
@@ -61,6 +62,7 @@ describe('CreatorProfilePageComponent (Mission 1 — Profil Public Créateur)', 
         tags: ['chevalier', 'vip'],
         visibility: 'subscribers',
         likesCount: 5,
+        commentsCount: 1,
         attachmentsCount: 1,
         hasAudio: false,
         coverUrl: null,
@@ -158,5 +160,27 @@ describe('CreatorProfilePageComponent (Mission 1 — Profil Public Créateur)', 
 
     expect(component.loading()).toBe(false);
     expect(component.error()).toContain('introuvable ou a été suspendu par la modération');
+  });
+
+  it('affiche les cartes de créations avec le lien étendu et le compteur de commentaires sans bouton redondant', () => {
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cards = compiled.querySelectorAll('.post-preview-card');
+    expect(cards.length).toBe(2);
+
+    // Vérification du lien étendu
+    const stretchedLink = compiled.querySelector('.card-stretched-link');
+    expect(stretchedLink).not.toBeNull();
+    expect(stretchedLink?.textContent).toContain('Figurine Dragon 3D');
+
+    // Vérification du compteur de commentaires
+    const commentsTags = compiled.querySelectorAll('.comments-tag');
+    expect(commentsTags.length).toBe(2);
+    expect(commentsTags[0].textContent).toContain('💬 4');
+    expect(commentsTags[1].textContent).toContain('💬 1');
+
+    // Vérification de la suppression du bouton redondant "Consulter le projet"
+    const redundantBtn = compiled.querySelector('.btn-consult');
+    expect(redundantBtn).toBeNull();
   });
 });

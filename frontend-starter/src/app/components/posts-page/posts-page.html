@@ -241,7 +241,7 @@
             </div>
 
             <h2 class="post-title">
-              <a [routerLink]="['/posts', post.id]">{{ post.title }}</a>
+              <a [routerLink]="['/posts', post.id]" class="card-stretched-link">{{ post.title }}</a>
             </h2>
 
             <p class="post-desc">{{ post.shortDescription }}</p>
@@ -251,7 +251,7 @@
               @for (tag of post.tags; track tag) {
                 <button
                   type="button"
-                  class="tag"
+                  class="tag card-interactive-element"
                   [class.tag-active]="selectedTag() === tag.toLowerCase()"
                   (click)="selectTag(tag)"
                   [title]="'Filtrer par #' + tag"
@@ -261,20 +261,20 @@
               }
             </div>
 
-            <!-- Pied de carte : Auteur avec avatar & Likes -->
+            <!-- Pied de carte : Auteur avec avatar & Likes & Commentaires -->
             <div class="card-footer">
-              <a [routerLink]="['/creators', post.author.id]" class="author-link" [title]="'Voir le profil de ' + post.author.name">
+              <a [routerLink]="['/creators', post.author.id]" class="author-link card-interactive-element" [title]="'Voir le profil de ' + post.author.name">
                 <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
                 <span class="author-name">{{ post.author.name }}</span>
               </a>
 
-              <div class="card-actions">
+              <div class="card-actions card-interactive-element">
+                <span class="comments-pill" title="Commentaires">
+                  💬 {{ post.commentsCount }}
+                </span>
                 <span class="likes-pill" title="Mentions J'aime">
                   <span class="heart-icon">♥</span> {{ post.likesCount }}
                 </span>
-                <a [routerLink]="['/posts', post.id]" class="btn-view">
-                  {{ post.isLocked ? 'Voir l’aperçu' : 'Voir le projet' }}
-                </a>
               </div>
             </div>
           </div>

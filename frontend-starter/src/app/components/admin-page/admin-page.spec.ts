@@ -54,6 +54,7 @@ describe('AdminPageComponent', () => {
     visibility: 'public',
     status: 'published',
     likesCount: 5,
+    commentsCount: 2,
     attachments: [],
     userInteractions: {
       isLiked: false,

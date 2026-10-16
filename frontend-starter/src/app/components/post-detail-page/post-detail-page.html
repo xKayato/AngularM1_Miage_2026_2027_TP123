@@ -514,5 +514,11 @@
         </aside>
       </div>
     </article>
+  } @else {
+    <div class="alert alert-error" role="alert">
+      <h2>Projet indisponible</h2>
+      <p>Impossible d’afficher ce projet. Vérifiez l’adresse ou explorez les créations disponibles.</p>
+      <a routerLink="/posts" class="btn-primary">Explorer les créations disponibles</a>
+    </div>
   }
 </div>

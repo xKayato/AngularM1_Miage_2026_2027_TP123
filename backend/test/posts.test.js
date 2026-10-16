@@ -6,6 +6,7 @@ import { createApp } from "../src/app.js";
 import { User } from "../src/models/User.js";
 import { Post } from "../src/models/Post.js";
 import { Like } from "../src/models/Like.js";
+import { Comment } from "../src/models/Comment.js";
 
 let server, base;
 const JWT_SECRET = "tp1-development-secret";
@@ -71,6 +72,8 @@ const originalPostCountDocuments = Post.countDocuments;
 const originalPostPrototypeSave = Post.prototype.save;
 const originalLikeCountDocuments = Like.countDocuments;
 const originalLikeAggregate = Like.aggregate;
+const originalCommentCountDocuments = Comment.countDocuments;
+const originalCommentAggregate = Comment.aggregate;
 
 test.beforeEach(() => {
   resetMemoryStore();
@@ -99,6 +102,9 @@ test.beforeEach(() => {
     const result = Array.from(grouped.entries()).map(([k, v]) => ({ _id: k, count: v }));
     return Promise.resolve(result);
   };
+
+  Comment.countDocuments = () => Promise.resolve(0);
+  Comment.aggregate = () => Promise.resolve([]);
 
   Post.prototype.save = function () {
     const raw = this.toObject();
@@ -183,6 +189,8 @@ test.after(() => {
   Post.prototype.save = originalPostPrototypeSave;
   Like.countDocuments = originalLikeCountDocuments;
   Like.aggregate = originalLikeAggregate;
+  Comment.countDocuments = originalCommentCountDocuments;
+  Comment.aggregate = originalCommentAggregate;
 });
 
 test("Mission 2 — Authentification et contrôle des comptes", async (t) => {

@@ -83,6 +83,13 @@ export function toPostPreview(post, options = {}) {
     );
   }
 
+  let commentsCount = 0;
+  if (typeof options.commentsCount === "number") {
+    commentsCount = Math.max(0, options.commentsCount);
+  } else if (typeof raw.commentsCount === "number") {
+    commentsCount = Math.max(0, raw.commentsCount);
+  }
+
   return {
     id: postId,
     author: authorObj,
@@ -92,6 +99,7 @@ export function toPostPreview(post, options = {}) {
     tags: Array.isArray(raw.tags) ? raw.tags : [],
     visibility,
     likesCount,
+    commentsCount,
     attachmentsCount,
     hasAudio,
     coverUrl,
@@ -108,6 +116,7 @@ export function toPostPreview(post, options = {}) {
  * @param {Object} [options]
  * @param {Object} [options.userInteractions] - Interactions de l'utilisateur courant
  * @param {number} [options.likesCount] - Nombre de likes précalculé
+ * @param {number} [options.commentsCount] - Nombre de commentaires précalculé
  * @param {string} [options.authorName] - Nom d'auteur de repli si author non peuplé
  * @returns {Object} PostDetail conforme au contrat
  */
@@ -161,6 +170,13 @@ export function toPostDetail(post, options = {}) {
     );
   }
 
+  let commentsCount = 0;
+  if (typeof options.commentsCount === "number") {
+    commentsCount = Math.max(0, options.commentsCount);
+  } else if (typeof raw.commentsCount === "number") {
+    commentsCount = Math.max(0, raw.commentsCount);
+  }
+
   return {
     id: postId,
     author: authorObj,
@@ -172,6 +188,7 @@ export function toPostDetail(post, options = {}) {
     visibility: raw.visibility,
     status: raw.status,
     likesCount,
+    commentsCount,
     attachments,
     userInteractions: {
       ...defaultInteractions,

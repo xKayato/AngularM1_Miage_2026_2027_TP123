@@ -287,13 +287,19 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     const posts = facetResult[0]?.docs || [];
     const totalPages = Math.ceil(totalDocs / limit) || 1;
 
-    // 7. Calcul dynamique des likes via collection Like (pas de compteur dénormalisé sur Post)
+    // 7. Calcul dynamique des likes et commentaires via collections dédiées
     const postIds = posts.map((p) => p._id);
     const likeCounts = await Like.aggregate([
       { $match: { postId: { $in: postIds } } },
       { $group: { _id: "$postId", count: { $sum: 1 } } },
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
+
+    const commentCounts = await Comment.aggregate([
+      { $match: { postId: { $in: postIds } } },
+      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    ]);
+    const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
 
     // 8. Résolution des relations de l'utilisateur connecté (follows et abonnements actifs)
     let followingSet = new Set();
@@ -338,6 +344,7 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       return toPostPreview(post, {
         isLocked,
         likesCount: likesMap.get(String(post._id)) || 0,
+        commentsCount: commentsMap.get(String(post._id)) || 0,
         authorName: post.author.name,
       });
     });
@@ -395,9 +402,16 @@ postsRouter.get("/my", authMakerShare, async (req, res, next) => {
     ]);
     const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
 
+    const commentCounts = await Comment.aggregate([
+      { $match: { postId: { $in: postIds } } },
+      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    ]);
+    const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
+
     const docs = posts.map((p) =>
       toPostAuthorManagement(p, {
         likesCount: likesMap.get(String(p._id)) || 0,
+        commentsCount: commentsMap.get(String(p._id)) || 0,
         authorName: p.author?.name || req.user.name,
       })
     );
@@ -450,6 +464,7 @@ postsRouter.post("/", authMakerShare, async (req, res, next) => {
     res.status(201).json(
       toPostAuthorManagement(newPost, {
         likesCount,
+        commentsCount: 0,
         authorName: req.user.name,
       })
     );
@@ -527,9 +542,12 @@ postsRouter.get("/shared/:token", optionalAuthMakerShare, async (req, res, next)
       };
     }
 
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
+
     res.json(
       toPostDetail(post, {
         likesCount,
+        commentsCount,
         userInteractions,
         authorName: post.author?.name,
         isAuthor,
@@ -571,6 +589,7 @@ postsRouter.get("/:id/preview", optionalAuthMakerShare, async (req, res, next) =
     }
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     let isLocked = true;
     if (post.visibility === "public" || isAuthor) {
@@ -595,6 +614,7 @@ postsRouter.get("/:id/preview", optionalAuthMakerShare, async (req, res, next) =
       toPostPreview(post, {
         isLocked,
         likesCount,
+        commentsCount,
         authorName: post.author?.name,
       })
     );
@@ -621,6 +641,7 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     }
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     let userInteractions = {
       isLiked: false,
@@ -657,6 +678,7 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     res.json(
       toPostDetail(post, {
         likesCount,
+        commentsCount,
         userInteractions,
         authorName: post.author?.name,
         isAuthor: access.isAuthor,
@@ -943,10 +965,12 @@ postsRouter.put("/:id", authMakerShare, async (req, res, next) => {
     await post.save();
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: req.user.name,
       })
     );
@@ -988,10 +1012,12 @@ postsRouter.post("/:id/publish", authMakerShare, async (req, res, next) => {
     await post.save();
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: req.user.name,
       })
     );
@@ -1023,10 +1049,12 @@ postsRouter.post("/:id/unpublish", authMakerShare, async (req, res, next) => {
     await post.save();
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: req.user.name,
       })
     );
@@ -1399,7 +1427,8 @@ postsRouter.put("/:id/cover", authMakerShare, async (req, res, next) => {
     }
 
     const likesCount = await Like.countDocuments({ postId: updatedPost._id });
-    return res.status(200).json(toPostAuthorManagement(updatedPost, { likesCount }));
+    const commentsCount = await Comment.countDocuments({ postId: updatedPost._id });
+    return res.status(200).json(toPostAuthorManagement(updatedPost, { likesCount, commentsCount }));
   } catch (err) {
     next(err);
   }

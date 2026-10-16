@@ -302,4 +302,20 @@ describe('ProfilePageComponent', () => {
     expect(component.follows().length).toBe(0);
     expect(component.totalFollows()).toBe(0);
   });
+
+  it('affiche un contrôle unique et accessible pour l avatar sans doublon du bouton Parcourir natif', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const fileInputs = compiled.querySelectorAll('input[type="file"]');
+    expect(fileInputs.length).toBe(1);
+
+    const fileInput = fileInputs[0] as HTMLInputElement;
+    expect(fileInput.id).toBe('avatar-file-input');
+    expect(fileInput.classList.contains('sr-only')).toBe(true);
+
+    const labels = compiled.querySelectorAll('label[for="avatar-file-input"]');
+    expect(labels.length).toBe(1);
+    const label = labels[0] as HTMLElement;
+    expect(label.textContent).toContain('Mettre à jour la photo de profil');
+    expect(label.getAttribute('tabindex')).toBe('0');
+  });
 });

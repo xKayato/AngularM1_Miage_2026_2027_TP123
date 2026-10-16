@@ -29,6 +29,7 @@ describe('SharedPostPageComponent', () => {
     status: 'published',
     author: { id: 'author-99', name: 'SecretMaker' },
     likesCount: 5,
+    commentsCount: 1,
     userInteractions: {
       isLiked: false,
       isFollowingAuthor: false,

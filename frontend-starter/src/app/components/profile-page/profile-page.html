@@ -24,17 +24,27 @@
         </div>
 
         <div class="avatar-actions">
-          <label for="avatar-file-input" class="btn-secondary btn-upload-label">
-            📷 {{ uploadingAvatar() ? 'Téléversement...' : 'Changer la photo' }}
-          </label>
           <input
             id="avatar-file-input"
+            #avatarFileInput
             type="file"
             accept="image/jpeg,image/png,image/webp"
             (change)="onAvatarFileSelected($event)"
             [disabled]="uploadingAvatar() || deletingAvatar()"
             class="sr-only"
+            aria-label="Mettre à jour la photo de profil"
           />
+          <label
+            for="avatar-file-input"
+            class="btn-secondary btn-upload-label"
+            tabindex="0"
+            (keydown.enter)="avatarFileInput.click()"
+            (keydown.space)="$event.preventDefault(); avatarFileInput.click()"
+            role="button"
+            aria-controls="avatar-file-input"
+          >
+            📷 {{ uploadingAvatar() ? 'Téléversement...' : 'Mettre à jour la photo de profil' }}
+          </label>
 
           @if (user.hasAvatar) {
             <button

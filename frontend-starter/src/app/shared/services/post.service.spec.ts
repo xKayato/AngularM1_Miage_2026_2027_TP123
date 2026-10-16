@@ -28,6 +28,7 @@ describe('PostService', () => {
     tags: ['lego', 'diy'],
     visibility: 'public',
     likesCount: 12,
+    commentsCount: 3,
     attachmentsCount: 2,
     hasAudio: false,
     coverUrl: '/api/posts/post-1/attachments/att-1',
@@ -46,6 +47,7 @@ describe('PostService', () => {
     visibility: 'public',
     status: 'published',
     likesCount: 12,
+    commentsCount: 3,
     attachments: [
       {
         id: 'att-1',

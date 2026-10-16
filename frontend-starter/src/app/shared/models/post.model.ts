@@ -27,6 +27,7 @@ export interface PostPreview {
   tags: string[];
   visibility: 'public' | 'followers' | 'subscribers';
   likesCount: number;
+  commentsCount: number;
   attachmentsCount: number;
   hasAudio: boolean;
   coverUrl: string | null;
@@ -63,6 +64,7 @@ export interface PostDetail {
   visibility: PostVisibility;
   status: PostStatus;
   likesCount: number;
+  commentsCount: number;
   attachments: AttachmentInfo[];
   userInteractions: UserInteractions;
   publishedAt: string | null;

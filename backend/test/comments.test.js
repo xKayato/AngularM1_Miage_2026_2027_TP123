@@ -373,4 +373,79 @@ test.describe("Mission 4 — Commentaires Sécurisés (/api/posts/:id/comments)"
     });
     assert.strictEqual(resPost.status, 403);
   });
+
+  test("Point 4 — commentsCount est fourni dans les listes, aperçus et détails, et s'actualise après ajout/suppression", async () => {
+    const { post, authorToken, commenterToken } = await createUsersAndPost({ visibility: "public" });
+
+    // 1. Avant tout commentaire : commentsCount === 0
+    const resDetailInitial = await fetch(`${base}/api/posts/${post._id}`, {
+      headers: { Authorization: `Bearer ${authorToken}` },
+    });
+    const detailInitial = await resDetailInitial.json();
+    assert.strictEqual(detailInitial.commentsCount, 0);
+
+    const resListInitial = await fetch(`${base}/api/posts`);
+    const listInitial = await resListInitial.json();
+    const catalogPostInitial = listInitial.docs.find((p) => String(p.id) === String(post._id));
+    assert.ok(catalogPostInitial);
+    assert.strictEqual(catalogPostInitial.commentsCount, 0);
+
+    // 2. Ajout de 2 commentaires
+    const resAdd1 = await fetch(`${base}/api/posts/${post._id}/comments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${commenterToken}`,
+      },
+      body: JSON.stringify({ text: "Premier commentaire" }),
+    });
+    assert.strictEqual(resAdd1.status, 201);
+    const comment1 = await resAdd1.json();
+
+    const resAdd2 = await fetch(`${base}/api/posts/${post._id}/comments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${commenterToken}`,
+      },
+      body: JSON.stringify({ text: "Deuxième commentaire" }),
+    });
+    assert.strictEqual(resAdd2.status, 201);
+
+    // 3. Vérification du compteur à 2 dans le détail et dans la liste
+    const resDetailAfter = await fetch(`${base}/api/posts/${post._id}`, {
+      headers: { Authorization: `Bearer ${authorToken}` },
+    });
+    const detailAfter = await resDetailAfter.json();
+    assert.strictEqual(detailAfter.commentsCount, 2);
+
+    const resListAfter = await fetch(`${base}/api/posts`);
+    const listAfter = await resListAfter.json();
+    const catalogPostAfter = listAfter.docs.find((p) => String(p.id) === String(post._id));
+    assert.strictEqual(catalogPostAfter.commentsCount, 2);
+
+    // 4. Vérification dans l'aperçu verrouillé (/preview) sans fuite de contenu
+    const resPreview = await fetch(`${base}/api/posts/${post._id}/preview`);
+    const preview = await resPreview.json();
+    assert.strictEqual(preview.commentsCount, 2);
+    assert.strictEqual(preview.content, undefined);
+
+    // 5. Suppression d'un commentaire -> commentsCount redescend à 1
+    const resDel = await fetch(`${base}/api/posts/${post._id}/comments/${comment1.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${commenterToken}` },
+    });
+    assert.strictEqual(resDel.status, 200);
+
+    const resDetailFinal = await fetch(`${base}/api/posts/${post._id}`, {
+      headers: { Authorization: `Bearer ${authorToken}` },
+    });
+    const detailFinal = await resDetailFinal.json();
+    assert.strictEqual(detailFinal.commentsCount, 1);
+
+    const resListFinal = await fetch(`${base}/api/posts`);
+    const listFinal = await resListFinal.json();
+    const catalogPostFinal = listFinal.docs.find((p) => String(p.id) === String(post._id));
+    assert.strictEqual(catalogPostFinal.commentsCount, 1);
+  });
 });

@@ -70,6 +70,14 @@ export class PostsManagementPageComponent implements OnInit {
   readonly uploadingAttachments = signal<boolean>(false);
   readonly attachmentsError = signal<string | null>(null);
 
+  // Téléversement transparent des pièces jointes dès la création initiale
+  readonly creationSelectedFiles = signal<File[]>([]);
+  readonly creationFilesError = signal<string | null>(null);
+  readonly creationUploadProgress = signal<{ step: string } | null>(null);
+  readonly totalCreationFilesSize = computed(() =>
+    this.creationSelectedFiles().reduce((sum, f) => sum + f.size, 0)
+  );
+
   // Pagination
   readonly currentPage = signal<number>(1);
   readonly totalPages = signal<number>(1);
@@ -140,6 +148,9 @@ export class PostsManagementPageComponent implements OnInit {
     this.editingPostId.set(null);
     this.error.set(null);
     this.successMessage.set(null);
+    this.creationSelectedFiles.set([]);
+    this.creationFilesError.set(null);
+    this.creationUploadProgress.set(null);
     this.postForm.reset({
       title: '',
       shortDescription: '',
@@ -159,6 +170,9 @@ export class PostsManagementPageComponent implements OnInit {
     this.editingPostId.set(post.id);
     this.error.set(null);
     this.successMessage.set(null);
+    this.creationSelectedFiles.set([]);
+    this.creationFilesError.set(null);
+    this.creationUploadProgress.set(null);
     this.postForm.patchValue({
       title: post.title,
       shortDescription: post.shortDescription,
@@ -173,6 +187,42 @@ export class PostsManagementPageComponent implements OnInit {
     this.currentView.set('list');
     this.editingPostId.set(null);
     this.error.set(null);
+    this.creationSelectedFiles.set([]);
+    this.creationFilesError.set(null);
+    this.creationUploadProgress.set(null);
+  }
+
+  onCreationFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const newFiles = Array.from(input.files);
+    const existing = this.creationSelectedFiles();
+    const combined = [...existing, ...newFiles];
+
+    const validation = this.validateSelectedFiles(combined, []);
+    if (!validation.valid) {
+      this.creationFilesError.set(validation.error);
+      input.value = '';
+      return;
+    }
+
+    this.creationFilesError.set(null);
+    this.creationSelectedFiles.set(combined);
+    input.value = '';
+  }
+
+  removeCreationFile(index: number): void {
+    this.creationSelectedFiles.update((files) => files.filter((_, i) => i !== index));
+    this.creationFilesError.set(null);
+  }
+
+  getFileIcon(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return '🖼️';
+    if (ext === 'pdf') return '📄';
+    if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return '🎵';
+    return '📎';
   }
 
   onSubmit(): void {
@@ -229,22 +279,70 @@ export class PostsManagementPageComponent implements OnInit {
         tags,
       };
 
-      this.postService.createPost(dto).subscribe({
-        next: (created) => {
-          this.loading.set(false);
-          this.successMessage.set(
-            `Brouillon "${created.title}" créé avec succès !`,
-          );
-          this.currentView.set('list');
-          this.loadPosts(1);
-        },
-        error: (err) => {
-          this.loading.set(false);
-          this.error.set(
-            err.error?.message || 'Erreur lors de la création du brouillon.',
-          );
-        },
-      });
+      const filesToUpload = this.creationSelectedFiles();
+
+      if (filesToUpload.length === 0) {
+        this.postService.createPost(dto).subscribe({
+          next: (created) => {
+            this.loading.set(false);
+            this.successMessage.set(
+              `Brouillon "${created.title}" créé avec succès !`,
+            );
+            this.currentView.set('list');
+            this.loadPosts(1);
+          },
+          error: (err) => {
+            this.loading.set(false);
+            this.error.set(
+              err.error?.message || 'Erreur lors de la création du brouillon.',
+            );
+          },
+        });
+      } else {
+        this.creationUploadProgress.set({
+          step: `Étape 1/2 : Enregistrement du brouillon...`,
+        });
+
+        this.postService.createPost(dto).subscribe({
+          next: (created) => {
+            this.creationUploadProgress.set({
+              step: `Étape 2/2 : Téléversement automatique de ${filesToUpload.length} pièce(s) jointe(s)...`,
+            });
+
+            this.postService.uploadAttachments(created.id, filesToUpload).subscribe({
+              next: (added) => {
+                this.loading.set(false);
+                this.creationUploadProgress.set(null);
+                this.creationSelectedFiles.set([]);
+                this.successMessage.set(
+                  `Projet "${created.title}" créé avec succès avec ${added.length} pièce(s) jointe(s) !`,
+                );
+                this.currentView.set('list');
+                this.loadPosts(1);
+              },
+              error: (uploadErr) => {
+                this.loading.set(false);
+                this.creationUploadProgress.set(null);
+                this.creationSelectedFiles.set([]);
+                this.currentView.set('list');
+                this.loadPosts(1);
+                this.error.set(
+                  `Le brouillon "${created.title}" a bien été créé, mais l'envoi des pièces jointes a échoué : ${
+                    uploadErr.error?.message || "Erreur réseau lors de l'envoi des fichiers"
+                  }. Vous pouvez retenter l'envoi depuis vos postes.`,
+                );
+              },
+            });
+          },
+          error: (err) => {
+            this.loading.set(false);
+            this.creationUploadProgress.set(null);
+            this.error.set(
+              err.error?.message || 'Erreur lors de la création du brouillon.',
+            );
+          },
+        });
+      }
     }
   }
 

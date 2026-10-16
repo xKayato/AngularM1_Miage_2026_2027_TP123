@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { User } from "../models/User.js";
 import { Post } from "../models/Post.js";
 import { Like } from "../models/Like.js";
+import { Comment } from "../models/Comment.js";
 import { authMakerShare } from "../middlewares/authMakerShare.js";
 import { toPostAuthorManagement } from "../utils/postProjections.js";
 
@@ -59,10 +60,12 @@ adminRouter.patch("/posts/:id/archive", async (req, res, next) => {
     await post.save();
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.status(200).json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: post.author?.name,
       })
     );
@@ -93,10 +96,12 @@ adminRouter.patch("/posts/:id/restore", async (req, res, next) => {
     await post.save();
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.status(200).json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: post.author?.name,
       })
     );
@@ -206,10 +211,12 @@ adminRouter.get("/posts/:id", async (req, res, next) => {
     }
 
     const likesCount = await Like.countDocuments({ postId: post._id });
+    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.status(200).json(
       toPostAuthorManagement(post, {
         likesCount,
+        commentsCount,
         authorName: post.author?.name,
       })
     );

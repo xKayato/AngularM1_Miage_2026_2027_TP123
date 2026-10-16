@@ -940,6 +940,18 @@ export function createApp() {
     }
   });
 
+  // Repli SPA Angular pour l'accès direct aux routes frontend (/posts/:id, etc.)
+  const staticPath = process.env.STATIC_DIR || path.resolve("../frontend-starter/dist/gpc/browser");
+  if (fs.existsSync(staticPath)) {
+    app.use(express.static(staticPath));
+    app.use((req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api")) return next();
+      res.sendFile(path.join(staticPath, "index.html"), (err) => {
+        if (err && !res.headersSent) next(err);
+      });
+    });
+  }
+
   /** Gestionnaire central des erreurs connues de l'application. */
   app.use((error, _req, res, next) => {
     console.error("[error] Erreur reçue par le gestionnaire central", error);

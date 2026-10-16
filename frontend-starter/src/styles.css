@@ -434,3 +434,38 @@ html.dark .alert-warning {
   }
 }
 
+/* Utilitaires Accessibilité (WCAG) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Lien étendu couvrant toute la carte tout en préservant l'accessibilité */
+.card-stretched-link::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+}
+
+/* Éléments interactifs internes qui conservent leur propre clic au-dessus du lien étendu */
+.card-interactive-element,
+.card-actions a,
+.card-actions button,
+.author-link,
+.tags-row button,
+.tags-row a {
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+

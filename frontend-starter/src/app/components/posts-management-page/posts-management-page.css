@@ -826,3 +826,110 @@ html.dark .status-published {
   border-color: var(--border-color);
 }
 
+/* Styles pour téléversement direct des pièces jointes à la création */
+.creation-attachments-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.creation-file-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.file-picker-label {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.file-picker-label:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.file-picker-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.inline-alert {
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.selected-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+}
+
+.selected-files-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.selected-files-header .total-size {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.creation-file-item {
+  border-left: 3px solid var(--brand-primary);
+}
+
+.btn-remove-creation-file {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: #DC2626;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-remove-creation-file:hover:not(:disabled) {
+  background-color: #FEE2E2;
+  border-color: #FCA5A5;
+}
+
+.upload-progress-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--brand-light);
+  border: 1px solid var(--brand-primary);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.spinner-sm {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(200, 90, 50, 0.25);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+

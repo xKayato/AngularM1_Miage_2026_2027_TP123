@@ -84,6 +84,13 @@
   gap: 0.4rem;
   cursor: pointer;
   margin: 0;
+  user-select: none;
+}
+
+.btn-upload-label:focus-visible,
+#avatar-file-input:focus-visible + .btn-upload-label {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 .btn-danger-outline {

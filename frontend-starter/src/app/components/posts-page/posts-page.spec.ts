@@ -24,6 +24,7 @@ describe('PostsPageComponent', () => {
     visibility: 'public',
     author: { id: 'author-1', name: 'GuitarMaker' },
     likesCount: 12,
+    commentsCount: 5,
     attachmentsCount: 2,
     hasAudio: false,
     coverUrl: null,
@@ -40,6 +41,7 @@ describe('PostsPageComponent', () => {
     visibility: 'public',
     author: { id: 'author-2', name: 'PaperMaster' },
     likesCount: 25,
+    commentsCount: 8,
     attachmentsCount: 1,
     hasAudio: false,
     coverUrl: null,
@@ -386,6 +388,30 @@ describe('PostsPageComponent', () => {
     expect(component.suggestionsError()).toBe('Erreur réseau suggestion');
     // Le catalogue reste intact
     expect(component.error()).toBeNull();
+  });
+
+  it('affiche les cartes du catalogue avec le lien étendu et le badge de commentaires sans bouton redondant', () => {
+    component.posts.set([mockPostPreview1, mockPostPreview2]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const cards = compiled.querySelectorAll('.catalogue-card');
+    expect(cards.length).toBe(2);
+
+    const stretchedLinks = compiled.querySelectorAll('.card-stretched-link');
+    expect(stretchedLinks.length).toBe(2);
+    const titles = Array.from(stretchedLinks).map((el) => el.textContent?.trim());
+    expect(titles).toContain('Guitare Lego Custom');
+    expect(titles).toContain('Faucon Millenium Papercraft');
+
+    const commentsPills = compiled.querySelectorAll('.comments-pill');
+    expect(commentsPills.length).toBe(2);
+    const commentTexts = Array.from(commentsPills).map((el) => el.textContent?.trim());
+    expect(commentTexts).toContain('💬 5');
+    expect(commentTexts).toContain('💬 8');
+
+    // Vérification de la suppression de l'ancien bouton redondant
+    expect(compiled.querySelector('.btn-view')).toBeNull();
   });
 
   it('nettoie les abonnements lors de la destruction (ngOnDestroy)', () => {

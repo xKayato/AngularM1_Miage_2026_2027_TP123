@@ -43,6 +43,7 @@ describe('PostDetailPageComponent', () => {
     status: 'published',
     author: { id: 'author-1', name: 'HendrixMaker' },
     likesCount: 15,
+    commentsCount: 3,
     userInteractions: {
       isLiked: false,
       isFollowingAuthor: false,
@@ -92,6 +93,7 @@ describe('PostDetailPageComponent', () => {
     visibility: 'subscribers',
     author: { id: 'author-1', name: 'HendrixMaker' },
     likesCount: 15,
+    commentsCount: 3,
     attachmentsCount: 2,
     hasAudio: true,
     coverUrl: null,
@@ -148,6 +150,7 @@ describe('PostDetailPageComponent', () => {
             snapshot: {
               paramMap: convertToParamMap({ id: 'post-1' }),
             },
+            paramMap: of(convertToParamMap({ id: 'post-1' })),
           },
         },
       ],
@@ -488,6 +491,50 @@ describe('PostDetailPageComponent', () => {
       component.closePdfViewer();
       expect(component.activePdfAttachment()).toBe(null);
       expect(component.safePdfBlobUrl()).toBe(null);
+    });
+
+    it('met à jour réactivement commentsCount lors de l ajout et de la suppression d un commentaire', () => {
+      fixture.detectChanges();
+      expect(component.postDetail()?.commentsCount).toBe(3);
+
+      // Ajout de commentaire
+      component.commentText.set('Nouveau commentaire de test');
+      component.submitComment();
+      expect(postServiceMock.addComment).toHaveBeenCalledWith('post-1', 'Nouveau commentaire de test');
+      expect(component.postDetail()?.commentsCount).toBe(4);
+
+      // Suppression de commentaire
+      component.deleteComment('c-1');
+      expect(postServiceMock.deleteComment).toHaveBeenCalledWith('post-1', 'c-1');
+      expect(component.postDetail()?.commentsCount).toBe(3);
+    });
+
+    it('affiche un état de repli explicite (jamais de page blanche) en cas d erreur 404', () => {
+      postServiceMock.getPostDetail.mockReturnValue(throwError(() => ({ status: 404 })));
+      postServiceMock.getPostPreview.mockReturnValue(throwError(() => ({ status: 404 })));
+
+      component.loadPost('unknown-id');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBe(false);
+      expect(component.error()).toContain('introuvable');
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.alert-error')).not.toBeNull();
+      expect(compiled.textContent).toContain('Projet introuvable ou retiré');
+    });
+
+    it('affiche un état de repli explicite en cas d erreur 410 (projet archivé)', () => {
+      postServiceMock.getPostDetail.mockReturnValue(throwError(() => ({ status: 410 })));
+      postServiceMock.getPostPreview.mockReturnValue(throwError(() => ({ status: 410 })));
+
+      component.loadPost('archived-id');
+      fixture.detectChanges();
+
+      expect(component.loading()).toBe(false);
+      expect(component.error()).toContain('archivé');
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.alert-error')).not.toBeNull();
+      expect(compiled.textContent).toContain('Ce projet a été archivé par la modération');
     });
   });
 });
