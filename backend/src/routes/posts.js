@@ -41,26 +41,48 @@ export const postsRouter = Router();
  */
 postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
   try {
-    // 1. Validation stricte des paramètres de pagination
+    // 0. Validation du mode de recherche (catalog ou suggest)
+    const mode = req.query.mode ? String(req.query.mode).trim() : "catalog";
+    if (mode !== "catalog" && mode !== "suggest") {
+      return res.status(400).json({
+        message: "Le paramètre mode doit valoir 'suggest' ou être omis.",
+      });
+    }
+
+    if (mode === "suggest") {
+      if (!req.query.query || typeof req.query.query !== "string" || !req.query.query.trim()) {
+        return res.status(400).json({
+          message: "Le paramètre query est obligatoire en mode suggestion.",
+        });
+      }
+    }
+
+    // 1. Validation de la pagination
     if (req.query.page !== undefined) {
       const p = Number(req.query.page);
       if (!Number.isInteger(p) || p < 1) {
         return res.status(400).json({
-          message: "Le paramètre page doit être un entier positif supérieur ou égal à 1.",
+          message: "Le paramètre page doit être un entier supérieur ou égal à 1.",
         });
       }
     }
     if (req.query.limit !== undefined) {
       const l = Number(req.query.limit);
-      if (!Number.isInteger(l) || l < 1 || l > 50) {
+      const maxLimit = mode === "suggest" ? 5 : 20;
+      if (!Number.isInteger(l) || l < 1 || l > maxLimit) {
         return res.status(400).json({
-          message: "Le paramètre limit doit être un entier compris entre 1 et 50.",
+          message:
+            mode === "suggest"
+              ? "En mode suggestion, le paramètre limit doit être un entier compris entre 1 et 5."
+              : "Le paramètre limit doit être un entier compris entre 1 et 20.",
         });
       }
     }
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const defaultLimit = mode === "suggest" ? 5 : 10;
+    const maxLimit = mode === "suggest" ? 5 : 20;
+    const limit = Math.min(maxLimit, Math.max(1, parseInt(req.query.limit, 10) || defaultLimit));
     const offset = (page - 1) * limit;
 
     // 2. Validation de la catégorie si fournie
@@ -114,17 +136,54 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
 
       // Étape 1 : $search si recherche textuelle et Atlas Search activé
       if (useAtlasSearch && textQuery) {
-        const compoundClauses = {
-          must: [
+        let compoundClauses;
+
+        if (mode === "suggest") {
+          // Mode suggestion : autocomplétion sur title avec priorité au préfixe exact
+          const shouldClauses = [
             {
-              text: {
+              autocomplete: {
                 query: textQuery,
-                path: ["title", "shortDescription"],
-                fuzzy: { maxEdits: 1, prefixLength: 1 },
+                path: "title",
+                score: { boost: { value: 3 } },
               },
             },
-          ],
-        };
+          ];
+
+          // Tolérance aux fautes (fuzzy) activée uniquement à partir de 3 caractères
+          if (textQuery.length >= 3) {
+            shouldClauses.push({
+              autocomplete: {
+                query: textQuery,
+                path: "title",
+                fuzzy: {
+                  maxEdits: 1,
+                  prefixLength: 2,
+                  maxExpansions: 50,
+                },
+                score: { boost: { value: 1 } },
+              },
+            });
+          }
+
+          compoundClauses = {
+            should: shouldClauses,
+            minimumShouldMatch: 1,
+          };
+        } else {
+          // Mode catalogue : recherche plein texte standard avec analyseur français
+          compoundClauses = {
+            must: [
+              {
+                text: {
+                  query: textQuery,
+                  path: ["title", "shortDescription"],
+                  fuzzy: { maxEdits: 1, prefixLength: 1 },
+                },
+              },
+            ],
+          };
+        }
 
         const filterClauses = [];
         if (category) {
@@ -170,10 +229,15 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       // Si Atlas Search n'a pas été utilisé mais qu'une recherche textuelle est demandée (repli regex)
       if (!useAtlasSearch && textQuery) {
         const escaped = textQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        matchStage.$or = [
-          { title: { $regex: escaped, $options: "i" } },
-          { shortDescription: { $regex: escaped, $options: "i" } },
-        ];
+        if (mode === "suggest") {
+          // En mode suggestion : préfixe de mot insensible à la casse sur title
+          matchStage.title = { $regex: `\\b${escaped}`, $options: "i" };
+        } else {
+          matchStage.$or = [
+            { title: { $regex: escaped, $options: "i" } },
+            { shortDescription: { $regex: escaped, $options: "i" } },
+          ];
+        }
       }
 
       if (category) {
@@ -192,7 +256,9 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
         $facet: {
           totalDocs: [{ $count: "count" }],
           docs: [
-            { $sort: { publishedAt: -1, createdAt: -1, _id: -1 } },
+            ...(useAtlasSearch && textQuery
+              ? [{ $sort: { score: { $meta: "searchScore" }, publishedAt: -1, _id: -1 } }]
+              : [{ $sort: { publishedAt: -1, createdAt: -1, _id: -1 } }]),
             { $skip: offset },
             { $limit: limit },
           ],

@@ -76,12 +76,28 @@ test("Mission 7 — Validation stricte des paramètres invalides (400 Bad Reques
     assert.equal(res.status, 400);
   });
 
-  await t.test("Rejette limit < 1 ou limit > 50 (400)", async () => {
+  await t.test("Rejette limit < 1 ou limit > 20 (400)", async () => {
     const resLow = await fetch(`${base}/api/posts?limit=0`);
     assert.equal(resLow.status, 400);
+    const bodyLow = await resLow.json();
+    assert.match(bodyLow.message, /compris entre 1 et 20/i);
 
-    const resHigh = await fetch(`${base}/api/posts?limit=51`);
+    const resHigh = await fetch(`${base}/api/posts?limit=21`);
     assert.equal(resHigh.status, 400);
+    const bodyHigh = await resHigh.json();
+    assert.match(bodyHigh.message, /compris entre 1 et 20/i);
+
+    // limit=20 est accepté aux bornes
+    const resExact = await fetch(`${base}/api/posts?limit=20`);
+    assert.equal(resExact.status, 200);
+    const dataExact = await resExact.json();
+    assert.equal(dataExact.limit, 20);
+
+    // Omission de limit utilise le défaut 10
+    const resDefault = await fetch(`${base}/api/posts`);
+    assert.equal(resDefault.status, 200);
+    const dataDefault = await resDefault.json();
+    assert.equal(dataDefault.limit, 10);
   });
 
   await t.test("Rejette une catégorie invalide (400)", async () => {
@@ -351,3 +367,147 @@ test("Mission 7 — Projection stricte PostPreview sans fuite de contenu ou secr
   assert.equal(preview.author.name, author.name);
   assert.match(preview.coverUrl, new RegExp(`/api/posts/${post._id}/attachments/`));
 });
+
+test("Mode Suggestion (mode=suggest) — Validation stricte des paramètres", async (t) => {
+  await t.test("Rejette un mode inconnu (400)", async () => {
+    const res = await fetch(`${base}/api/posts?mode=inconnu&query=test`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /mode doit valoir 'suggest'/i);
+  });
+
+  await t.test("Rejette mode=suggest sans paramètre query (400)", async () => {
+    const res = await fetch(`${base}/api/posts?mode=suggest`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /paramètre query est obligatoire/i);
+  });
+
+  await t.test("Rejette mode=suggest avec query vide après trim (400)", async () => {
+    const res = await fetch(`${base}/api/posts?mode=suggest&query=%20%20`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /paramètre query est obligatoire/i);
+  });
+
+  await t.test("Rejette mode=suggest avec limit > 5 (400)", async () => {
+    const res = await fetch(`${base}/api/posts?mode=suggest&query=test&limit=6`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.message, /limit doit être un entier compris entre 1 et 5/i);
+  });
+
+  await t.test("Accepte mode=suggest avec limit=5 (200)", async () => {
+    const res = await fetch(`${base}/api/posts?mode=suggest&query=test&limit=5`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.limit, 5);
+  });
+
+  await t.test("Applique le défaut limit=5 si limit est omis en mode suggest", async () => {
+    const res = await fetch(`${base}/api/posts?mode=suggest&query=test`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.limit, 5);
+  });
+});
+
+test("Mode Suggestion — Autocomplétion par préfixe insensible à la casse dès 1 caractère", async () => {
+  const { user: author } = await createUser();
+  const uniqueTag = `suggest-${Date.now()}`;
+
+  await createPost(author._id, {
+    title: "Test origami",
+    shortDescription: "Description tutoriel origami facile",
+    category: "Origami",
+    tags: [uniqueTag],
+    status: "published",
+    visibility: "public",
+  });
+
+  // 1. Frappe d'une seule lettre majuscule "T"
+  const res1 = await fetch(`${base}/api/posts?mode=suggest&query=T&tags=${uniqueTag}`);
+  assert.equal(res1.status, 200);
+  const data1 = await res1.json();
+  assert.equal(data1.docs.length, 1);
+  assert.equal(data1.docs[0].title, "Test origami");
+
+  // 2. Frappe de 2 lettres minuscules "te"
+  const res2 = await fetch(`${base}/api/posts?mode=suggest&query=te&tags=${uniqueTag}`);
+  assert.equal(res2.status, 200);
+  const data2 = await res2.json();
+  assert.equal(data2.docs.length, 1);
+  assert.equal(data2.docs[0].title, "Test origami");
+
+  // 3. Frappe de 3 lettres "tes"
+  const res3 = await fetch(`${base}/api/posts?mode=suggest&query=tes&tags=${uniqueTag}`);
+  assert.equal(res3.status, 200);
+  const data3 = await res3.json();
+  assert.equal(data3.docs.length, 1);
+  assert.equal(data3.docs[0].title, "Test origami");
+
+  // 4. Frappe complète "test"
+  const res4 = await fetch(`${base}/api/posts?mode=suggest&query=test&tags=${uniqueTag}`);
+  assert.equal(res4.status, 200);
+  const data4 = await res4.json();
+  assert.equal(data4.docs.length, 1);
+  assert.equal(data4.docs[0].title, "Test origami");
+
+  // 5. Frappe du mot secondaire "origami"
+  const res5 = await fetch(`${base}/api/posts?mode=suggest&query=origami&tags=${uniqueTag}`);
+  assert.equal(res5.status, 200);
+  const data5 = await res5.json();
+  assert.equal(data5.docs.length, 1);
+  assert.equal(data5.docs[0].title, "Test origami");
+});
+
+test("Mode Suggestion — Sécurité stricte : exclusion des drafts, visibilité link et comptes suspendus", async () => {
+  const { user: activeAuthor } = await createUser("user", "active");
+  const { user: suspendedAuthor } = await createUser("user", "suspended");
+  const secTag = `suggest-sec-${Date.now()}`;
+
+  // Public actif -> visible
+  await createPost(activeAuthor._id, {
+    title: "Test création publique",
+    category: "Lego",
+    tags: [secTag],
+    status: "published",
+    visibility: "public",
+  });
+
+  // Draft actif -> exclu
+  await createPost(activeAuthor._id, {
+    title: "Test brouillon privé",
+    category: "Lego",
+    tags: [secTag],
+    status: "draft",
+    visibility: "public",
+  });
+
+  // Link actif -> exclu
+  await createPost(activeAuthor._id, {
+    title: "Test partage par lien",
+    category: "Lego",
+    tags: [secTag],
+    status: "published",
+    visibility: "link",
+  });
+
+  // Suspendu -> exclu
+  await createPost(suspendedAuthor._id, {
+    title: "Test auteur suspendu",
+    category: "Lego",
+    tags: [secTag],
+    status: "published",
+    visibility: "public",
+  });
+
+  const res = await fetch(`${base}/api/posts?mode=suggest&query=Test&tags=${secTag}`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+
+  assert.equal(data.totalDocs, 1);
+  assert.equal(data.docs.length, 1);
+  assert.equal(data.docs[0].title, "Test création publique");
+});
+

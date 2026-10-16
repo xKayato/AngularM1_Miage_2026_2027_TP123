@@ -1,20 +1,30 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { PostService } from '../../shared/services/post.service';
 import { PostPreview } from '../../shared/models/post.model';
 
 @Component({
   selector: 'app-posts-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule],
   templateUrl: './posts-page.html',
   styleUrls: ['./posts-page.css'],
 })
-export class PostsPageComponent implements OnInit {
+export class PostsPageComponent implements OnInit, OnDestroy {
   private readonly postService = inject(PostService);
+  private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef);
 
+  private searchSubscription?: Subscription;
+  private postsSubscription?: Subscription;
+  private suggestionsSubscription?: Subscription;
+  private currentRequestId = 0;
+  private currentSuggestionRequestId = 0;
+
+  // Catalogue
   readonly posts = signal<PostPreview[]>([]);
   readonly loading = signal<boolean>(false);
   readonly error = signal<string | null>(null);
@@ -25,7 +35,15 @@ export class PostsPageComponent implements OnInit {
 
   readonly selectedCategory = signal<string>('');
   readonly selectedTag = signal<string>('');
-  readonly searchQuery = signal<string>('');
+  readonly appliedQuery = signal<string>('');
+
+  // Recherche & Suggestions
+  readonly searchControl = new FormControl('', { nonNullable: true });
+  readonly suggestions = signal<PostPreview[]>([]);
+  readonly showSuggestions = signal<boolean>(false);
+  readonly suggestionsLoading = signal<boolean>(false);
+  readonly suggestionsError = signal<string | null>(null);
+  readonly highlightedIndex = signal<number>(-1);
 
   readonly categories = [
     'Toutes',
@@ -39,17 +57,144 @@ export class PostsPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPosts(1);
+
+    this.searchSubscription = this.searchControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe((query) => {
+        this.loadSuggestions(query);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.searchSubscription?.unsubscribe();
+    this.postsSubscription?.unsubscribe();
+    this.suggestionsSubscription?.unsubscribe();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.showSuggestions() && !this.elementRef.nativeElement.contains(event.target)) {
+      this.closeSuggestions();
+    }
+  }
+
+  loadSuggestions(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      this.closeSuggestions();
+      return;
+    }
+
+    this.suggestionsSubscription?.unsubscribe();
+    const reqId = ++this.currentSuggestionRequestId;
+
+    this.suggestionsLoading.set(true);
+    this.suggestionsError.set(null);
+    this.highlightedIndex.set(-1);
+    this.showSuggestions.set(true);
+
+    const category = this.selectedCategory() === 'Toutes' ? undefined : this.selectedCategory() || undefined;
+    const tag = this.selectedTag().trim() || undefined;
+
+    this.suggestionsSubscription = this.postService
+      .getPosts({
+        page: 1,
+        limit: 5,
+        query: trimmed,
+        category,
+        tags: tag,
+        mode: 'suggest',
+      })
+      .subscribe({
+        next: (pageData) => {
+          if (reqId !== this.currentSuggestionRequestId) {
+            // Réponse tardive ou suggestions déjà fermées : ignorée
+            return;
+          }
+          this.suggestionsLoading.set(false);
+          this.suggestions.set(pageData.docs || pageData.items || []);
+        },
+        error: (err) => {
+          if (reqId !== this.currentSuggestionRequestId) {
+            return;
+          }
+          this.suggestionsLoading.set(false);
+          this.suggestionsError.set(
+            err.error?.message || 'Erreur lors de la recherche de suggestions.'
+          );
+        },
+      });
+  }
+
+  closeSuggestions(): void {
+    this.showSuggestions.set(false);
+    this.suggestionsSubscription?.unsubscribe();
+    this.currentSuggestionRequestId++;
+    this.suggestions.set([]);
+    this.suggestionsLoading.set(false);
+    this.suggestionsError.set(null);
+    this.highlightedIndex.set(-1);
+  }
+
+  openPost(postId: string): void {
+    this.closeSuggestions();
+    this.router.navigate(['/posts', postId]);
+  }
+
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeSuggestions();
+    } else if (event.key === 'ArrowDown') {
+      if (this.showSuggestions() && this.suggestions().length > 0) {
+        event.preventDefault();
+        const next = (this.highlightedIndex() + 1) % this.suggestions().length;
+        this.highlightedIndex.set(next);
+      }
+    } else if (event.key === 'ArrowUp') {
+      if (this.showSuggestions() && this.suggestions().length > 0) {
+        event.preventDefault();
+        const prev =
+          this.highlightedIndex() <= 0
+            ? this.suggestions().length - 1
+            : this.highlightedIndex() - 1;
+        this.highlightedIndex.set(prev);
+      }
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      this.onSubmitSearch();
+    }
+  }
+
+  onSubmitSearch(): void {
+    if (
+      this.showSuggestions() &&
+      this.highlightedIndex() >= 0 &&
+      this.highlightedIndex() < this.suggestions().length
+    ) {
+      const selected = this.suggestions()[this.highlightedIndex()];
+      this.openPost(selected.id);
+      return;
+    }
+
+    this.closeSuggestions();
+    const query = this.searchControl.value.trim();
+    this.appliedQuery.set(query);
+    this.loadPosts(1);
   }
 
   loadPosts(page: number): void {
+    this.postsSubscription?.unsubscribe();
+    const requestId = ++this.currentRequestId;
+
     this.loading.set(true);
     this.error.set(null);
 
     const category = this.selectedCategory() === 'Toutes' ? '' : this.selectedCategory();
-    const query = this.searchQuery().trim();
+    const query = this.appliedQuery().trim();
     const tag = this.selectedTag().trim();
 
-    this.postService
+    this.postsSubscription = this.postService
       .getPosts({
         page,
         limit: 9,
@@ -59,13 +204,20 @@ export class PostsPageComponent implements OnInit {
       })
       .subscribe({
         next: (pageData) => {
+          if (requestId !== this.currentRequestId) {
+            // Protection anti-collision : réponse obsolète ignorée
+            return;
+          }
           this.posts.set(pageData.docs || pageData.items || []);
-          this.currentPage.set(pageData.page || 1);
+          this.currentPage.set(pageData.page || page);
           this.totalPages.set(pageData.totalPages || pageData.pages || 1);
-          this.totalDocs.set(pageData.totalDocs || pageData.total || 0);
+          this.totalDocs.set(pageData.totalDocs ?? pageData.total ?? 0);
           this.loading.set(false);
         },
         error: (err) => {
+          if (requestId !== this.currentRequestId) {
+            return;
+          }
           this.loading.set(false);
           this.error.set(
             err.error?.message || 'Erreur lors du chargement des créations.'
@@ -74,11 +226,17 @@ export class PostsPageComponent implements OnInit {
       });
   }
 
-  onFilterChange(): void {
-    this.loadPosts(1);
+  selectCategory(cat: string): void {
+    const newCat = cat === 'Toutes' ? '' : cat;
+    if (this.selectedCategory() !== newCat) {
+      this.closeSuggestions();
+      this.selectedCategory.set(newCat);
+      this.loadPosts(1);
+    }
   }
 
   selectTag(tag: string): void {
+    this.closeSuggestions();
     const trimmed = tag.trim().toLowerCase();
     if (this.selectedTag() === trimmed) {
       this.selectedTag.set('');
@@ -89,13 +247,26 @@ export class PostsPageComponent implements OnInit {
   }
 
   clearTag(): void {
-    this.selectedTag.set('');
-    this.loadPosts(1);
+    if (this.selectedTag()) {
+      this.closeSuggestions();
+      this.selectedTag.set('');
+      this.loadPosts(1);
+    }
+  }
+
+  clearSearch(): void {
+    this.searchControl.setValue('', { emitEvent: false });
+    this.closeSuggestions();
+    if (this.appliedQuery()) {
+      this.appliedQuery.set('');
+      this.loadPosts(1);
+    }
   }
 
   goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages() && !this.loading()) {
+    if (page >= 1 && page <= this.totalPages() && !this.loading() && page !== this.currentPage()) {
       this.loadPosts(page);
     }
   }
 }
+

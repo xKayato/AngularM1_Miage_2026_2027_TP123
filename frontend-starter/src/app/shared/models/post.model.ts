@@ -118,6 +118,7 @@ export interface PostFilterParams {
   query?: string;
   tags?: string | string[];
   category?: string;
+  mode?: 'catalog' | 'suggest';
 }
 
 export interface MyPostsFilterParams {

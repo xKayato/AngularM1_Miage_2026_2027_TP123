@@ -6,17 +6,90 @@
     </div>
 
     <div class="filters-bar">
-      <div class="search-box">
-        <label for="search-input" class="sr-only">Rechercher</label>
-        <input
-          id="search-input"
-          type="search"
-          placeholder="Rechercher par titre ou mot-clé..."
-          [ngModel]="searchQuery()"
-          (ngModelChange)="searchQuery.set($event)"
-          (keyup.enter)="onFilterChange()"
-        />
-        <button type="button" class="btn-search" (click)="onFilterChange()">Chercher</button>
+      <div class="search-box-wrapper">
+        <div class="search-box">
+          <label for="search-input" class="sr-only">Rechercher</label>
+          <input
+            id="search-input"
+            type="search"
+            role="combobox"
+            aria-autocomplete="list"
+            [attr.aria-expanded]="showSuggestions()"
+            aria-controls="suggestions-listbox"
+            [attr.aria-activedescendant]="highlightedIndex() >= 0 ? 'suggestion-item-' + highlightedIndex() : null"
+            placeholder="Rechercher par titre ou mot-clé..."
+            [formControl]="searchControl"
+            (keydown)="onKeyDown($event)"
+            autocomplete="off"
+          />
+          @if (searchControl.value) {
+            <button
+              type="button"
+              class="btn-clear-search"
+              (click)="clearSearch()"
+              aria-label="Effacer la recherche"
+            >
+              ✕ Effacer
+            </button>
+          }
+          <button
+            type="button"
+            class="btn-search"
+            (click)="onSubmitSearch()"
+            aria-label="Lancer la recherche"
+          >
+            Chercher
+          </button>
+        </div>
+
+        @if (showSuggestions()) {
+          <div
+            id="suggestions-listbox"
+            class="suggestions-dropdown"
+            role="listbox"
+            aria-label="Suggestions de créations"
+          >
+            @if (suggestionsLoading()) {
+              <div class="suggestion-status" aria-live="polite">
+                <span class="mini-spinner"></span> Recherche de suggestions...
+              </div>
+            } @else if (suggestionsError()) {
+              <div class="suggestion-status error" role="alert">
+                {{ suggestionsError() }}
+              </div>
+            } @else if (suggestions().length === 0) {
+              <div class="suggestion-status empty">
+                Aucune suggestion trouvée pour « {{ searchControl.value }} »
+              </div>
+            } @else {
+              <ul class="suggestions-list">
+                @for (item of suggestions(); track item.id; let idx = $index) {
+                  <li
+                    [id]="'suggestion-item-' + idx"
+                    role="option"
+                    class="suggestion-item"
+                    [class.highlighted]="highlightedIndex() === idx"
+                    [attr.aria-selected]="highlightedIndex() === idx"
+                    (click)="openPost(item.id)"
+                  >
+                    <div class="suggestion-main">
+                      <span class="suggestion-title">{{ item.title }}</span>
+                      <span class="suggestion-meta">
+                        Par {{ item.author.name }} • <span class="suggestion-category">{{ item.category }}</span>
+                      </span>
+                    </div>
+                    <div class="suggestion-badges">
+                      @if (item.isLocked) {
+                        <span class="badge-lock" title="Contenu réservé">🔒</span>
+                      }
+                      <span class="suggestion-likes">❤️ {{ item.likesCount }}</span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
       </div>
 
       <div class="category-chips" role="radiogroup" aria-label="Filtrer par catégorie">
@@ -25,7 +98,7 @@
             type="button"
             class="chip"
             [class.active]="(selectedCategory() === '' && cat === 'Toutes') || selectedCategory() === cat"
-            (click)="selectedCategory.set(cat === 'Toutes' ? '' : cat); onFilterChange()"
+            (click)="selectCategory(cat)"
           >
             {{ cat }}
           </button>
@@ -119,26 +192,26 @@
       }
     </div>
 
-    @if (totalPages() > 1) {
-      <nav class="pagination-bar" aria-label="Pagination des créations">
-        <button
-          type="button"
-          class="btn-page"
-          [disabled]="currentPage() <= 1 || loading()"
-          (click)="goToPage(currentPage() - 1)"
-        >
-          Précédent
-        </button>
-        <span class="page-indicator">Page {{ currentPage() }} sur {{ totalPages() }}</span>
-        <button
-          type="button"
-          class="btn-page"
-          [disabled]="currentPage() >= totalPages() || loading()"
-          (click)="goToPage(currentPage() + 1)"
-        >
-          Suivant
-        </button>
-      </nav>
-    }
+    <nav class="pagination-bar" aria-label="Pagination des créations">
+      <button
+        type="button"
+        class="btn-page"
+        [disabled]="currentPage() <= 1 || loading()"
+        (click)="goToPage(currentPage() - 1)"
+      >
+        Précédent
+      </button>
+      <span class="page-indicator">
+        Page {{ currentPage() }} sur {{ totalPages() }} ({{ totalDocs() }} création{{ totalDocs() > 1 ? 's' : '' }} au total)
+      </span>
+      <button
+        type="button"
+        class="btn-page"
+        [disabled]="currentPage() >= totalPages() || loading()"
+        (click)="goToPage(currentPage() + 1)"
+      >
+        Suivant
+      </button>
+    </nav>
   }
 </section>

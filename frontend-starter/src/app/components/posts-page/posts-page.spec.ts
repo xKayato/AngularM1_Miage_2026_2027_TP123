@@ -1,21 +1,22 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, beforeEach, it, expect, vi } from 'vitest';
+import { Router, provideRouter } from '@angular/router';
 import { PostsPageComponent } from './posts-page';
 import { PostService } from '../../shared/services/post.service';
 import { PostPreview } from '../../shared/models/post.model';
 import { Page } from '../../shared/models/page.model';
-import { provideRouter } from '@angular/router';
 
 describe('PostsPageComponent', () => {
   let component: PostsPageComponent;
   let fixture: ComponentFixture<PostsPageComponent>;
+  let router: Router;
   let postServiceMock: {
     getPosts: ReturnType<typeof vi.fn>;
   };
 
-  const mockPostPreview: PostPreview = {
-    id: 'post-123',
+  const mockPostPreview1: PostPreview = {
+    id: 'post-1',
     title: 'Guitare Lego Custom',
     shortDescription: 'Un modèle réduit avec cordes nylon.',
     category: 'Lego',
@@ -30,9 +31,25 @@ describe('PostsPageComponent', () => {
     publishedAt: new Date().toISOString(),
   };
 
-  const mockPage: Page<PostPreview> = {
-    items: [mockPostPreview],
-    docs: [mockPostPreview],
+  const mockPostPreview2: PostPreview = {
+    id: 'post-2',
+    title: 'Faucon Millenium Papercraft',
+    shortDescription: 'Modèle papier ultra détaillé.',
+    category: 'Papercraft',
+    tags: ['papercraft', 'star-wars'],
+    visibility: 'public',
+    author: { id: 'author-2', name: 'PaperMaster' },
+    likesCount: 25,
+    attachmentsCount: 1,
+    hasAudio: false,
+    coverUrl: null,
+    isLocked: false,
+    publishedAt: new Date().toISOString(),
+  };
+
+  const mockPageCatalog: Page<PostPreview> = {
+    items: [mockPostPreview1],
+    docs: [mockPostPreview1],
     total: 1,
     totalDocs: 1,
     limit: 9,
@@ -46,9 +63,30 @@ describe('PostsPageComponent', () => {
     pagingCounter: 1,
   };
 
+  const mockPageSuggestions: Page<PostPreview> = {
+    items: [mockPostPreview2],
+    docs: [mockPostPreview2],
+    total: 1,
+    totalDocs: 1,
+    limit: 5,
+    page: 1,
+    pages: 1,
+    totalPages: 1,
+    hasPrevPage: false,
+    hasNextPage: false,
+    prevPage: null,
+    nextPage: null,
+    pagingCounter: 1,
+  };
+
   beforeEach(async () => {
     postServiceMock = {
-      getPosts: vi.fn().mockReturnValue(of(mockPage)),
+      getPosts: vi.fn().mockImplementation((params) => {
+        if (params.limit === 5) {
+          return of(mockPageSuggestions);
+        }
+        return of(mockPageCatalog);
+      }),
     };
 
     await TestBed.configureTestingModule({
@@ -59,12 +97,15 @@ describe('PostsPageComponent', () => {
       ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     fixture = TestBed.createComponent(PostsPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
-  it('initialise le composant et charge la première page de posts', () => {
+  it('initialise le composant, charge le catalogue page 1 et affiche la pagination complète', () => {
     expect(component).toBeTruthy();
     expect(postServiceMock.getPosts).toHaveBeenCalledWith({
       page: 1,
@@ -76,93 +117,80 @@ describe('PostsPageComponent', () => {
     expect(component.posts().length).toBe(1);
     expect(component.posts()[0].title).toBe('Guitare Lego Custom');
     expect(component.totalPages()).toBe(2);
+    expect(component.totalDocs()).toBe(1);
+
+    const indicator = fixture.nativeElement.querySelector('.page-indicator');
+    expect(indicator.textContent).toContain('Page 1 sur 2 (1 création au total)');
   });
 
-  it('applique un filtre de catégorie et recharge la page 1', () => {
-    component.selectedCategory.set('Lego');
-    component.onFilterChange();
+  it('après 300 ms sans frappe, charge des suggestions (limit=5) SANS modifier les cards ni la pagination du catalogue', () => {
+    vi.useFakeTimers();
+    postServiceMock.getPosts.mockClear();
 
+    // Saisie utilisateur
+    component.searchControl.setValue('faucon');
+
+    // Avant 300 ms : rien
+    vi.advanceTimersByTime(200);
+    expect(postServiceMock.getPosts).not.toHaveBeenCalled();
+
+    // À 300 ms : appel de suggestion avec limit=5
+    vi.advanceTimersByTime(100);
+    expect(postServiceMock.getPosts).toHaveBeenCalledTimes(1);
     expect(postServiceMock.getPosts).toHaveBeenCalledWith({
       page: 1,
-      limit: 9,
-      category: 'Lego',
-      query: undefined,
+      limit: 5,
+      category: undefined,
+      query: 'faucon',
       tags: undefined,
+      mode: 'suggest',
     });
+
+    // L'état du catalogue reste STRICTEMENT inchangé
+    expect(component.posts().length).toBe(1);
+    expect(component.posts()[0].title).toBe('Guitare Lego Custom');
+    expect(component.currentPage()).toBe(1);
+    expect(component.totalDocs()).toBe(1);
+    expect(component.loading()).toBe(false);
+
+    // Le panneau de suggestions est ouvert avec les résultats de suggestion
+    expect(component.showSuggestions()).toBe(true);
+    expect(component.suggestions().length).toBe(1);
+    expect(component.suggestions()[0].title).toBe('Faucon Millenium Papercraft');
+
+    vi.useRealTimers();
   });
 
-  it('applique une recherche textuelle', () => {
-    component.searchQuery.set('custom');
-    component.onFilterChange();
+  it('appui sur Entrée sans suggestion surlignée soumet la recherche, ferme le panneau et recharge le catalogue page 1', () => {
+    postServiceMock.getPosts.mockClear();
+    component.searchControl.setValue('vaisseau');
+    component.showSuggestions.set(true);
 
+    const event = new KeyboardEvent('keydown', { key: 'Enter' });
+    component.onKeyDown(event);
+
+    expect(component.showSuggestions()).toBe(false);
+    expect(component.appliedQuery()).toBe('vaisseau');
     expect(postServiceMock.getPosts).toHaveBeenCalledWith({
       page: 1,
       limit: 9,
       category: undefined,
-      query: 'custom',
-      tags: undefined,
-    });
-  });
-
-  it('applique un filtre par tag via selectTag et permet de le retirer', () => {
-    component.selectTag('lego');
-
-    expect(component.selectedTag()).toBe('lego');
-    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
-      page: 1,
-      limit: 9,
-      category: undefined,
-      query: undefined,
-      tags: 'lego',
-    });
-
-    // Clic à nouveau sur le même tag -> désélectionne le tag
-    component.selectTag('lego');
-    expect(component.selectedTag()).toBe('');
-    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
-      page: 1,
-      limit: 9,
-      category: undefined,
-      query: undefined,
-      tags: undefined,
-    });
-  });
-
-  it('efface le filtre par tag via clearTag', () => {
-    component.selectTag('papercraft');
-    expect(component.selectedTag()).toBe('papercraft');
-
-    component.clearTag();
-    expect(component.selectedTag()).toBe('');
-    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
-      page: 1,
-      limit: 9,
-      category: undefined,
-      query: undefined,
-      tags: undefined,
-    });
-  });
-
-  it('combine recherche textuelle, catégorie et tag', () => {
-    component.searchQuery.set('vaisseau');
-    component.selectedCategory.set('Lego');
-    component.selectedTag.set('star-wars');
-    component.onFilterChange();
-
-    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
-      page: 1,
-      limit: 9,
-      category: 'Lego',
       query: 'vaisseau',
-      tags: 'star-wars',
+      tags: undefined,
     });
   });
 
-  it('navigue entre les pages via goToPage', () => {
-    component.goToPage(2);
+  it('appui sur Entrée sur un champ vide retire le filtre textuel et recharge le catalogue non filtré', () => {
+    component.appliedQuery.set('ancien-filtre');
+    component.searchControl.setValue('');
+    postServiceMock.getPosts.mockClear();
 
+    const event = new KeyboardEvent('keydown', { key: 'Enter' });
+    component.onKeyDown(event);
+
+    expect(component.appliedQuery()).toBe('');
     expect(postServiceMock.getPosts).toHaveBeenCalledWith({
-      page: 2,
+      page: 1,
       limit: 9,
       category: undefined,
       query: undefined,
@@ -170,27 +198,197 @@ describe('PostsPageComponent', () => {
     });
   });
 
-  it('ignore les requêtes de page hors bornes', () => {
-    component.goToPage(0);
-    component.goToPage(5);
+  it('navigation clavier dans les suggestions (Flèche Bas / Haut) et validation par Entrée ouvre le post', () => {
+    component.showSuggestions.set(true);
+    component.suggestions.set([mockPostPreview1, mockPostPreview2]);
+    component.highlightedIndex.set(-1);
 
-    // Ne doit pas avoir été appelé pour 0 ou 5
-    expect(postServiceMock.getPosts).not.toHaveBeenCalledWith(
-      expect.objectContaining({ page: 0 }),
-    );
-    expect(postServiceMock.getPosts).not.toHaveBeenCalledWith(
-      expect.objectContaining({ page: 5 }),
-    );
+    // Flèche Bas -> premier item (index 0)
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(component.highlightedIndex()).toBe(0);
+
+    // Flèche Bas -> deuxième item (index 1)
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(component.highlightedIndex()).toBe(1);
+
+    // Flèche Bas -> boucle au premier (index 0)
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(component.highlightedIndex()).toBe(0);
+
+    // Flèche Haut -> boucle au dernier (index 1)
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
+    expect(component.highlightedIndex()).toBe(1);
+
+    // Entrée sur l'item surligné -> navigation vers le post
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(router.navigate).toHaveBeenCalledWith(['/posts', 'post-2']);
+    expect(component.showSuggestions()).toBe(false);
   });
 
-  it('gère les erreurs de chargement', () => {
-    postServiceMock.getPosts.mockReturnValue(
-      throwError(() => ({ error: { message: 'Erreur réseau' } })),
-    );
+  it('clic sur une suggestion ouvre le post correspondant sans appliquer de filtre au catalogue', () => {
+    component.showSuggestions.set(true);
+    component.suggestions.set([mockPostPreview2]);
+    postServiceMock.getPosts.mockClear();
 
+    component.openPost('post-2');
+
+    expect(router.navigate).toHaveBeenCalledWith(['/posts', 'post-2']);
+    expect(component.showSuggestions()).toBe(false);
+    // Le catalogue n'a pas été rechargé
+    expect(postServiceMock.getPosts).not.toHaveBeenCalled();
+  });
+
+  it('touche Échap ferme les suggestions sans effacer la saisie', () => {
+    component.searchControl.setValue('test-echap');
+    component.showSuggestions.set(true);
+
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(component.showSuggestions()).toBe(false);
+    expect(component.searchControl.value).toBe('test-echap');
+  });
+
+  it('clic extérieur ferme le panneau de suggestions', () => {
+    component.showSuggestions.set(true);
+
+    // Simule un clic en dehors du composant
+    const outsideElement = document.createElement('div');
+    component.onDocumentClick({ target: outsideElement } as unknown as MouseEvent);
+
+    expect(component.showSuggestions()).toBe(false);
+  });
+
+  it('changement de catégorie ou de tag utilise la dernière recherche validée (appliedQuery), jamais la saisie non validée', () => {
+    component.appliedQuery.set('requete-validee');
+    component.searchControl.setValue('texte-non-valide');
+    component.showSuggestions.set(true);
+    postServiceMock.getPosts.mockClear();
+
+    component.selectCategory('Lego');
+
+    // Les suggestions sont fermées
+    expect(component.showSuggestions()).toBe(false);
+    // Le catalogue est rechargé avec 'requete-validee', pas avec 'texte-non-valide'
+    expect(postServiceMock.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 9,
+      category: 'Lego',
+      query: 'requete-validee',
+      tags: undefined,
+    });
+  });
+
+  it('SCÉNARIO CRITIQUE : une réponse de suggestions tardive ne rouvre pas le panneau si fermé ou remplacé', () => {
+    const slowSuggestions$ = new Subject<Page<PostPreview>>();
+    postServiceMock.getPosts.mockReturnValueOnce(slowSuggestions$);
+
+    component.loadSuggestions('lente');
+    expect(component.showSuggestions()).toBe(true);
+
+    // L'utilisateur ferme les suggestions ou valide par Entrée
+    component.closeSuggestions();
+    expect(component.showSuggestions()).toBe(false);
+
+    // La réponse tardive arrive
+    slowSuggestions$.next(mockPageSuggestions);
+
+    // Le panneau DOIT RESTER FERMÉ et les suggestions vides
+    expect(component.showSuggestions()).toBe(false);
+    expect(component.suggestions().length).toBe(0);
+  });
+
+  it('SCÉNARIO CRITIQUE : empêche qu’une réponse de catalogue tardive ne remplace les résultats d’une recherche plus récente', () => {
+    const slowRequest$ = new Subject<Page<PostPreview>>();
+    const fastRequest$ = new Subject<Page<PostPreview>>();
+
+    // Première requête lente
+    postServiceMock.getPosts.mockReturnValueOnce(slowRequest$);
+    component.appliedQuery.set('requete-lente');
     component.loadPosts(1);
 
-    expect(component.loading()).toBe(false);
-    expect(component.error()).toBe('Erreur réseau');
+    // Deuxième requête plus rapide
+    postServiceMock.getPosts.mockReturnValueOnce(fastRequest$);
+    component.appliedQuery.set('requete-rapide');
+    component.loadPosts(1);
+
+    // La deuxième requête répond d'abord avec mockPostPreview2
+    fastRequest$.next({
+      items: [mockPostPreview2],
+      docs: [mockPostPreview2],
+      total: 1,
+      totalDocs: 1,
+      page: 1,
+      pages: 1,
+      limit: 9,
+    });
+
+    expect(component.posts().length).toBe(1);
+    expect(component.posts()[0].title).toBe('Faucon Millenium Papercraft');
+
+    // La première requête répond plus tard avec mockPostPreview1
+    slowRequest$.next({
+      items: [mockPostPreview1],
+      docs: [mockPostPreview1],
+      total: 1,
+      totalDocs: 1,
+      page: 1,
+      pages: 1,
+      limit: 9,
+    });
+
+    // La réponse tardive a été neutralisée : mockPostPreview2 reste affiché
+    expect(component.posts().length).toBe(1);
+    expect(component.posts()[0].title).toBe('Faucon Millenium Papercraft');
+  });
+
+  it('ignore les requêtes de page hors bornes ou vers la page courante', () => {
+    postServiceMock.getPosts.mockClear();
+
+    component.goToPage(0);
+    component.goToPage(1);
+    component.goToPage(5);
+
+    expect(postServiceMock.getPosts).not.toHaveBeenCalled();
+  });
+
+  it('affiche la barre de pagination et totalDocs même pour 1 seule page avec boutons désactivés', () => {
+    component.currentPage.set(1);
+    component.totalPages.set(1);
+    component.totalDocs.set(4);
+    fixture.detectChanges();
+
+    const indicator = fixture.nativeElement.querySelector('.page-indicator');
+    expect(indicator.textContent).toContain('Page 1 sur 1 (4 créations au total)');
+
+    const prevButton = fixture.nativeElement.querySelector('.btn-page:first-child');
+    const nextButton = fixture.nativeElement.querySelector('.btn-page:last-child');
+    expect(prevButton.disabled).toBe(true);
+    expect(nextButton.disabled).toBe(true);
+  });
+
+  it('affiche l\'état vide @empty si aucun post n\'est retourné', () => {
+    component.posts.set([]);
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('.empty-state');
+    expect(emptyState).toBeTruthy();
+    expect(emptyState.textContent).toContain('Aucune création trouvée correspondant à vos critères');
+  });
+
+  it('gère les erreurs de suggestion sans faire planter le catalogue', () => {
+    postServiceMock.getPosts.mockReturnValue(
+      throwError(() => ({ error: { message: 'Erreur réseau suggestion' } })),
+    );
+
+    component.loadSuggestions('erreur');
+
+    expect(component.suggestionsLoading()).toBe(false);
+    expect(component.suggestionsError()).toBe('Erreur réseau suggestion');
+    // Le catalogue reste intact
+    expect(component.error()).toBeNull();
+  });
+
+  it('nettoie les abonnements lors de la destruction (ngOnDestroy)', () => {
+    expect(() => fixture.destroy()).not.toThrow();
   });
 });

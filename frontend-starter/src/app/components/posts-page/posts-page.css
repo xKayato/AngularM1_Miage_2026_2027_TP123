@@ -25,10 +25,15 @@
   gap: 1rem;
 }
 
+.search-box-wrapper {
+  position: relative;
+  max-width: 520px;
+}
+
 .search-box {
   display: flex;
   gap: 0.5rem;
-  max-width: 500px;
+  width: 100%;
 }
 
 .search-box input {
@@ -37,6 +42,13 @@
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .btn-search {
@@ -47,6 +59,145 @@
   border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-search:hover {
+  background: #1d4ed8;
+}
+
+.btn-clear-search {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-search:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s ease;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.highlighted {
+  background: #f1f5f9;
+}
+
+.suggestion-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.suggestion-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestion-meta {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.suggestion-category {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.suggestion-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.badge-lock {
+  font-size: 0.85rem;
+}
+
+.suggestion-status {
+  padding: 0.85rem 1rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.suggestion-status.error {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.suggestion-status.empty {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.mini-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .category-chips {

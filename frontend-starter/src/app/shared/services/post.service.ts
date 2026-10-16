@@ -51,6 +51,9 @@ export class PostService {
           httpParams = httpParams.set('tags', tagsValue.trim());
         }
       }
+      if (params.mode) {
+        httpParams = httpParams.set('mode', params.mode);
+      }
     }
 
     return this.http.get<Page<PostPreview>>(this.baseUrl, { params: httpParams });

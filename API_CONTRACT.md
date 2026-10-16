@@ -176,7 +176,12 @@ interface PostAuthorManagement extends PostDetail {
 
 ## 5. Pipeline d'Agrégation pour le Catalogue et la Recherche
 
-> ⚠️ **Note d'étape :** Aucun index Atlas Search n'est encore installé ni créé à ce stade (réservé à la Mission 7).
+### Paramètres de Requête (`GET /api/posts`) :
+* `page` (optionnel) : Entier $\ge 1$, défaut : `1`. Rejet `400 Bad Request` si non entier ou $< 1$.
+* `limit` (optionnel) : Entier compris entre `1` et `20`, défaut : `10`. Rejet `400 Bad Request` si non entier, $< 1$ ou $> 20$ (`{ "message": "Le paramètre limit doit être un entier compris entre 1 et 20." }`).
+* `category` (optionnel) : Catégorie valide parmi la liste autorisée (`Lego`, `Papercraft`, `Origami`, `Musique`, `Modèles 3D`, `Autre`) ou `Toutes`. Rejet `400 Bad Request` si inconnue.
+* `tags` (optionnel) : Tag unique ou liste de tags séparés par des virgules. Règle `$all` (tous les tags demandés). Rejet `400 Bad Request` si non conformes au format `^[a-z0-9-]+$`.
+* `query` (optionnel) : Texte libre de recherche, maximum 150 caractères. Rejet `400 Bad Request` si $> 150$ caractères.
 
 ### Ordre Séquentiel du Pipeline :
 1. **Étape 1 — Recherche textuelle éventuelle :**
@@ -248,10 +253,13 @@ interface PostAuthorManagement extends PostDetail {
    ```
 
 ### Mappings validés pour Atlas Search (`posts_search_index`) :
-* Pour permettre le filtrage exact combiné à la recherche textuelle Lucene :
+* **Définition dans le projet :**
   * `category` : indexé en type `token` pour l'égalité exacte avec l'opérateur `equals` (le type `string` avec analyzer `lucene.keyword` n'est pas compatible avec `equals`).
   * `tags` : indexé en type `token` pour le filtrage exact des éléments du tableau avec l'opérateur `equals`.
-  * `title` & `shortDescription` : indexés en `type: "string", analyzer: "lucene.french"`.
+  * `title` & `shortDescription` : indexés en `type: "string", analyzer: "lucene.french"` avec tolérance aux fautes (`fuzzy: { maxEdits: 1, prefixLength: 1 }`).
+* **État de vérification et environnements :**
+  * **Sur le cluster réel MongoDB Atlas :** L'index `posts_search_index` a été créé et vérifié lors de la Mission 7, validant le pipeline `$search` complet.
+  * **En environnement de test local (`npm test`) :** Les tests s'exécutent sur `mongodb-memory-server` (dépourvu du démon Lucene Atlas Search) ; le backend intègre un repli synchrone automatique par expressions régulières (`$regex`) garantissant l'exécution 100% isolée et déterministe des tests sans altération ni dépendance du cluster Atlas.
 
 ---
 
