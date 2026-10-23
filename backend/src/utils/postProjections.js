@@ -184,6 +184,7 @@ export function toPostDetail(post, options = {}) {
     likesCount,
     commentsCount,
     attachments,
+    coverUrl: attachments.find((att) => att.isCover)?.downloadUrl || null,
     userInteractions: {
       ...defaultInteractions,
       ...(options.userInteractions || {}),

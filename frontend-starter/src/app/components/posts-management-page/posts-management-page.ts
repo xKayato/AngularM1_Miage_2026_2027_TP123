@@ -3,6 +3,7 @@ import {
   computed,
   ElementRef,
   inject,
+  OnDestroy,
   OnInit,
   signal,
   ViewChild,
@@ -50,7 +51,7 @@ const TAG_REGEX = /^[a-z0-9-]+$/;
   templateUrl: './posts-management-page.html',
   styleUrl: './posts-management-page.css',
 })
-export class PostsManagementPageComponent implements OnInit {
+export class PostsManagementPageComponent implements OnInit, OnDestroy {
   private readonly postService = inject(PostService);
   private readonly markdownService = inject(MarkdownService);
   private readonly fb = inject(FormBuilder);
@@ -72,6 +73,13 @@ export class PostsManagementPageComponent implements OnInit {
   readonly publishingPost = signal<PostAuthorManagement | null>(null);
   readonly selectedVisibility = signal<PostVisibility>('public');
 
+  // Modal / Lien secret de partage (posts en visibilité 'link')
+  readonly secretLinkPost = signal<PostAuthorManagement | null>(null);
+  readonly generatedSecretUrl = signal<string | null>(null);
+  readonly isGeneratingSecretLink = signal<boolean>(false);
+  readonly secretLinkSuccessToast = signal<string | null>(null);
+  private secretToastTimeout?: any;
+
   // Modal / Gestion des pièces jointes (Mission 3)
   readonly attachmentsModalPost = signal<PostAuthorManagement | null>(null);
   readonly selectedFiles = signal<File[]>([]);
@@ -80,6 +88,7 @@ export class PostsManagementPageComponent implements OnInit {
 
   // Téléversement transparent des pièces jointes dès la création initiale
   readonly creationSelectedFiles = signal<File[]>([]);
+  readonly creationCoverIndex = signal<number | null>(null);
   readonly creationFilesError = signal<string | null>(null);
   readonly creationUploadProgress = signal<{ step: string } | null>(null);
   readonly totalCreationFilesSize = computed(() =>
@@ -100,6 +109,11 @@ export class PostsManagementPageComponent implements OnInit {
   private noticeTimeout?: any;
   private readonly fileTempIds = new WeakMap<File, string>();
   private tempIdCounter = 0;
+  private readonly objectUrlCache = new Map<File, string>();
+  readonly attachmentBlobUrls = signal<Record<string, string>>({});
+  readonly failedCoverUrls = signal<Record<string, boolean>>({});
+  private readonly loadingAttachmentKeys = new Set<string>();
+  private readonly createdAttachmentObjectUrls: string[] = [];
 
   // Formulaire réactif pour création / édition de brouillon
   readonly postForm: FormGroup = this.fb.group({
@@ -142,6 +156,7 @@ export class PostsManagementPageComponent implements OnInit {
           const total = pageData.totalDocs ?? pageData.total ?? 0;
           const pages = pageData.totalPages ?? pageData.pages ?? 1;
           this.posts.set(list);
+          this.preloadPostImages(list);
           this.currentPage.set(pageData.page);
           this.totalPages.set(pages);
           this.totalDocs.set(total);
@@ -162,11 +177,25 @@ export class PostsManagementPageComponent implements OnInit {
     this.loadPosts(1);
   }
 
+  ngOnDestroy(): void {
+    if (this.noticeTimeout) clearTimeout(this.noticeTimeout);
+    if (this.secretToastTimeout) clearTimeout(this.secretToastTimeout);
+    for (const url of this.objectUrlCache.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.objectUrlCache.clear();
+    for (const url of this.createdAttachmentObjectUrls) {
+      URL.revokeObjectURL(url);
+    }
+    this.createdAttachmentObjectUrls.length = 0;
+  }
+
   startCreate(): void {
     this.editingPostId.set(null);
     this.error.set(null);
     this.successMessage.set(null);
     this.creationSelectedFiles.set([]);
+    this.creationCoverIndex.set(null);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
     this.lastSelectionStart = 0;
@@ -191,6 +220,7 @@ export class PostsManagementPageComponent implements OnInit {
     this.error.set(null);
     this.successMessage.set(null);
     this.creationSelectedFiles.set([]);
+    this.creationCoverIndex.set(null);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
     this.lastSelectionStart = post.content ? post.content.length : 0;
@@ -210,6 +240,7 @@ export class PostsManagementPageComponent implements OnInit {
     this.editingPostId.set(null);
     this.error.set(null);
     this.creationSelectedFiles.set([]);
+    this.creationCoverIndex.set(null);
     this.creationFilesError.set(null);
     this.creationUploadProgress.set(null);
     this.lastSelectionStart = 0;
@@ -237,8 +268,52 @@ export class PostsManagementPageComponent implements OnInit {
   }
 
   removeCreationFile(index: number): void {
+    const file = this.creationSelectedFiles()[index];
+    if (file && this.objectUrlCache.has(file)) {
+      URL.revokeObjectURL(this.objectUrlCache.get(file)!);
+      this.objectUrlCache.delete(file);
+    }
+
+    const currentCover = this.creationCoverIndex();
+    if (currentCover === index) {
+      this.creationCoverIndex.set(null);
+    } else if (currentCover !== null && currentCover > index) {
+      this.creationCoverIndex.set(currentCover - 1);
+    }
+
     this.creationSelectedFiles.update((files) => files.filter((_, i) => i !== index));
     this.creationFilesError.set(null);
+  }
+
+  toggleCreationCover(index: number): void {
+    const file = this.creationSelectedFiles()[index];
+    if (!file || !this.isCreationFileImage(file.name)) return;
+
+    if (this.creationCoverIndex() === index) {
+      this.creationCoverIndex.set(null);
+      this.showInsertionNotice('Couverture retirée.');
+    } else {
+      this.creationCoverIndex.set(index);
+      this.showInsertionNotice(`⭐ "${file.name}" choisie comme photo de couverture !`);
+    }
+  }
+
+  getBlobUrlForFile(file: File): string {
+    let url = this.objectUrlCache.get(file);
+    if (!url) {
+      try {
+        url = URL.createObjectURL(file);
+      } catch {
+        url = `blob:local/${encodeURIComponent(file.name)}`;
+      }
+      this.objectUrlCache.set(file, url);
+    }
+    return url;
+  }
+
+  isCreationFileImage(filename: string): boolean {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext);
   }
 
   getFileIcon(filename: string): string {
@@ -343,6 +418,7 @@ export class PostsManagementPageComponent implements OnInit {
                   const matchedAtt =
                     added.find((a) => a.originalName === file.name) || added[index];
                   if (matchedAtt) {
+                    this.cacheLocalFileBlobForAttachment(file, matchedAtt);
                     const tempToken = `attachment:temp:${tempId}`;
                     const realToken = `attachment:${matchedAtt.id}`;
                     if (finalContent.includes(tempToken)) {
@@ -351,6 +427,18 @@ export class PostsManagementPageComponent implements OnInit {
                     }
                   }
                 });
+
+                let coverAttId: string | null = null;
+                const chosenCoverIdx = this.creationCoverIndex();
+                if (chosenCoverIdx !== null) {
+                  const chosenFile = filesToUpload[chosenCoverIdx];
+                  const matchedCover =
+                    (chosenFile && added.find((a) => a.originalName === chosenFile.name)) ||
+                    added[chosenCoverIdx];
+                  if (matchedCover) {
+                    coverAttId = matchedCover.id;
+                  }
+                }
 
                 if (contentChanged) {
                   this.creationUploadProgress.set({
@@ -365,20 +453,21 @@ export class PostsManagementPageComponent implements OnInit {
                   };
                   this.postService.updatePost(created.id, updateDto).subscribe({
                     next: () => {
-                      this.finalizePostCreation(created.title, added.length);
+                      this.finalizePostCreation(created.id, created.title, added.length, coverAttId);
                     },
                     error: () => {
-                      this.finalizePostCreation(created.title, added.length);
+                      this.finalizePostCreation(created.id, created.title, added.length, coverAttId);
                     },
                   });
                 } else {
-                  this.finalizePostCreation(created.title, added.length);
+                  this.finalizePostCreation(created.id, created.title, added.length, coverAttId);
                 }
               },
               error: (uploadErr) => {
                 this.loading.set(false);
                 this.creationUploadProgress.set(null);
                 this.creationSelectedFiles.set([]);
+                this.creationCoverIndex.set(null);
                 this.currentView.set('list');
                 this.loadPosts(1);
                 this.error.set(
@@ -401,10 +490,34 @@ export class PostsManagementPageComponent implements OnInit {
     }
   }
 
-  private finalizePostCreation(title: string, attachmentsCount: number): void {
+  private finalizePostCreation(
+    postId: string,
+    title: string,
+    attachmentsCount: number,
+    coverAttachmentId?: string | null,
+  ): void {
+    if (coverAttachmentId && typeof this.postService.setCover === 'function') {
+      const cover$ = this.postService.setCover(postId, coverAttachmentId);
+      if (cover$ && typeof cover$.subscribe === 'function') {
+        cover$.subscribe({
+          next: () => {
+            this.doFinishCreation(title, attachmentsCount);
+          },
+          error: () => {
+            this.doFinishCreation(title, attachmentsCount);
+          },
+        });
+        return;
+      }
+    }
+    this.doFinishCreation(title, attachmentsCount);
+  }
+
+  private doFinishCreation(title: string, attachmentsCount: number): void {
     this.loading.set(false);
     this.creationUploadProgress.set(null);
     this.creationSelectedFiles.set([]);
+    this.creationCoverIndex.set(null);
     this.successMessage.set(
       `Projet "${title}" créé avec succès avec ${attachmentsCount} pièce(s) jointe(s) !`,
     );
@@ -585,6 +698,12 @@ export class PostsManagementPageComponent implements OnInit {
 
     this.postService.uploadAttachments(post.id, files).subscribe({
       next: (added) => {
+        files.forEach((file, idx) => {
+          const matched = added.find((a) => a.originalName === file.name) || added[idx];
+          if (matched) {
+            this.cacheLocalFileBlobForAttachment(file, matched);
+          }
+        });
         this.uploadingAttachments.set(false);
         this.successMessage.set(
           `${added.length} pièce(s) jointe(s) ajoutée(s) avec succès au projet "${post.title}".`
@@ -671,7 +790,7 @@ export class PostsManagementPageComponent implements OnInit {
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   }
 
-  // --- GESTION DE LA COUVERTURE (MISSION 3) ---
+  // --- GESTION DE LA COUVERTURE (MISSION 3 & ÉDITEUR DIRECT) ---
   setCover(attachmentId: string | null): void {
     const post = this.attachmentsModalPost();
     if (!post) return;
@@ -679,6 +798,8 @@ export class PostsManagementPageComponent implements OnInit {
     this.postService.setCover(post.id, attachmentId).subscribe({
       next: (updated) => {
         this.attachmentsModalPost.set(updated);
+        this.posts.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+        this.preloadPostImages([updated]);
         this.successMessage.set(
           attachmentId
             ? 'Couverture du projet mise à jour avec succès.'
@@ -688,6 +809,28 @@ export class PostsManagementPageComponent implements OnInit {
       },
       error: (err) => {
         this.attachmentsError.set(
+          err.error?.message || 'Erreur lors de la modification de la couverture.'
+        );
+      },
+    });
+  }
+
+  setEditorCover(attachmentId: string | null): void {
+    const postId = this.editingPostId();
+    if (!postId) return;
+
+    this.postService.setCover(postId, attachmentId).subscribe({
+      next: (updated) => {
+        this.posts.update((list) => list.map((p) => (p.id === updated.id ? updated : p)));
+        this.preloadPostImages([updated]);
+        this.showInsertionNotice(
+          attachmentId
+            ? '⭐ Photo de page définie comme couverture.'
+            : 'Couverture retirée.'
+        );
+      },
+      error: (err) => {
+        this.error.set(
           err.error?.message || 'Erreur lors de la modification de la couverture.'
         );
       },
@@ -706,8 +849,32 @@ export class PostsManagementPageComponent implements OnInit {
   /** Prévisualisation dynamique et sécurisée du Markdown via MarkdownService */
   readonly previewHtml = computed(() => {
     const content = this.postForm.get('content')?.value || '';
-    const attachments = this.currentEditingPost()?.attachments || [];
-    return this.markdownService.render(content, attachments);
+    const existing = this.currentEditingPost()?.attachments || [];
+
+    // Fichiers locaux en attente convertis en AttachmentInfo virtuels avec URL blob
+    const virtualFiles: AttachmentInfo[] = this.creationSelectedFiles().map((file) => {
+      const tempId = this.getTempIdForFile(file);
+      const url = this.getBlobUrlForFile(file);
+      const isImg = this.isCreationFileImage(file.name);
+      return {
+        id: tempId,
+        tempId: tempId,
+        originalName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        family: isImg ? ('image' as const) : file.name.endsWith('.pdf') ? ('pdf' as const) : ('file' as const),
+        downloadUrl: url,
+        isCover: false,
+      } as AttachmentInfo;
+    });
+
+    const allAttachments = [...existing, ...virtualFiles];
+    const editingPost = this.currentEditingPost();
+    return this.markdownService.render(
+      content,
+      allAttachments,
+      (att) => this.getAttachmentImageUrl(att, editingPost) || att.downloadUrl
+    );
   });
 
   switchEditorTab(tab: 'edit' | 'preview'): void {
@@ -886,6 +1053,12 @@ export class PostsManagementPageComponent implements OnInit {
 
       this.postService.uploadAttachments(this.editingPostId()!, fileList).subscribe({
         next: (added) => {
+          fileList.forEach((file, idx) => {
+            const matched = added.find((a) => a.originalName === file.name) || added[idx];
+            if (matched) {
+              this.cacheLocalFileBlobForAttachment(file, matched);
+            }
+          });
           this.uploadingAttachments.set(false);
           this.posts.update((list) =>
             list.map((p) => {
@@ -939,7 +1112,129 @@ export class PostsManagementPageComponent implements OnInit {
     }
   }
 
+  /**
+   * Applique un formatage Markdown intelligent en respectant la sélection courante.
+   * Si du texte est sélectionné, il est enveloppé proprement (ex: **texte**).
+   * Sinon, un extrait avec le curseur repositionné est inséré.
+   */
+  applyFormat(
+    type: 'bold' | 'italic' | 'underline' | 'code' | 'h2' | 'h3' | 'list' | 'ordered-list' | 'quote'
+  ): void {
+    const textarea = this.editorTextarea?.nativeElement;
+    const contentCtrl = this.postForm.get('content');
+    if (!contentCtrl) return;
+
+    const currentVal: string = contentCtrl.value || '';
+    const start = textarea ? textarea.selectionStart : this.lastSelectionStart;
+    const end = textarea ? textarea.selectionEnd : this.lastSelectionEnd;
+
+    const safeStart = Math.min(Math.max(0, start), currentVal.length);
+    const safeEnd = Math.min(Math.max(safeStart, end), currentVal.length);
+    const selected = currentVal.substring(safeStart, safeEnd);
+
+    let prefix = '';
+    let suffix = '';
+    let defaultText = '';
+    let isBlock = false;
+
+    switch (type) {
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        defaultText = 'Texte en gras';
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        defaultText = 'Texte en italique';
+        break;
+      case 'underline':
+        prefix = '<u>';
+        suffix = '</u>';
+        defaultText = 'Texte souligné';
+        break;
+      case 'code':
+        prefix = '`';
+        suffix = '`';
+        defaultText = 'code';
+        break;
+      case 'h2':
+        prefix = '## ';
+        suffix = '';
+        defaultText = 'Nouveau sous-titre d\'étape';
+        isBlock = true;
+        break;
+      case 'h3':
+        prefix = '### ';
+        suffix = '';
+        defaultText = 'Sous-section';
+        isBlock = true;
+        break;
+      case 'list':
+        prefix = '- ';
+        suffix = '';
+        defaultText = 'Élément de liste';
+        isBlock = true;
+        break;
+      case 'ordered-list':
+        prefix = '1. ';
+        suffix = '';
+        defaultText = 'Étape numérotée';
+        isBlock = true;
+        break;
+      case 'quote':
+        prefix = '> 💡 ';
+        suffix = '';
+        defaultText = 'Astuce d\'atelier : ';
+        isBlock = true;
+        break;
+    }
+
+    const before = currentVal.substring(0, safeStart);
+    const after = currentVal.substring(safeEnd);
+
+    let replacement = '';
+    let newCursorPos = safeStart;
+
+    if (isBlock) {
+      const needsLeading = before.length > 0 && !before.endsWith('\n');
+      const needsTrailing = after.length > 0 && !after.startsWith('\n');
+      const body = selected || defaultText;
+      replacement = (needsLeading ? '\n\n' : '') + prefix + body + suffix + (needsTrailing ? '\n\n' : '');
+      newCursorPos = before.length + replacement.length;
+    } else {
+      const body = selected || defaultText;
+      replacement = prefix + body + suffix;
+      newCursorPos = selected
+        ? before.length + replacement.length
+        : before.length + prefix.length + body.length;
+    }
+
+    const newVal = before + replacement + after;
+    contentCtrl.setValue(newVal);
+    contentCtrl.markAsDirty();
+
+    this.lastSelectionStart = newCursorPos;
+    this.lastSelectionEnd = newCursorPos;
+
+    if (textarea) {
+      textarea.focus();
+      setTimeout(() => {
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+  }
+
   formatEditor(snippet: string): void {
+    if (snippet === '**Texte en gras**') return this.applyFormat('bold');
+    if (snippet === '*Texte en italique*') return this.applyFormat('italic');
+    if (snippet === '<u>Texte souligné</u>') return this.applyFormat('underline');
+    if (snippet === '`code / cote`' || snippet === '`code`') return this.applyFormat('code');
+    if (snippet.startsWith('## ')) return this.applyFormat('h2');
+    if (snippet.startsWith('### ')) return this.applyFormat('h3');
+    if (snippet.startsWith('- ')) return this.applyFormat('list');
+    if (snippet.startsWith('1. ')) return this.applyFormat('ordered-list');
+    if (snippet.startsWith('> ')) return this.applyFormat('quote');
     this.insertSnippetAtCursor(snippet);
   }
 
@@ -985,6 +1280,238 @@ export class PostsManagementPageComponent implements OnInit {
       content.includes(`attachment:temp:${tempId}`) ||
       content.includes(fileOrAtt.name)
     );
+  }
+
+  // --- GESTION DU LIEN SECRET & PARTAGE (POSTS LINK-ONLY) ---
+  openSecretLinkModal(post: PostAuthorManagement): void {
+    this.secretLinkPost.set(post);
+    this.generatedSecretUrl.set(null);
+    this.isGeneratingSecretLink.set(true);
+
+    this.postService.createShareLink(post.id).subscribe({
+      next: (res) => {
+        this.isGeneratingSecretLink.set(false);
+        const fullUrl = `${window.location.origin}/share/${res.token}`;
+        this.generatedSecretUrl.set(fullUrl);
+        this.copyToClipboard(fullUrl, 'Lien secret copié dans le presse-papier !');
+      },
+      error: (err) => {
+        this.isGeneratingSecretLink.set(false);
+        this.error.set(
+          err.error?.message || 'Impossible de générer le lien de partage secret.'
+        );
+      },
+    });
+  }
+
+  closeSecretLinkModal(): void {
+    this.secretLinkPost.set(null);
+    this.generatedSecretUrl.set(null);
+  }
+
+  copyToClipboard(text: string, successMsg = 'Copié dans le presse-papier !'): void {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          this.showSecretToast(successMsg);
+        })
+        .catch(() => {
+          this.showSecretToast(successMsg);
+        });
+    } else {
+      this.showSecretToast(successMsg);
+    }
+  }
+
+  showSecretToast(msg: string): void {
+    this.secretLinkSuccessToast.set(msg);
+    if (this.secretToastTimeout) clearTimeout(this.secretToastTimeout);
+    this.secretToastTimeout = setTimeout(() => {
+      this.secretLinkSuccessToast.set(null);
+    }, 3500);
+  }
+
+  private safeCreateObjectUrl(blob: Blob | File): string | null {
+    if (!blob || typeof URL.createObjectURL !== 'function') return null;
+    try {
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  }
+
+  private cacheLocalFileBlobForAttachment(file: File, att: AttachmentInfo): void {
+    if (!this.isCreationFileImage(file.name)) {
+      return;
+    }
+    const blobUrl = this.safeCreateObjectUrl(file);
+    if (!blobUrl) return;
+    this.createdAttachmentObjectUrls.push(blobUrl);
+    this.attachmentBlobUrls.update((map) => ({
+      ...map,
+      [att.id]: blobUrl,
+      ...(att.downloadUrl ? { [att.downloadUrl]: blobUrl } : {}),
+    }));
+  }
+
+  private preloadPostImages(postsList: PostAuthorManagement[]): void {
+    if (typeof this.postService.getAttachmentBlob !== 'function') return;
+
+    for (const post of postsList) {
+      const imageAttachments = (post.attachments || []).filter((a) => a.family === 'image');
+      for (const att of imageAttachments) {
+        this.ensureAttachmentBlobLoaded(post.id, att.id, att.downloadUrl);
+      }
+
+      if (post.coverUrl) {
+        const extractedId = this.extractAttachmentIdFromUrl(post.coverUrl);
+        if (extractedId) {
+          this.ensureAttachmentBlobLoaded(post.id, extractedId, post.coverUrl);
+        }
+      }
+    }
+  }
+
+  private extractAttachmentIdFromUrl(url: string): string | null {
+    const match = url.match(/\/api\/posts\/[^/]+\/attachments\/([^/?#]+)/);
+    return match ? match[1] : null;
+  }
+
+  private ensureAttachmentBlobLoaded(
+    postId: string,
+    attachmentId: string,
+    downloadUrl?: string
+  ): void {
+    if (typeof this.postService.getAttachmentBlob !== 'function') return;
+    const key = `${postId}:${attachmentId}`;
+    const currentMap = this.attachmentBlobUrls();
+    if (
+      currentMap[attachmentId] ||
+      (downloadUrl && currentMap[downloadUrl]) ||
+      this.loadingAttachmentKeys.has(key)
+    ) {
+      return;
+    }
+
+    const obs$ = this.postService.getAttachmentBlob(postId, attachmentId);
+    if (!obs$ || typeof obs$.subscribe !== 'function') return;
+
+    this.loadingAttachmentKeys.add(key);
+    obs$.subscribe({
+      next: (blob) => {
+        this.loadingAttachmentKeys.delete(key);
+        const blobUrl = this.safeCreateObjectUrl(blob);
+        if (blobUrl) {
+          this.createdAttachmentObjectUrls.push(blobUrl);
+          this.attachmentBlobUrls.update((map) => ({
+            ...map,
+            [attachmentId]: blobUrl,
+            ...(downloadUrl ? { [downloadUrl]: blobUrl } : {}),
+          }));
+        }
+      },
+      error: () => {
+        this.loadingAttachmentKeys.delete(key);
+      },
+    });
+  }
+
+  getAttachmentImageUrl(
+    att: AttachmentInfo,
+    post?: PostAuthorManagement | null
+  ): string | null {
+    const blobs = this.attachmentBlobUrls();
+    if (blobs[att.id]) {
+      return blobs[att.id];
+    }
+    if (att.downloadUrl && blobs[att.downloadUrl]) {
+      return blobs[att.downloadUrl];
+    }
+    if (
+      att.downloadUrl?.startsWith('blob:') ||
+      att.downloadUrl?.startsWith('data:')
+    ) {
+      return att.downloadUrl;
+    }
+    if (
+      post &&
+      (post.status !== 'published' || post.visibility !== 'public') &&
+      this.loadingAttachmentKeys.has(`${post.id}:${att.id}`)
+    ) {
+      return null;
+    }
+    if (att.downloadUrl && this.failedCoverUrls()[att.downloadUrl]) {
+      return null;
+    }
+    return att.downloadUrl || null;
+  }
+
+  markCoverUrlFailed(url?: string | null): void {
+    if (!url || url.startsWith('blob:')) return;
+    this.failedCoverUrls.update((map) => ({ ...map, [url]: true }));
+  }
+
+  getPostFirstImage(post: PostAuthorManagement): AttachmentInfo | null {
+    const coverAtt =
+      post.attachments?.find((a) => a.isCover && a.family === 'image') ||
+      post.attachments?.find((a) => a.isCover);
+
+    let rawAtt: AttachmentInfo | null = coverAtt || null;
+
+    if (!rawAtt && post.coverUrl) {
+      rawAtt = {
+        id: this.extractAttachmentIdFromUrl(post.coverUrl) || 'cover',
+        downloadUrl: post.coverUrl,
+        originalName: 'Couverture',
+        mimeType: 'image/jpeg',
+        size: 0,
+        family: 'image',
+        isCover: true,
+      };
+    }
+
+    if (!rawAtt) {
+      rawAtt = post.attachments?.find((a) => a.family === 'image') || null;
+    }
+
+    if (!rawAtt) return null;
+
+    const resolvedUrl = this.getAttachmentImageUrl(rawAtt, post);
+    if (!resolvedUrl) return null;
+
+    return {
+      ...rawAtt,
+      downloadUrl: resolvedUrl,
+    };
+  }
+
+  getCategoryIcon(category: string): string {
+    switch (category) {
+      case 'Lego':
+        return '🧱';
+      case 'Papercraft':
+        return '✂️';
+      case 'Origami':
+        return '📄';
+      case 'Synthétiseur':
+        return '🎹';
+      case 'Impression 3D':
+      case 'Modèles 3D':
+        return '🖨️';
+      case 'Robotique':
+        return '🤖';
+      case 'Menuiserie':
+        return '🪵';
+      case 'Cosplay':
+        return '🎭';
+      case 'Musique':
+        return '🎵';
+      case 'Poterie':
+        return '🏺';
+      default:
+        return '📐';
+    }
   }
 }
 

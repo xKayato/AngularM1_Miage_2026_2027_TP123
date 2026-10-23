@@ -101,6 +101,10 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     this.searchSubscription?.unsubscribe();
     this.postsSubscription?.unsubscribe();
     this.suggestionsSubscription?.unsubscribe();
+    for (const url of this.createdObjectUrls) {
+      URL.revokeObjectURL(url);
+    }
+    this.createdObjectUrls.length = 0;
   }
 
   @HostListener('document:click', ['$event'])
@@ -118,6 +122,10 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   }
 
   readonly failedAvatars = signal<Record<string, boolean>>({});
+  readonly coverBlobUrls = signal<Record<string, string>>({});
+  readonly failedCovers = signal<Record<string, boolean>>({});
+  private readonly loadingCoverIds = new Set<string>();
+  private readonly createdObjectUrls: string[] = [];
 
   isAvatarFailed(id: string): boolean {
     return Boolean(this.failedAvatars()[id]);
@@ -125,6 +133,61 @@ export class PostsPageComponent implements OnInit, OnDestroy {
 
   markAvatarFailed(id: string): void {
     this.failedAvatars.update((map) => ({ ...map, [id]: true }));
+  }
+
+  markCoverFailed(postId: string): void {
+    this.failedCovers.update((map) => ({ ...map, [postId]: true }));
+  }
+
+  getPostCoverUrl(post: PostPreview): string | null {
+    if (!post.coverUrl || this.failedCovers()[post.id]) {
+      return null;
+    }
+    const blobUrl = this.coverBlobUrls()[post.id];
+    if (blobUrl) {
+      return blobUrl;
+    }
+    if (post.visibility !== 'public' && this.loadingCoverIds.has(post.id)) {
+      return null;
+    }
+    return post.coverUrl;
+  }
+
+  private preloadProtectedCovers(list: PostPreview[]): void {
+    if (typeof this.postService.getAttachmentBlob !== 'function') return;
+    for (const post of list) {
+      if (
+        !post.isLocked &&
+        post.coverUrl &&
+        post.visibility !== 'public' &&
+        !this.coverBlobUrls()[post.id] &&
+        !this.loadingCoverIds.has(post.id)
+      ) {
+        const match = post.coverUrl.match(/\/api\/posts\/([^/]+)\/attachments\/([^/?#]+)/);
+        if (!match) continue;
+        const obs$ = this.postService.getAttachmentBlob(match[1], match[2]);
+        if (!obs$ || typeof obs$.subscribe !== 'function') continue;
+        this.loadingCoverIds.add(post.id);
+        obs$.subscribe({
+          next: (blob) => {
+            this.loadingCoverIds.delete(post.id);
+            if (blob && typeof URL.createObjectURL === 'function') {
+              try {
+                const url = URL.createObjectURL(blob);
+                this.createdObjectUrls.push(url);
+                this.coverBlobUrls.update((m) => ({ ...m, [post.id]: url }));
+              } catch {
+                // Fallback silencieux sous environnement de test jsdom
+              }
+            }
+          },
+          error: () => {
+            this.loadingCoverIds.delete(post.id);
+            this.markCoverFailed(post.id);
+          },
+        });
+      }
+    }
   }
 
   getInitials(name?: string | null): string {
@@ -266,7 +329,9 @@ export class PostsPageComponent implements OnInit, OnDestroy {
           if (requestId !== this.currentRequestId) {
             return;
           }
-          this.posts.set(pageData.docs || pageData.items || []);
+          const list = pageData.docs || pageData.items || [];
+          this.posts.set(list);
+          this.preloadProtectedCovers(list);
           this.currentPage.set(pageData.page || page);
           this.totalPages.set(pageData.totalPages || pageData.pages || 1);
           this.totalDocs.set(pageData.totalDocs ?? pageData.total ?? 0);

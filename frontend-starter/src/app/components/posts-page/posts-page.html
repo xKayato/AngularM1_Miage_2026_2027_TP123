@@ -224,8 +224,8 @@
                   {{ post.visibility === 'followers' ? "Suivez l'auteur pour débloquer" : 'Abonnement requis' }}
                 </span>
               </div>
-            } @else if (post.coverUrl) {
-              <img [src]="post.coverUrl" [alt]="post.title" class="cover-img" loading="lazy" />
+            } @else if (getPostCoverUrl(post); as coverImgUrl) {
+              <img [src]="coverImgUrl" [alt]="post.title" class="cover-img" (error)="markCoverFailed(post.id)" loading="lazy" />
             } @else {
               <div class="default-cover" aria-label="Aperçu du projet">
                 <span class="cover-art-icon">📐</span>

@@ -1,9 +1,11 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
+import { PostService } from '../../shared/services/post.service';
 import { CreatorPublicProfile } from '../../shared/models/creator.model';
+import { PostPreview } from '../../shared/models/post.model';
 
 @Component({
   selector: 'app-creator-profile-page',
@@ -12,10 +14,16 @@ import { CreatorPublicProfile } from '../../shared/models/creator.model';
   templateUrl: './creator-profile-page.html',
   styleUrls: ['./creator-profile-page.css'],
 })
-export class CreatorProfilePageComponent implements OnInit {
+export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly creatorService = inject(CreatorService);
+  private readonly postService = inject(PostService, { optional: true });
   readonly auth = inject(AuthService);
+
+  readonly coverBlobUrls = signal<Record<string, string>>({});
+  readonly failedCovers = signal<Record<string, boolean>>({});
+  private readonly loadingCoverIds = new Set<string>();
+  private readonly createdObjectUrls: string[] = [];
 
   readonly creatorId = signal<string>('');
   readonly profile = signal<CreatorPublicProfile | null>(null);
@@ -27,12 +35,46 @@ export class CreatorProfilePageComponent implements OnInit {
   readonly actionMessage = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
 
+  readonly shareToast = signal<string | null>(null);
+  private shareTimeout?: any;
+
   readonly isSelf = computed(() => {
     const current = this.profile();
     if (!current) return false;
     const myId = this.auth.currentUser()?.id;
     return Boolean(current.isSelf || (myId && myId === current.id));
   });
+
+  ngOnDestroy(): void {
+    if (this.shareTimeout) clearTimeout(this.shareTimeout);
+    for (const url of this.createdObjectUrls) {
+      URL.revokeObjectURL(url);
+    }
+    this.createdObjectUrls.length = 0;
+  }
+
+  shareProfile(): void {
+    const prof = this.profile();
+    if (!prof) return;
+
+    const fullUrl = `${window.location.origin}/creators/${prof.id}`;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard
+        .writeText(fullUrl)
+        .then(() => this.triggerShareToast('Lien du profil copié dans le presse-papier !'))
+        .catch(() => this.triggerShareToast('Lien du profil copié !'));
+    } else {
+      this.triggerShareToast('Lien du profil copié dans le presse-papier !');
+    }
+  }
+
+  private triggerShareToast(message: string): void {
+    this.shareToast.set(message);
+    if (this.shareTimeout) clearTimeout(this.shareTimeout);
+    this.shareTimeout = setTimeout(() => {
+      this.shareToast.set(null);
+    }, 3500);
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -53,6 +95,7 @@ export class CreatorProfilePageComponent implements OnInit {
     this.creatorService.getCreatorProfile(id).subscribe({
       next: (data) => {
         this.profile.set(data);
+        this.preloadProtectedCovers(data.creations || []);
         this.loading.set(false);
       },
       error: (err) => {
@@ -168,6 +211,61 @@ export class CreatorProfilePageComponent implements OnInit {
         }
       },
     });
+  }
+
+  markCoverFailed(postId: string): void {
+    this.failedCovers.update((map) => ({ ...map, [postId]: true }));
+  }
+
+  getPostCoverUrl(post: PostPreview): string | null {
+    if (!post.coverUrl || this.failedCovers()[post.id]) {
+      return null;
+    }
+    const blobUrl = this.coverBlobUrls()[post.id];
+    if (blobUrl) {
+      return blobUrl;
+    }
+    if (post.visibility !== 'public' && this.loadingCoverIds.has(post.id)) {
+      return null;
+    }
+    return post.coverUrl;
+  }
+
+  private preloadProtectedCovers(list: PostPreview[]): void {
+    if (!this.postService || typeof this.postService.getAttachmentBlob !== 'function') return;
+    for (const post of list) {
+      if (
+        !post.isLocked &&
+        post.coverUrl &&
+        post.visibility !== 'public' &&
+        !this.coverBlobUrls()[post.id] &&
+        !this.loadingCoverIds.has(post.id)
+      ) {
+        const match = post.coverUrl.match(/\/api\/posts\/([^/]+)\/attachments\/([^/?#]+)/);
+        if (!match) continue;
+        const obs$ = this.postService.getAttachmentBlob(match[1], match[2]);
+        if (!obs$ || typeof obs$.subscribe !== 'function') continue;
+        this.loadingCoverIds.add(post.id);
+        obs$.subscribe({
+          next: (blob) => {
+            this.loadingCoverIds.delete(post.id);
+            if (blob && typeof URL.createObjectURL === 'function') {
+              try {
+                const url = URL.createObjectURL(blob);
+                this.createdObjectUrls.push(url);
+                this.coverBlobUrls.update((m) => ({ ...m, [post.id]: url }));
+              } catch {
+                // Fallback silencieux sous environnement de test jsdom
+              }
+            }
+          },
+          error: () => {
+            this.loadingCoverIds.delete(post.id);
+            this.markCoverFailed(post.id);
+          },
+        });
+      }
+    }
   }
 
   getInitials(name: string): string {

@@ -696,3 +696,261 @@ html.dark .intext-temp-badge {
   justify-content: center;
   flex-shrink: 0;
 }
+
+/* --- TYPOGRAPHIE & RENDU DU CONTENU MARKDOWN --- */
+.markdown-rendered-content {
+  line-height: 1.7;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.markdown-rendered-content .tutorial-h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.4rem;
+}
+
+.markdown-rendered-content .tutorial-h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1.35rem;
+  margin-bottom: 0.5rem;
+  color: var(--brand-primary);
+}
+
+.markdown-rendered-content .tutorial-h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1.1rem;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+}
+
+.markdown-rendered-content .tutorial-p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 0.975rem;
+  line-height: 1.7;
+}
+
+.markdown-rendered-content .tutorial-quote {
+  margin: 1.25rem 0;
+  padding: 0.85rem 1.25rem;
+  background: var(--bg-subtle);
+  border-left: 4px solid var(--brand-primary);
+  border-radius: 0 10px 10px 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.markdown-rendered-content .tutorial-list,
+.markdown-rendered-content .tutorial-ordered-list {
+  margin: 0.75rem 0 1.25rem 1.75rem;
+  padding-left: 0.25rem;
+}
+
+.markdown-rendered-content .tutorial-list li,
+.markdown-rendered-content .tutorial-ordered-list li {
+  margin-bottom: 0.45rem;
+  line-height: 1.6;
+}
+
+.markdown-rendered-content .tutorial-hr {
+  border: 0;
+  height: 1px;
+  background: var(--border-color);
+  margin: 2rem 0;
+}
+
+.markdown-rendered-content .tutorial-code-block {
+  background: #1E1E1E;
+  color: #E2E8F0;
+  padding: 1.1rem 1.25rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 1.25rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.markdown-rendered-content .inline-code {
+  background: var(--bg-subtle);
+  color: var(--brand-primary);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  border: 1px solid var(--border-color);
+}
+
+/* --- BOUTONS & TOASTS DE PARTAGE UNIFIÉS --- */
+.btn-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-share:hover {
+  background: var(--bg-subtle);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.btn-share-secret {
+  background: rgba(200, 90, 50, 0.08);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.btn-share-secret:hover {
+  background: var(--brand-primary);
+  color: #FFFFFF;
+}
+
+.share-feedback-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #10B981;
+  color: #FFFFFF;
+  padding: 0.45rem 0.95rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  animation: fadeInNotice 0.2s ease-out;
+}
+
+/* --- VIGNETTES COUVERTURE DANS « MES CRÉATIONS » --- */
+.my-post-cover-wrapper {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  border-radius: 12px 12px 0 0;
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.my-post-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.post-card:hover .my-post-cover-img {
+  transform: scale(1.02);
+}
+
+.my-post-cover-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.my-post-cover-placeholder .cat-icon {
+  font-size: 2.2rem;
+  opacity: 0.7;
+}
+
+.cover-overlay-badges {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.cover-badge-pill {
+  pointer-events: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.65);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cover-badge-pill.status-draft {
+  background: rgba(234, 88, 12, 0.85);
+}
+
+.cover-badge-pill.status-published {
+  background: rgba(16, 185, 129, 0.85);
+}
+
+.cover-badge-pill.status-archived {
+  background: rgba(239, 68, 68, 0.85);
+}
+
+.cover-badge-pill.vis-link {
+  background: rgba(99, 102, 241, 0.85);
+}
+
+/* --- BADGES & SÉLECTEURS DE COUVERTURE DANS L'ÉDITEUR --- */
+.cover-thumb-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.btn-cover-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.btn-cover-toggle:hover {
+  border-color: #F59E0B;
+  color: #D97706;
+  background: #FFFBEB;
+}
+
+.btn-cover-toggle.is-active-cover {
+  background: #FEF3C7;
+  color: #B45309;
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 1px #F59E0B;
+}
+

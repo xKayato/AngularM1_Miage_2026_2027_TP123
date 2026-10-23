@@ -124,26 +124,45 @@
             <span class="date-published-text">📅 Publié le {{ (detail.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</span>
           </div>
 
-          <!-- Bouton J'aime interactif -->
-          <div class="like-container">
-            @if (auth.isAuthenticated() && !isSelfAuthor()) {
-              <button
-                type="button"
-                class="btn-like"
-                [class.liked]="detail.userInteractions.isLiked"
-                (click)="toggleLike()"
-                [disabled]="isLikeLoading()"
-                [attr.aria-label]="detail.userInteractions.isLiked ? 'Je n’aime plus ce projet' : 'J’aime ce projet'"
-              >
-                <span class="like-heart" aria-hidden="true">{{ detail.userInteractions.isLiked ? '❤️' : '🤍' }}</span>
-                <span class="likes-count">{{ detail.likesCount }}</span>
-                <span class="like-label">{{ detail.userInteractions.isLiked ? 'Aimé' : 'J’aime' }}</span>
-              </button>
-            } @else {
-              <span class="likes-badge" title="Nombre de mentions j'aime">
-                ❤️ {{ detail.likesCount }} j'aime
+          <!-- Actions d'en-tête (Like & Partage) -->
+          <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+            <button
+              type="button"
+              class="btn-share"
+              (click)="sharePost()"
+              [disabled]="isSharing()"
+              title="Partager ce tutoriel"
+            >
+              🔗 Partager
+            </button>
+
+            @if (shareToast(); as msg) {
+              <span class="share-feedback-toast" role="status">
+                ✓ {{ msg }}
               </span>
             }
+
+            <!-- Bouton J'aime interactif -->
+            <div class="like-container">
+              @if (auth.isAuthenticated() && !isSelfAuthor()) {
+                <button
+                  type="button"
+                  class="btn-like"
+                  [class.liked]="detail.userInteractions.isLiked"
+                  (click)="toggleLike()"
+                  [disabled]="isLikeLoading()"
+                  [attr.aria-label]="detail.userInteractions.isLiked ? 'Je n’aime plus ce projet' : 'J’aime ce projet'"
+                >
+                  <span class="like-heart" aria-hidden="true">{{ detail.userInteractions.isLiked ? '❤️' : '🤍' }}</span>
+                  <span class="likes-count">{{ detail.likesCount }}</span>
+                  <span class="like-label">{{ detail.userInteractions.isLiked ? 'Aimé' : 'J’aime' }}</span>
+                </button>
+              } @else {
+                <span class="likes-badge" title="Nombre de mentions j'aime">
+                  ❤️ {{ detail.likesCount }} j'aime
+                </span>
+              }
+            </div>
           </div>
         </div>
 

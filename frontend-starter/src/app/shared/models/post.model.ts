@@ -68,6 +68,7 @@ export interface PostDetail {
   likesCount: number;
   commentsCount: number;
   attachments: AttachmentInfo[];
+  coverUrl?: string | null;
   userInteractions: UserInteractions;
   publishedAt: string | null;
   archivedAt?: string | null;
@@ -87,8 +88,10 @@ export interface ShareLinkInfo {
 
 export interface ShareLinkCreatedResponse {
   shareUrl: string;
+  token?: string;
   expiresAt: string;
-  expiresInDays: number;
+  expiresInDays?: number;
+  revoked?: boolean;
 }
 
 /** DTO d'espace auteur enrichi de la gestion du lien sans secret brut. */

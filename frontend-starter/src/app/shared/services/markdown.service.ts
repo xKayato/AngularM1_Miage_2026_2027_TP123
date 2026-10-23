@@ -77,18 +77,29 @@ export class MarkdownService {
       const alt = rawAlt.trim() || 'Image du tutoriel';
       const src = rawSrc.trim();
 
-      // Jeton temporaire local (mode création)
+      // Résolution par token attachment:<id>, attachment:temp:<id>, ou nom direct
+      let targetAtt: AttachmentInfo | undefined;
+      const cleanAlt = alt.toLowerCase();
+
       if (src.startsWith('attachment:temp:')) {
-        return `<figure class="tutorial-inline-image-box temp-pending"><div class="temp-image-placeholder"><span class="temp-icon">🖼️</span> <span class="temp-image-name">${alt}</span> <span class="temp-badge">[Image en attente d'enregistrement]</span></div><figcaption class="tutorial-image-caption">${alt}</figcaption></figure>`;
+        const tempToken = src.replace(/^attachment:temp:/, '').trim();
+        targetAtt = attachments.find(
+          (a) => a.id === tempToken || (a as any).tempId === tempToken || a.originalName.toLowerCase() === cleanAlt,
+        );
+      } else if (src.startsWith('attachment:')) {
+        const attId = src.replace(/^attachment:/, '').trim();
+        targetAtt = attachments.find(
+          (a) => a.id === attId || a.originalName.toLowerCase() === attId.toLowerCase(),
+        );
+      } else {
+        targetAtt = attachments.find(
+          (a) => a.id === src || a.originalName.toLowerCase() === src.toLowerCase(),
+        );
       }
 
-      // Résolution par token attachment:<id> ou nom direct
-      let targetAtt: AttachmentInfo | undefined;
-      if (src.startsWith('attachment:')) {
-        const attId = src.replace(/^attachment:/, '').trim();
-        targetAtt = attachments.find((a) => a.id === attId);
-      } else {
-        targetAtt = attachments.find((a) => a.id === src || a.originalName === src);
+      // Repli si non trouvé : tenter de matcher par le nom indiqué dans l'alt
+      if (!targetAtt && alt) {
+        targetAtt = attachments.find((a) => a.originalName.toLowerCase() === cleanAlt);
       }
 
       if (targetAtt) {
@@ -99,6 +110,11 @@ export class MarkdownService {
           }
         }
         return `<div class="intext-attachment-box"><span class="intext-badge">${targetAtt.family.toUpperCase()}</span><span class="intext-title">${targetAtt.originalName} (${this.formatBytes(targetAtt.size)})</span></div>`;
+      }
+
+      // Si c'est un jeton temporaire sans URL locale résolue
+      if (src.startsWith('attachment:temp:')) {
+        return `<figure class="tutorial-inline-image-box temp-pending"><div class="temp-image-placeholder"><span class="temp-icon">🖼️</span> <span class="temp-image-name">${alt}</span> <span class="temp-badge">[Image en attente d'enregistrement]</span></div><figcaption class="tutorial-image-caption">${alt}</figcaption></figure>`;
       }
 
       // Rejet formel des URLs d'images externes pour éviter pistage, XSS et failles SSRF
@@ -114,12 +130,22 @@ export class MarkdownService {
 
       // 5.a. Résolution des pièces jointes sous forme de lien ou bloc in-text : attachment:<id> ou attachment:temp:<id>
       if (decodedHref.startsWith('attachment:')) {
-        if (decodedHref.startsWith('attachment:temp:')) {
-          return `<span class="intext-temp-badge"><span class="badge-icon">⏳</span> <span class="badge-name">${linkText}</span> <span class="badge-hint">[Pièce jointe en attente d'enregistrement]</span></span>`;
-        }
+        let targetAtt: AttachmentInfo | undefined;
 
-        const attId = decodedHref.replace(/^attachment:/, '').trim();
-        const targetAtt = attachments.find((a) => a.id === attId || a.originalName === attId);
+        if (decodedHref.startsWith('attachment:temp:')) {
+          const tempToken = decodedHref.replace(/^attachment:temp:/, '').trim();
+          targetAtt = attachments.find(
+            (a) => a.id === tempToken || (a as any).tempId === tempToken || a.originalName.toLowerCase() === linkText.toLowerCase(),
+          );
+          if (!targetAtt) {
+            return `<span class="intext-temp-badge"><span class="badge-icon">⏳</span> <span class="badge-name">${linkText}</span> <span class="badge-hint">[Pièce jointe en attente d'enregistrement]</span></span>`;
+          }
+        } else {
+          const attId = decodedHref.replace(/^attachment:/, '').trim();
+          targetAtt = attachments.find(
+            (a) => a.id === attId || a.originalName.toLowerCase() === attId.toLowerCase() || a.originalName.toLowerCase() === linkText.toLowerCase(),
+          );
+        }
 
         if (targetAtt) {
           const resolvedUrl = getAttachmentUrl ? getAttachmentUrl(targetAtt) : targetAtt.downloadUrl;

@@ -30,7 +30,22 @@
         <div class="creator-details">
           <div class="name-row">
             <h1 class="font-display creator-display-name">{{ creator.name }}</h1>
-            <span class="member-tag">Membre depuis le {{ creator.createdAt | date:'mediumDate' }}</span>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <span class="member-tag">Membre depuis le {{ creator.createdAt | date:'mediumDate' }}</span>
+              <button
+                type="button"
+                class="btn-share"
+                (click)="shareProfile()"
+                title="Copier le lien public du profil"
+              >
+                🔗 Partager le profil
+              </button>
+              @if (shareToast(); as msg) {
+                <span class="share-feedback-toast" role="status">
+                  ✓ {{ msg }}
+                </span>
+              }
+            </div>
           </div>
 
           <p class="bio-text">
@@ -166,8 +181,8 @@
                     {{ post.visibility === 'followers' ? 'Réservé aux followers' : 'Abonnement requis' }}
                   </span>
                 </div>
-              } @else if (post.coverUrl) {
-                <img [src]="post.coverUrl" [alt]="post.title" class="post-cover-img" loading="lazy" />
+              } @else if (getPostCoverUrl(post); as coverImgUrl) {
+                <img [src]="coverImgUrl" [alt]="post.title" class="post-cover-img" (error)="markCoverFailed(post.id)" loading="lazy" />
               } @else {
                 <div class="default-cover-box">📐</div>
               }

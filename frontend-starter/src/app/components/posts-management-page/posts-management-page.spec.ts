@@ -801,6 +801,57 @@ describe('PostsManagementPageComponent', () => {
         expect(pos).toBe('Fin du projet'.length);
       });
     });
+
+    it('précharge l image de couverture en Blob authentifié pour un brouillon (status: draft) afin d éviter un 404 dans <img>', () => {
+      const createObjSpy = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockImplementation(() => 'blob:http://localhost/draft-cover-blob');
+      const revokeObjSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+
+      const draftWithCover: PostAuthorManagement = {
+        ...mockPost,
+        id: 'draft-jojo',
+        title: 'Jojo',
+        status: 'draft',
+        coverUrl: '/api/posts/draft-jojo/attachments/att-cover-1',
+        attachments: [
+          {
+            id: 'att-cover-1',
+            originalName: 'jojo-cover.png',
+            mimeType: 'image/png',
+            size: 2048,
+            family: 'image',
+            downloadUrl: '/api/posts/draft-jojo/attachments/att-cover-1',
+            isCover: true,
+          },
+        ],
+      };
+
+      const fakeBlob = new Blob(['png-bytes'], { type: 'image/png' });
+      (postServiceMock as any).getAttachmentBlob = vi.fn().mockReturnValue(of(fakeBlob));
+      postServiceMock.getMyPosts.mockReturnValue(
+        of({
+          docs: [draftWithCover],
+          totalDocs: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+        })
+      );
+
+      component.loadPosts(1);
+
+      expect((postServiceMock as any).getAttachmentBlob).toHaveBeenCalledWith(
+        'draft-jojo',
+        'att-cover-1'
+      );
+      const cover = component.getPostFirstImage(draftWithCover);
+      expect(cover).not.toBeNull();
+      expect(cover?.downloadUrl).toBe('blob:http://localhost/draft-cover-blob');
+
+      createObjSpy.mockRestore();
+      revokeObjSpy.mockRestore();
+    });
   });
 });
 

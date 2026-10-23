@@ -79,6 +79,11 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   readonly imageUrls = signal<Record<string, string>>({});
   private readonly createdObjectUrls: string[] = [];
 
+  // Gestion du partage & lien secret
+  readonly shareToast = signal<string | null>(null);
+  readonly isSharing = signal<boolean>(false);
+  private shareTimeout?: any;
+
   ngOnInit(): void {
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
@@ -95,10 +100,60 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
+    if (this.shareTimeout) clearTimeout(this.shareTimeout);
     // Nettoyage impératif de toutes les URLs Blob créées en mémoire
     for (const url of this.createdObjectUrls) {
       URL.revokeObjectURL(url);
     }
+  }
+
+  sharePost(): void {
+    const detail = this.postDetail();
+    const preview = this.postPreview();
+    const post = detail || preview;
+    if (!post) return;
+
+    if (this.isSelfAuthor() && detail?.visibility === 'link') {
+      this.isSharing.set(true);
+      this.postService.createShareLink(detail.id).subscribe({
+        next: (res) => {
+          this.isSharing.set(false);
+          const secretUrl = `${window.location.origin}/share/${res.token}`;
+          this.copyUrl(secretUrl, 'Lien secret copié dans le presse-papier ! (Valable 7 jours)');
+        },
+        error: () => {
+          this.isSharing.set(false);
+          const fallbackUrl = `${window.location.origin}/posts/${post.id}`;
+          this.copyUrl(fallbackUrl, 'Lien du tutoriel copié !');
+        },
+      });
+    } else {
+      const publicUrl = `${window.location.origin}/posts/${post.id}`;
+      this.copyUrl(publicUrl, 'Lien du tutoriel copié dans le presse-papier !');
+    }
+  }
+
+  private copyUrl(url: string, message: string): void {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          this.triggerShareToast(message);
+        })
+        .catch(() => {
+          this.triggerShareToast(message);
+        });
+    } else {
+      this.triggerShareToast(message);
+    }
+  }
+
+  private triggerShareToast(message: string): void {
+    this.shareToast.set(message);
+    if (this.shareTimeout) clearTimeout(this.shareTimeout);
+    this.shareTimeout = setTimeout(() => {
+      this.shareToast.set(null);
+    }, 3500);
   }
 
   loadPost(id: string): void {

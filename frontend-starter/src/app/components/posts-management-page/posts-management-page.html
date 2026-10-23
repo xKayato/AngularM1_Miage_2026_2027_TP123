@@ -77,6 +77,37 @@
       <div class="posts-list">
         @for (post of posts(); track post.id) {
           <article class="post-card card" [class.archived]="post.status === 'archived'">
+            <!-- Couverture du poste (Mission : voir les photos de page de mes postes) -->
+            <div class="my-post-cover-wrapper">
+              <div class="cover-overlay-badges">
+                <span class="cover-badge-pill" [class]="'status-' + post.status">
+                  @switch (post.status) {
+                    @case ('draft') { 📝 Brouillon }
+                    @case ('published') { ✅ Publié }
+                    @case ('archived') { 🚫 Archivé }
+                  }
+                </span>
+                <span class="cover-badge-pill" [class.vis-link]="post.visibility === 'link'">
+                  @switch (post.visibility) {
+                    @case ('public') { 🌐 Public }
+                    @case ('followers') { 🔒👥 Followers }
+                    @case ('subscribers') { 🔒⭐ Abonnés }
+                    @case ('link') { 🔗 Link only }
+                    @default { 🌐 Public }
+                  }
+                </span>
+              </div>
+
+              @if (getPostFirstImage(post); as coverImg) {
+                <img [src]="coverImg.downloadUrl" [alt]="post.title" class="my-post-cover-img" (error)="markCoverUrlFailed(coverImg.downloadUrl)" loading="lazy" />
+              } @else {
+                <div class="my-post-cover-placeholder">
+                  <span class="cat-icon">{{ getCategoryIcon(post.category) }}</span>
+                  <span class="font-display">{{ post.category }}</span>
+                </div>
+              }
+            </div>
+
             <div class="card-header">
               <div class="title-meta">
                 <span class="badge category-badge">{{ post.category }}</span>
@@ -126,6 +157,17 @@
                   >
                     📎 Pièces jointes ({{ post.attachments.length }}/10)
                   </button>
+
+                  @if (post.status === 'published' && post.visibility === 'link') {
+                    <button
+                      type="button"
+                      class="btn btn-share btn-share-secret"
+                      (click)="openSecretLinkModal(post)"
+                      title="Obtenir et copier le lien secret d'accès"
+                    >
+                      🔗 Lien secret
+                    </button>
+                  }
 
                   @if (post.status === 'draft') {
                     <button
@@ -268,16 +310,16 @@
           <!-- Barre d'outils de mise en page -->
           <div class="editor-toolbar" role="toolbar" aria-label="Outils de mise en page et pièces jointes">
             <div class="toolbar-formatting-group">
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('**Texte en gras**')" title="Gras"><b>B</b></button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('*Texte en italique*')" title="Italique"><i>I</i></button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('<u>Texte souligné</u>')" title="Souligné"><u>U</u></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('bold')" title="Gras"><b>B</b></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('italic')" title="Italique"><i>I</i></button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('underline')" title="Souligné"><u>U</u></button>
               <span class="tool-sep" aria-hidden="true">|</span>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('## Nouveau sous-titre d\'étape')">Titre H2</button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('### Sous-section')">H3</button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('- Élément de liste')">• Liste</button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('1. Étape numérotée')">1. Étapes</button>
-              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="formatEditor('> 💡 Astuce d\'atelier : ')">❝ Citation</button>
-              <button type="button" class="btn-tool font-mono" (mousedown)="$event.preventDefault()" (click)="formatEditor('`code / cote`')">&lt;/&gt;</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('h2')">Titre H2</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('h3')">H3</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('list')">• Liste</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('ordered-list')">1. Étapes</button>
+              <button type="button" class="btn-tool" (mousedown)="$event.preventDefault()" (click)="applyFormat('quote')">❝ Citation</button>
+              <button type="button" class="btn-tool font-mono" (mousedown)="$event.preventDefault()" (click)="applyFormat('code')">&lt;/&gt;</button>
             </div>
 
             <div class="toolbar-actions-group">
@@ -375,29 +417,59 @@
               <div class="attachments-intext-grid">
                 @for (att of currentEditingPost()!.attachments; track att.id) {
                   <div class="intext-item-card">
-                    <div class="truncate">
-                      <span class="intext-file-title truncate">
-                        {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
-                        {{ att.originalName }}
-                      </span>
-                      <span class="intext-status-line">
-                        @if (isAttachmentInContent(att)) {
-                          <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
-                        } @else {
-                          <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; min-width: 0;">
+                      @if (att.family === 'image') {
+                        @if (getAttachmentImageUrl(att, currentEditingPost()); as attImgUrl) {
+                          <img [src]="attImgUrl" [alt]="att.originalName" class="cover-thumb-preview" (error)="markCoverUrlFailed(attImgUrl)" />
                         }
-                      </span>
+                      }
+                      <div class="truncate">
+                        <span class="intext-file-title truncate">
+                          {{ att.family === 'image' ? '🖼️' : att.family === 'audio' ? '🎵' : '📄' }}
+                          {{ att.originalName }}
+                        </span>
+                        <span class="intext-status-line">
+                          @if (isAttachmentInContent(att)) {
+                            <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(att.size) }})</span>
+                          } @else {
+                            <span class="text-muted">Fichier joint disponible ({{ formatBytes(att.size) }})</span>
+                          }
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      class="btn-insert-inline"
-                      (mousedown)="$event.preventDefault()"
-                      (click)="insertAttachmentAtCursor(att)"
-                      tabindex="0"
-                      title="Insérer à la position actuelle du curseur"
-                    >
-                      ↵ Insérer au curseur
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                      @if (att.family === 'image') {
+                        @if (att.isCover) {
+                          <button
+                            type="button"
+                            class="btn-cover-toggle is-active-cover"
+                            (click)="setEditorCover(null)"
+                            title="Cette image est la photo de page actuelle. Cliquez pour la retirer."
+                          >
+                            ⭐ Couverture active (✕)
+                          </button>
+                        } @else {
+                          <button
+                            type="button"
+                            class="btn-cover-toggle"
+                            (click)="setEditorCover(att.id)"
+                            title="Définir comme photo de couverture du tutoriel"
+                          >
+                            ⭐ Définir comme photo de page
+                          </button>
+                        }
+                      }
+                      <button
+                        type="button"
+                        class="btn-insert-inline"
+                        (mousedown)="$event.preventDefault()"
+                        (click)="insertAttachmentAtCursor(att)"
+                        tabindex="0"
+                        title="Insérer à la position actuelle du curseur"
+                      >
+                        ↵ Insérer au curseur
+                      </button>
+                    </div>
                   </div>
                 }
               </div>
@@ -441,19 +513,35 @@
                   <div class="attachments-intext-grid">
                     @for (file of creationSelectedFiles(); track file.name; let idx = $index) {
                       <div class="intext-item-card creation-file-item">
-                        <div class="truncate">
-                          <span class="intext-file-title truncate">
-                            {{ getFileIcon(file.name) }} {{ file.name }}
-                          </span>
-                          <span class="intext-status-line">
-                            @if (isAttachmentInContent(file)) {
-                              <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(file.size) }})</span>
-                            } @else {
-                              <span class="text-muted">{{ formatBytes(file.size) }} • En attente d'envoi</span>
-                            }
-                          </span>
+                        <div style="display: flex; gap: 0.75rem; align-items: center; min-width: 0;">
+                          @if (isCreationFileImage(file.name)) {
+                            <img [src]="getBlobUrlForFile(file)" [alt]="file.name" class="cover-thumb-preview" />
+                          }
+                          <div class="truncate">
+                            <span class="intext-file-title truncate">
+                              {{ getFileIcon(file.name) }} {{ file.name }}
+                            </span>
+                            <span class="intext-status-line">
+                              @if (isAttachmentInContent(file)) {
+                                <span class="text-success">✓ Inséré dans le texte ({{ formatBytes(file.size) }})</span>
+                              } @else {
+                                <span class="text-muted">{{ formatBytes(file.size) }} • En attente d'envoi</span>
+                              }
+                            </span>
+                          </div>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                          @if (isCreationFileImage(file.name)) {
+                            <button
+                              type="button"
+                              class="btn-cover-toggle"
+                              [class.is-active-cover]="creationCoverIndex() === idx"
+                              (click)="toggleCreationCover(idx)"
+                              title="Définir ce fichier comme photo de couverture du poste"
+                            >
+                              {{ creationCoverIndex() === idx ? '⭐ Photo de page choisie' : '⭐ Définir comme photo de page' }}
+                            </button>
+                          }
                           <button
                             type="button"
                             class="btn-insert-inline"
@@ -713,6 +801,66 @@
               }
             </button>
           }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL / LIEN SECRET DE PARTAGE (MISSION : Accès direct pour les posts link only) -->
+  @if (secretLinkPost(); as sPost) {
+    <div class="modal-backdrop" (click)="closeSecretLinkModal()">
+      <div class="modal-content card" (click)="$event.stopPropagation()" style="max-width: 540px;">
+        <h3 class="font-display">Lien d'accès secret — {{ sPost.title }}</h3>
+        <p class="subtitle">
+          Ce tutoriel est publié en visibilité <strong>Lien secret</strong>. Seules les personnes possédant ce lien sécurisé peuvent y accéder.
+        </p>
+
+        @if (isGeneratingSecretLink()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Génération du lien sécurisé...</p>
+          </div>
+        } @else if (generatedSecretUrl(); as link) {
+          <div class="form-group" style="margin: 1.25rem 0;">
+            <label style="font-weight: 700; margin-bottom: 0.4rem; display: block;">Lien secret de partage (valable 7 jours) :</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input
+                type="text"
+                readonly
+                [value]="link"
+                class="form-control font-mono"
+                style="font-size: 0.85rem;"
+                #secretInput
+                (click)="secretInput.select()"
+              />
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="copyToClipboard(link, 'Lien secret copié dans le presse-papier !')"
+              >
+                📋 Copier
+              </button>
+            </div>
+            <small class="field-help" style="display: block; margin-top: 0.4rem; color: var(--text-muted);">
+              Les visiteurs n'ont pas besoin d'être connectés pour consulter ce tutoriel avec ce lien.
+            </small>
+          </div>
+        }
+
+        @if (secretLinkSuccessToast(); as toast) {
+          <div class="share-feedback-toast" style="margin-bottom: 1rem;">
+            ✓ {{ toast }}
+          </div>
+        }
+
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="closeSecretLinkModal()"
+          >
+            Fermer
+          </button>
         </div>
       </div>
     </div>
