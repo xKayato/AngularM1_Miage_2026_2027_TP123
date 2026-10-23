@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { catchError, Observable, of, shareReplay, tap, throwError } from 'rxjs';
 import { Page } from '../models/page.model';
 import {
   AttachmentInfo,
@@ -24,6 +24,14 @@ import { LikeResponse } from '../models/creator.model';
 export class PostService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/posts';
+
+  /**
+   * Cache LRU en mémoire des flux binaires (Blob) de pièces jointes pour éviter
+   * les retéléchargements inutiles lors de la navigation entre Catalogue, Mes Postes et Détail,
+   * tout en respectant l'en-tête serveur Cache-Control: no-store sur disque.
+   */
+  private readonly blobCache = new Map<string, Observable<Blob>>();
+  private readonly maxBlobCacheEntries = 80;
 
   /**
    * Récupère la liste paginée des aperçus de posts (catalogue public et recherche).
@@ -151,6 +159,7 @@ export class PostService {
    * Téléverse un lot de pièces jointes (jusqu'à 10 fichiers) pour un post.
    * Utilise FormData et ne fixe pas manuellement le Content-Type pour laisser
    * le navigateur injecter le boundary multipart adéquat.
+   * Pré-alimente immédiatement le cache mémoire Blob avec les fichiers locaux téléversés.
    */
   uploadAttachments(
     postId: string,
@@ -161,14 +170,49 @@ export class PostService {
       formData.append('files', file);
     }
 
-    return this.http.post<AttachmentInfo[]>(
-      `${this.baseUrl}/${encodeURIComponent(postId)}/attachments`,
-      formData,
-    );
+    return this.http
+      .post<AttachmentInfo[]>(
+        `${this.baseUrl}/${encodeURIComponent(postId)}/attachments`,
+        formData,
+      )
+      .pipe(
+        tap((added) => {
+          if (Array.isArray(added)) {
+            files.forEach((file, index) => {
+              const matched =
+                added.find((a) => a.originalName === file.name) || added[index];
+              if (matched?.id) {
+                this.seedAttachmentBlob(postId, matched.id, file);
+              }
+            });
+          }
+        }),
+      );
   }
 
   /**
-   * Télécharge le contenu binaire d'une pièce jointe sécurisée.
+   * Pré-enregistre un Blob local dans le cache mémoire pour éviter tout aller-retour réseau
+   * après un téléversement réussi.
+   */
+  seedAttachmentBlob(postId: string, attachmentId: string, blob: Blob): void {
+    const key = `${postId}:${attachmentId}:`;
+    this.setBlobCacheEntry(key, of(blob));
+  }
+
+  private setBlobCacheEntry(key: string, obs$: Observable<Blob>): void {
+    if (this.blobCache.has(key)) {
+      this.blobCache.delete(key);
+    } else if (this.blobCache.size >= this.maxBlobCacheEntries) {
+      const oldestKey = this.blobCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.blobCache.delete(oldestKey);
+      }
+    }
+    this.blobCache.set(key, obs$);
+  }
+
+  /**
+   * Télécharge le contenu binaire d'une pièce jointe sécurisée avec mise en cache LRU en mémoire.
    * ⚠️ Sécurité : Si un shareToken est fourni, il est transmis EXCLUSIVEMENT via
    * l'en-tête HTTP 'X-Share-Token'. Il n'apparaît JAMAIS dans l'URL ni dans les query params.
    */
@@ -177,18 +221,40 @@ export class PostService {
     attachmentId: string,
     shareToken?: string,
   ): Observable<Blob> {
-    let headers = new HttpHeaders();
-    if (shareToken?.trim()) {
-      headers = headers.set('X-Share-Token', shareToken.trim());
+    const normalizedToken = shareToken?.trim() || '';
+    const cacheKey = `${postId}:${attachmentId}:${normalizedToken}`;
+
+    const cached = this.blobCache.get(cacheKey);
+    if (cached) {
+      // Rafraîchit la position LRU
+      this.blobCache.delete(cacheKey);
+      this.blobCache.set(cacheKey, cached);
+      return cached;
     }
 
-    return this.http.get(
-      `${this.baseUrl}/${encodeURIComponent(postId)}/attachments/${encodeURIComponent(attachmentId)}`,
-      {
-        headers,
-        responseType: 'blob',
-      },
-    );
+    let headers = new HttpHeaders();
+    if (normalizedToken) {
+      headers = headers.set('X-Share-Token', normalizedToken);
+    }
+
+    const request$ = this.http
+      .get(
+        `${this.baseUrl}/${encodeURIComponent(postId)}/attachments/${encodeURIComponent(attachmentId)}`,
+        {
+          headers,
+          responseType: 'blob',
+        },
+      )
+      .pipe(
+        catchError((err) => {
+          this.blobCache.delete(cacheKey);
+          return throwError(() => err);
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+
+    this.setBlobCacheEntry(cacheKey, request$);
+    return request$;
   }
 
   /**
@@ -302,4 +368,3 @@ export class PostService {
     );
   }
 }
-

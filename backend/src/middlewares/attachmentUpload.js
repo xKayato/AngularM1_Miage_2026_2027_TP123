@@ -17,11 +17,31 @@ const storage = multer.diskStorage({
     cb(null, UPLOADS_ATTACHMENTS);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const randomName = crypto.randomBytes(16).toString("hex") + ext;
+    const rawExt = path.extname(file.originalname || "").toLowerCase();
+    // Sanitize stricte de l'extension pour interdire tout caractère de traversée ou injection
+    const safeExt = /^\.[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : "";
+    const randomName = crypto.randomUUID() + safeExt;
     cb(null, randomName);
   },
 });
+
+/**
+ * Résout de manière sécurisée le chemin physique d'une pièce jointe stockée.
+ * Empêche toute attaque par traversée de répertoires (Path Traversal) en vérifiant
+ * que le nom stocké est un nom de fichier simple et que le chemin résolu demeure
+ * strictement confiné dans UPLOADS_ATTACHMENTS.
+ *
+ * @param {string} storedName - Nom de fichier stocké en base
+ * @returns {string | null} Chemin absolu sécurisé ou null si suspect
+ */
+export function resolveSafeAttachmentPath(storedName) {
+  if (!storedName || typeof storedName !== "string") return null;
+  const base = path.basename(storedName);
+  if (base !== storedName || base.startsWith(".")) return null;
+  const resolved = path.resolve(UPLOADS_ATTACHMENTS, base);
+  if (!resolved.startsWith(UPLOADS_ATTACHMENTS + path.sep)) return null;
+  return resolved;
+}
 
 // Limite Multer globale : 25 Mo max par fichier individuel, 10 fichiers max par lot
 const multerInstance = multer({

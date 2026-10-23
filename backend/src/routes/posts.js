@@ -1,11 +1,9 @@
 import { Router } from "express";
 import mongoose from "mongoose";
-import path from "node:path";
 import crypto from "node:crypto";
 import fsPromises from "node:fs/promises";
 import { Post } from "../models/Post.js";
 import { Like } from "../models/Like.js";
-import { User } from "../models/User.js";
 import { Follow } from "../models/Follow.js";
 import { Subscription } from "../models/Subscription.js";
 import { ShareLink } from "../models/ShareLink.js";
@@ -14,7 +12,7 @@ import { authMakerShare } from "../middlewares/authMakerShare.js";
 import { optionalAuthMakerShare } from "../middlewares/optionalAuthMakerShare.js";
 import {
   attachmentUploadMiddleware,
-  UPLOADS_ATTACHMENTS,
+  resolveSafeAttachmentPath,
 } from "../middlewares/attachmentUpload.js";
 import { detectAndValidateAttachment } from "../utils/attachmentValidator.js";
 import {
@@ -383,38 +381,49 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     const posts = facetResult[0]?.docs || [];
     const totalPages = Math.ceil(totalDocs / limit) || 1;
 
-    // 7. Calcul dynamique et parallèle des likes et commentaires via collections dédiées
-    const postIds = posts.map((p) => p._id);
-    const [likeCounts, commentCounts] = await Promise.all([
-      Like.aggregate([
-        { $match: { postId: { $in: postIds } } },
-        { $group: { _id: "$postId", count: { $sum: 1 } } },
-      ]),
-      Comment.aggregate([
-        { $match: { postId: { $in: postIds } } },
-        { $group: { _id: "$postId", count: { $sum: 1 } } },
-      ]),
-    ]);
-    const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
-    const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
-
-    // 8. Résolution parallèle des relations de l'utilisateur connecté (follows et abonnements actifs)
+    // 7 & 8. Calcul dynamique et parallèle des likes, commentaires et relations si la page contient des posts
+    let likesMap = new Map();
+    let commentsMap = new Map();
     let followingSet = new Set();
     let subSet = new Set();
-    if (req.user) {
-      const creatorIds = posts.map((p) => p.authorDoc?._id || p.author?._id || p.author);
-      const [userFollows, userSubs] = await Promise.all([
-        Follow.find({
-          followerId: req.user._id,
-          creatorId: { $in: creatorIds },
-        }).select("creatorId"),
-        Subscription.find({
-          subscriberId: req.user._id,
-          creatorId: { $in: creatorIds },
-          active: true,
-          expiresAt: { $gt: new Date() },
-        }).select("creatorId"),
+
+    if (posts.length > 0) {
+      const postIds = posts.map((p) => p._id);
+      const creatorIds = req.user
+        ? posts.map((p) => p.authorDoc?._id || p.author?._id || p.author)
+        : [];
+
+      const [likeCounts, commentCounts, userFollows, userSubs] = await Promise.all([
+        Like.aggregate([
+          { $match: { postId: { $in: postIds } } },
+          { $group: { _id: "$postId", count: { $sum: 1 } } },
+        ]),
+        Comment.aggregate([
+          { $match: { postId: { $in: postIds } } },
+          { $group: { _id: "$postId", count: { $sum: 1 } } },
+        ]),
+        req.user
+          ? Follow.find({
+              followerId: req.user._id,
+              creatorId: { $in: creatorIds },
+            })
+              .select("creatorId")
+              .lean()
+          : Promise.resolve([]),
+        req.user
+          ? Subscription.find({
+              subscriberId: req.user._id,
+              creatorId: { $in: creatorIds },
+              active: true,
+              expiresAt: { $gt: new Date() },
+            })
+              .select("creatorId")
+              .lean()
+          : Promise.resolve([]),
       ]);
+
+      likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
+      commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
       followingSet = new Set(userFollows.map((f) => String(f.creatorId)));
       subSet = new Set(userSubs.map((s) => String(s.creatorId)));
     }
@@ -484,28 +493,37 @@ postsRouter.get("/my", authMakerShare, async (req, res, next) => {
       filter.status = statusParam;
     }
 
-    const totalDocs = await Post.countDocuments(filter);
-    const totalPages = Math.ceil(totalDocs / limit) || 1;
     const offset = (page - 1) * limit;
 
-    const posts = await Post.find(filter)
-      .sort({ createdAt: -1, _id: -1 })
-      .skip(offset)
-      .limit(limit)
-      .populate("author", "name");
-
-    const postIds = posts.map((p) => p._id);
-    const likeCounts = await Like.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
+    const [totalDocs, posts] = await Promise.all([
+      Post.countDocuments(filter),
+      Post.find(filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(offset)
+        .limit(limit)
+        .populate("author", "name"),
     ]);
-    const likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
 
-    const commentCounts = await Comment.aggregate([
-      { $match: { postId: { $in: postIds } } },
-      { $group: { _id: "$postId", count: { $sum: 1 } } },
-    ]);
-    const commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    let likesMap = new Map();
+    let commentsMap = new Map();
+
+    if (posts.length > 0) {
+      const postIds = posts.map((p) => p._id);
+      const [likeCounts, commentCounts] = await Promise.all([
+        Like.aggregate([
+          { $match: { postId: { $in: postIds } } },
+          { $group: { _id: "$postId", count: { $sum: 1 } } },
+        ]),
+        Comment.aggregate([
+          { $match: { postId: { $in: postIds } } },
+          { $group: { _id: "$postId", count: { $sum: 1 } } },
+        ]),
+      ]);
+      likesMap = new Map(likeCounts.map((l) => [String(l._id), l.count]));
+      commentsMap = new Map(commentCounts.map((c) => [String(c._id), c.count]));
+    }
 
     const docs = posts.map((p) =>
       toPostAuthorManagement(p, {
@@ -558,11 +576,9 @@ postsRouter.post("/", authMakerShare, async (req, res, next) => {
 
     await newPost.save();
 
-    const likesCount = await Like.countDocuments({ postId: newPost._id });
-
     res.status(201).json(
       toPostAuthorManagement(newPost, {
-        likesCount,
+        likesCount: 0,
         commentsCount: 0,
         authorName: req.user.name,
       })
@@ -607,41 +623,30 @@ postsRouter.get("/shared/:token", optionalAuthMakerShare, async (req, res, next)
       return res.status(404).json({ message: "Post introuvable" });
     }
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
+    const authorId = post.author?._id || post.author;
+    const [likesCount, commentsCount, isLikedDoc, isFollowingDoc, sub] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+      req.user ? Like.exists({ postId: post._id, userId: req.user._id }) : Promise.resolve(null),
+      req.user
+        ? Follow.exists({ followerId: req.user._id, creatorId: authorId })
+        : Promise.resolve(null),
+      req.user
+        ? Subscription.findOne({
+            subscriberId: req.user._id,
+            creatorId: authorId,
+            active: true,
+            expiresAt: { $gt: new Date() },
+          })
+        : Promise.resolve(null),
+    ]);
 
-    let userInteractions = {
-      isLiked: false,
-      isFollowingAuthor: false,
-      isSubscribedToAuthor: false,
-      subscriptionExpiresAt: null,
+    const userInteractions = {
+      isLiked: Boolean(isLikedDoc),
+      isFollowingAuthor: Boolean(isFollowingDoc),
+      isSubscribedToAuthor: Boolean(sub),
+      subscriptionExpiresAt: sub?.expiresAt ? new Date(sub.expiresAt).toISOString() : null,
     };
-
-    if (req.user) {
-      const isLiked = Boolean(
-        await Like.exists({ postId: post._id, userId: req.user._id })
-      );
-      const isFollowing = Boolean(
-        await Follow.exists({
-          followerId: req.user._id,
-          creatorId: post.author._id || post.author,
-        })
-      );
-      const sub = await Subscription.findOne({
-        subscriberId: req.user._id,
-        creatorId: post.author._id || post.author,
-        active: true,
-        expiresAt: { $gt: new Date() },
-      });
-
-      userInteractions = {
-        isLiked,
-        isFollowingAuthor: isFollowing,
-        isSubscribedToAuthor: Boolean(sub),
-        subscriptionExpiresAt: sub?.expiresAt ? new Date(sub.expiresAt).toISOString() : null,
-      };
-    }
-
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
 
     res.json(
       toPostDetail(post, {
@@ -741,41 +746,33 @@ postsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       return res.status(access.status || 403).json({ message: access.message });
     }
 
-    const [likesCount, commentsCount] = await Promise.all([
+    const authorId = post.author?._id || post.author;
+    const [likesCount, commentsCount, isLiked, isFollowing, sub] = await Promise.all([
       Like.countDocuments({ postId: post._id }),
       Comment.countDocuments({ postId: post._id }),
+      req.user ? Like.exists({ postId: post._id, userId: req.user._id }) : Promise.resolve(null),
+      req.user
+        ? Follow.exists({
+            followerId: req.user._id,
+            creatorId: authorId,
+          })
+        : Promise.resolve(null),
+      req.user
+        ? Subscription.findOne({
+            subscriberId: req.user._id,
+            creatorId: authorId,
+            active: true,
+            expiresAt: { $gt: new Date() },
+          })
+        : Promise.resolve(null),
     ]);
 
-    let userInteractions = {
-      isLiked: false,
-      isFollowingAuthor: false,
-      isSubscribedToAuthor: false,
-      subscriptionExpiresAt: null,
+    const userInteractions = {
+      isLiked: Boolean(isLiked),
+      isFollowingAuthor: Boolean(isFollowing),
+      isSubscribedToAuthor: Boolean(sub),
+      subscriptionExpiresAt: sub?.expiresAt ? new Date(sub.expiresAt).toISOString() : null,
     };
-
-    if (req.user) {
-      const authorId = post.author?._id || post.author;
-      const [isLiked, isFollowing, sub] = await Promise.all([
-        Like.exists({ postId: post._id, userId: req.user._id }),
-        Follow.exists({
-          followerId: req.user._id,
-          creatorId: authorId,
-        }),
-        Subscription.findOne({
-          subscriberId: req.user._id,
-          creatorId: authorId,
-          active: true,
-          expiresAt: { $gt: new Date() },
-        }),
-      ]);
-
-      userInteractions = {
-        isLiked: Boolean(isLiked),
-        isFollowingAuthor: Boolean(isFollowing),
-        isSubscribedToAuthor: Boolean(sub),
-        subscriptionExpiresAt: sub?.expiresAt ? new Date(sub.expiresAt).toISOString() : null,
-      };
-    }
 
     res.json(
       toPostDetail(post, {
@@ -1047,7 +1044,6 @@ postsRouter.delete("/:id/comments/:cid", authMakerShare, async (req, res, next) 
   }
 });
 
-
 /**
  * PUT /api/posts/:id
  * Modification d'un post par son auteur.
@@ -1080,8 +1076,10 @@ postsRouter.put("/:id", authMakerShare, async (req, res, next) => {
 
     await post.save();
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+    ]);
 
     res.json(
       toPostAuthorManagement(post, {
@@ -1127,8 +1125,10 @@ postsRouter.post("/:id/publish", authMakerShare, async (req, res, next) => {
 
     await post.save();
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+    ]);
 
     res.json(
       toPostAuthorManagement(post, {
@@ -1164,8 +1164,10 @@ postsRouter.post("/:id/unpublish", authMakerShare, async (req, res, next) => {
     post.status = "draft";
     await post.save();
 
-    const likesCount = await Like.countDocuments({ postId: post._id });
-    const commentsCount = await Comment.countDocuments({ postId: post._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: post._id }),
+      Comment.countDocuments({ postId: post._id }),
+    ]);
 
     res.json(
       toPostAuthorManagement(post, {
@@ -1287,7 +1289,7 @@ postsRouter.delete("/:id/share-link", authMakerShare, async (req, res, next) => 
 /**
  * POST /api/posts/:id/attachments
  * Upload sécurisé de pièces jointes (fichiers multiples jusqu'à 10 par lot).
- * Contrôle atomique sous concurrence sur le document MongoDB.
+ * Validation parallèle des magic bytes, pré-contrôle mémoire de quota et mise à jour atomique MongoDB.
  */
 postsRouter.post(
   "/:id/attachments",
@@ -1327,29 +1329,43 @@ postsRouter.post(
         });
       }
 
-      const newAttachments = [];
-      for (const file of uploadedFiles) {
-        const validation = await detectAndValidateAttachment(
-          file.path,
-          file.size,
-          file.originalname
-        );
-        if (!validation.isValid) {
-          await cleanupCurrentBatch();
-          return res.status(400).json({ message: validation.error });
-        }
+      // Validation binaire parallèle (magic bytes + limites par famille) de tout le lot
+      const validations = await Promise.all(
+        uploadedFiles.map((file) =>
+          detectAndValidateAttachment(file.path, file.size, file.originalname)
+        )
+      );
 
-        newAttachments.push({
-          originalName: file.originalname,
-          storedName: file.filename,
-          mimeType: validation.mimeType,
-          size: file.size,
-          family: validation.family,
-          isCover: false,
+      const firstInvalid = validations.find((v) => !v.isValid);
+      if (firstInvalid) {
+        await cleanupCurrentBatch();
+        return res.status(400).json({ message: firstInvalid.error });
+      }
+
+      // Pré-contrôle mémoire rapide du quota (10 fichiers max, 50 Mo cumulés max)
+      const existingAttachments = post.attachments || [];
+      const existingBytes = existingAttachments.reduce((acc, a) => acc + (a.size || 0), 0);
+      const totalNewBytes = uploadedFiles.reduce((acc, f) => acc + f.size, 0);
+
+      if (
+        existingAttachments.length + uploadedFiles.length > 10 ||
+        existingBytes + totalNewBytes > 52428800
+      ) {
+        await cleanupCurrentBatch();
+        return res.status(400).json({
+          message:
+            "Dépassement de quota : un post ne peut pas contenir plus de 10 pièces jointes et 50 Mo cumulés.",
         });
       }
 
-      const totalNewBytes = newAttachments.reduce((acc, a) => acc + a.size, 0);
+      const newAttachments = uploadedFiles.map((file, idx) => ({
+        originalName: file.originalname,
+        storedName: file.filename,
+        mimeType: validations[idx].mimeType,
+        size: file.size,
+        family: validations[idx].family,
+        isCover: false,
+      }));
 
       // MISE À JOUR CONDITIONNELLE ATOMIQUE SUR LE DOCUMENT MONGODB
       const updatedPost = await Post.findOneAndUpdate(
@@ -1542,8 +1558,10 @@ postsRouter.put("/:id/cover", authMakerShare, async (req, res, next) => {
       });
     }
 
-    const likesCount = await Like.countDocuments({ postId: updatedPost._id });
-    const commentsCount = await Comment.countDocuments({ postId: updatedPost._id });
+    const [likesCount, commentsCount] = await Promise.all([
+      Like.countDocuments({ postId: updatedPost._id }),
+      Comment.countDocuments({ postId: updatedPost._id }),
+    ]);
     return res.status(200).json(toPostAuthorManagement(updatedPost, { likesCount, commentsCount }));
   } catch (err) {
     next(err);
@@ -1584,7 +1602,11 @@ postsRouter.get("/:id/attachments/:attachmentId", optionalAuthMakerShare, async 
       return res.status(404).json({ message: "Pièce jointe introuvable dans ce post" });
     }
 
-    const filePath = path.join(UPLOADS_ATTACHMENTS, attachment.storedName);
+    const filePath = resolveSafeAttachmentPath(attachment.storedName);
+    if (!filePath) {
+      return res.status(404).json({ message: "Fichier physique introuvable sur le serveur" });
+    }
+
     try {
       await fsPromises.access(filePath);
     } catch {
@@ -1644,8 +1666,10 @@ postsRouter.delete("/:id/attachments/:attachmentId", authMakerShare, async (req,
       return res.status(404).json({ message: "Pièce jointe introuvable dans ce post" });
     }
 
-    const filePath = path.join(UPLOADS_ATTACHMENTS, attachment.storedName);
-    await fsPromises.unlink(filePath).catch(() => {});
+    const filePath = resolveSafeAttachmentPath(attachment.storedName);
+    if (filePath) {
+      await fsPromises.unlink(filePath).catch(() => {});
+    }
 
     post.attachments.pull(attachment._id || attachment.id);
 

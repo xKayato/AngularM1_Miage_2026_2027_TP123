@@ -25,10 +25,25 @@ export const MAX_CUMULATIVE_BYTES_PER_POST = 50 * 1024 * 1024; // 50 Mo
  * @returns {Promise<{ isValid: boolean, error?: string, mimeType?: string, family?: 'image' | 'audio' | 'pdf' }>}
  */
 export async function detectAndValidateAttachment(filePath, size, originalName) {
+  if (typeof size === "number") {
+    if (size <= 0) {
+      return {
+        isValid: false,
+        error: `Fichier trop court ou vide pour '${originalName}'`,
+      };
+    }
+    if (size > LIMITS_BY_FAMILY.audio) {
+      return {
+        isValid: false,
+        error: `Le fichier '${originalName}' dépasse la taille maximale autorisée (25 Mo).`,
+      };
+    }
+  }
+
   let handle;
   try {
     handle = await fsPromises.open(filePath, "r");
-    const buffer = Buffer.alloc(32);
+    const buffer = Buffer.allocUnsafe(32);
     const { bytesRead } = await handle.read(buffer, 0, 32, 0);
 
     if (bytesRead < 4) {

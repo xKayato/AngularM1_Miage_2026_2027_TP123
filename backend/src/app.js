@@ -56,6 +56,11 @@ const allowed = new Set([
   "audio/x-m4a",
 ]);
 
+function safeExtension(originalName) {
+  const rawExt = path.extname(originalName || "").toLowerCase();
+  return /^\.[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : "";
+}
+
 /**
  * Crée un jeton JWT contenant uniquement l'identité nécessaire à l'API.
  * Le mot de passe n'est jamais placé dans le token. `sub` signifie subject
@@ -122,8 +127,7 @@ const storage = multer.diskStorage({
     }
   },
   filename: (_request, file, callback) => {
-    const filename =
-      crypto.randomUUID() + path.extname(file.originalname).toLowerCase();
+    const filename = crypto.randomUUID() + safeExtension(file.originalname);
     console.log(`[multer] Nom de stockage généré pour ${file.originalname}`);
     callback(null, filename);
   },
@@ -180,8 +184,7 @@ const uploadAvatar = multer({
       callback(null, UPLOADS_AVATARS);
     },
     filename: (_request, file, callback) => {
-      const filename =
-        crypto.randomUUID() + path.extname(file.originalname).toLowerCase();
+      const filename = crypto.randomUUID() + safeExtension(file.originalname);
       console.log(`[multer] Nom de stockage avatar généré pour ${file.originalname}`);
       callback(null, filename);
     },
@@ -205,6 +208,16 @@ const uploadAvatar = multer({
  */
 export function createApp() {
   const app = express();
+  app.disable("x-powered-by");
+
+  // En-têtes de sécurité HTTP systématiques (défense en profondeur)
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+    next();
+  });
 
   // Journaliser la fin de chaque requête permet de suivre méthode, URL,
   // statut et durée sans exposer les corps contenant des mots de passe.
@@ -229,9 +242,9 @@ export function createApp() {
   app.use(cors());
 
   // Express ne gère pas nativement le JSON : ce middleware transforme le corps JSON en objet JavaScript 
-  // accessible via req.body.
+  // accessible via req.body, avec une limite stricte de 1 Mo contre les attaques DoS.
   // Il est placé avant les routes pour que toutes les requêtes JSON soient traitées.
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
 
   /** Endpoint public utilisé pour vérifier que l'API répond. */
   app.get("/api/health", (_req, res) => {
@@ -514,7 +527,7 @@ export function createApp() {
 
         if (previousAvatar) {
           try {
-            await fsPromises.unlink(path.join(UPLOADS_AVATARS, previousAvatar));
+            await fsPromises.unlink(path.join(UPLOADS_AVATARS, path.basename(previousAvatar)));
             console.log(`[avatar] Ancien avatar supprimé : ${previousAvatar}`);
           } catch (cleanupErr) {
             console.error(`[avatar] Erreur suppression ancien avatar`, cleanupErr);
@@ -541,7 +554,7 @@ export function createApp() {
       }
 
       if (user.avatar?.storedName) {
-        const storedName = user.avatar.storedName;
+        const storedName = path.basename(user.avatar.storedName);
         user.avatar = undefined;
         await user.save();
 
@@ -566,7 +579,7 @@ export function createApp() {
         return res.status(400).json({ message: "Identifiant invalide" });
       }
 
-      const user = await User.findById(req.params.id);
+      const user = await User.findById(req.params.id).select("status avatar").lean();
       if (!user || user.status === "suspended") {
         return res.status(404).json({ message: "Utilisateur inconnu ou suspendu" });
       }
@@ -575,8 +588,11 @@ export function createApp() {
         return res.status(404).json({ message: "Aucun avatar pour cet utilisateur" });
       }
 
-      const avatarPath = path.join(UPLOADS_AVATARS, user.avatar.storedName);
-      if (!fs.existsSync(avatarPath)) {
+      const safeStoredName = path.basename(user.avatar.storedName);
+      const avatarPath = path.join(UPLOADS_AVATARS, safeStoredName);
+      try {
+        await fsPromises.access(avatarPath);
+      } catch {
         return res.status(404).json({ message: "Fichier avatar introuvable" });
       }
 
@@ -723,14 +739,14 @@ export function createApp() {
 
         if (audioFile) {
           try {
-            await fsPromises.unlink(path.join(UPLOADS, audioFile.filename));
+            await fsPromises.unlink(path.join(UPLOADS, path.basename(audioFile.filename)));
           } catch (cleanupError) {
             console.error(`[tracks] Impossible de supprimer le fichier audio temporaire`, cleanupError);
           }
         }
         if (coverFile) {
           try {
-            await fsPromises.unlink(path.join(UPLOADS_COVERS, coverFile.filename));
+            await fsPromises.unlink(path.join(UPLOADS_COVERS, path.basename(coverFile.filename)));
           } catch (cleanupError) {
             console.error(`[tracks] Impossible de supprimer l'image temporaire`, cleanupError);
           }
@@ -756,7 +772,7 @@ export function createApp() {
         return res.status(404).json({ message: "Aucune couverture pour cette piste" });
       }
 
-      const coverPath = path.join(UPLOADS_COVERS, track.cover.storedName);
+      const coverPath = path.join(UPLOADS_COVERS, path.basename(track.cover.storedName));
       res.type(track.cover.mimeType);
       res.sendFile(coverPath, (error) => {
         if (error) {
@@ -815,7 +831,7 @@ export function createApp() {
 
         if (previousCover) {
           try {
-            await fsPromises.unlink(path.join(UPLOADS_COVERS, previousCover));
+            await fsPromises.unlink(path.join(UPLOADS_COVERS, path.basename(previousCover)));
             console.log(`[cover] Ancienne couverture supprimée : ${previousCover}`);
           } catch (cleanupError) {
             console.error(`[cover] Impossible de supprimer l'ancienne couverture : ${previousCover}`, cleanupError);
@@ -848,7 +864,7 @@ export function createApp() {
         return res.status(404).json({ message: "Aucune couverture pour cette piste" });
       }
 
-      const coverFileName = track.cover.storedName;
+      const coverFileName = path.basename(track.cover.storedName);
       track.cover = undefined;
       await track.save();
 
@@ -879,7 +895,7 @@ export function createApp() {
         return res.status(404).json({ message: "Piste inconnue" });
       }
 
-      const audioPath = path.join(UPLOADS, track.storedName);
+      const audioPath = path.join(UPLOADS, path.basename(track.storedName));
       res.type(track.mimeType);
       // Ce callback permet de loguer le succès ou l'erreur du transfert.
       res.sendFile(audioPath, (error) => {
@@ -909,7 +925,7 @@ export function createApp() {
         return res.status(404).json({ message: "Piste inconnue" });
       }
 
-      const audioPath = path.join(UPLOADS, track.storedName);
+      const audioPath = path.join(UPLOADS, path.basename(track.storedName));
       try {
         await fsPromises.unlink(audioPath);
         console.log(`[tracks] Fichier supprimé : ${audioPath}`);
@@ -924,7 +940,7 @@ export function createApp() {
 
       // Nettoyage de la couverture sur disque si existante
       if (track.cover?.storedName) {
-        const coverPath = path.join(UPLOADS_COVERS, track.cover.storedName);
+        const coverPath = path.join(UPLOADS_COVERS, path.basename(track.cover.storedName));
         try {
           await fsPromises.unlink(coverPath);
           console.log(`[tracks] Fichier cover supprimé : ${coverPath}`);
