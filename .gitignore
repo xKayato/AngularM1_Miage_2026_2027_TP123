@@ -4,7 +4,6 @@ dist/
 .angular/
 .DS_Store
 Thumbs.db
-RAPPORT_IA_LIBRE.md
 backend/data/
 *.seed-manifest.json
 seed-manifest.json
