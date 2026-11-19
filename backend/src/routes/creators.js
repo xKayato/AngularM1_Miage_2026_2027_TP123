@@ -175,6 +175,15 @@ creatorsRouter.get("/my/follows", authMakerShare, async (req, res, next) => {
                 creator: {
                   id: { $toString: "$creatorDoc._id" },
                   name: "$creatorDoc.name",
+                  bio: { $ifNull: ["$creatorDoc.bio", ""] },
+                  hasAvatar: { $cond: [{ $ifNull: ["$creatorDoc.avatar.storedName", false] }, true, false] },
+                  avatarUrl: {
+                    $cond: [
+                      { $ifNull: ["$creatorDoc.avatar.storedName", false] },
+                      { $concat: ["/api/users/", { $toString: "$creatorDoc._id" }, "/avatar"] },
+                      null,
+                    ],
+                  },
                 },
                 createdAt: 1,
               },
@@ -336,8 +345,35 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     };
 
     // Parallélisation massive : compteurs réels et récupération des posts en 1 seul round-trip
-    const [followersCount, subscribersCount, creatorPosts] = await Promise.all([
-      Follow.countDocuments({ creatorId: creator._id }),
+    const [followersAgg, followingAgg, subscribersCount, creatorPosts] = await Promise.all([
+      Follow.aggregate([
+        { $match: { creatorId: creator._id } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "followerId",
+            foreignField: "_id",
+            as: "followerDoc",
+          },
+        },
+        { $unwind: "$followerDoc" },
+        { $match: { "followerDoc.status": { $ne: "suspended" } } },
+        { $count: "count" },
+      ]),
+      Follow.aggregate([
+        { $match: { followerId: creator._id } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "creatorId",
+            foreignField: "_id",
+            as: "creatorDoc",
+          },
+        },
+        { $unwind: "$creatorDoc" },
+        { $match: { "creatorDoc.status": { $ne: "suspended" } } },
+        { $count: "count" },
+      ]),
       Subscription.countDocuments({
         creatorId: creator._id,
         active: true,
@@ -345,9 +381,12 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       }),
       Post.find(postFilter)
         .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
-        .limit(30)
+        .limit(100)
         .lean(),
     ]);
+
+    const followersCount = followersAgg[0]?.count || 0;
+    const followingCount = followingAgg[0]?.count || 0;
 
     // Parallélisation des agrégations likes et commentaires pour les créations du créateur
     const postIds = creatorPosts.map((p) => p._id);
@@ -393,6 +432,7 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       avatarUrl: creator.avatar?.storedName ? `/api/users/${creator._id}/avatar` : null,
       createdAt: creator.createdAt,
       followersCount,
+      followingCount,
       subscribersCount,
       creationsCount,
       isSelf,
@@ -402,6 +442,178 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
         subscriptionExpiresAt,
       },
       creations,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/creators/:id/followers
+ * Retourne la liste paginée des followers actifs (non suspendus) d'un créateur.
+ */
+creatorsRouter.get("/:id/followers", optionalAuthMakerShare, async (req, res, next) => {
+  try {
+    const creatorId = req.params.id;
+    if (!isValidObjectId(creatorId)) {
+      return res.status(400).json({ message: "Identifiant créateur invalide" });
+    }
+
+    const creator = await User.findById(creatorId).select("_id status").lean();
+    if (!creator || creator.status === "suspended") {
+      return res.status(404).json({ message: "Créateur introuvable ou inactif" });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const pipeline = [
+      { $match: { creatorId: creator._id } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "followerId",
+          foreignField: "_id",
+          as: "userDoc",
+        },
+      },
+      { $unwind: "$userDoc" },
+      { $match: { "userDoc.status": { $ne: "suspended" } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $skip: offset },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                id: { $toString: "$_id" },
+                creator: {
+                  id: { $toString: "$userDoc._id" },
+                  name: "$userDoc.name",
+                  bio: { $ifNull: ["$userDoc.bio", ""] },
+                  hasAvatar: { $cond: [{ $ifNull: ["$userDoc.avatar.storedName", false] }, true, false] },
+                  avatarUrl: {
+                    $cond: [
+                      { $ifNull: ["$userDoc.avatar.storedName", false] },
+                      { $concat: ["/api/users/", { $toString: "$userDoc._id" }, "/avatar"] },
+                      null,
+                    ],
+                  },
+                },
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = await Follow.aggregate(pipeline);
+    const totalDocs = result[0]?.totalDocs[0]?.count || 0;
+    const docs = result[0]?.docs || [];
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    res.json({
+      docs,
+      items: docs,
+      totalDocs,
+      total: totalDocs,
+      limit,
+      page,
+      totalPages,
+      pages: totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/creators/:id/following
+ * Retourne la liste paginée des créateurs actifs (non suspendus) suivis par cet utilisateur.
+ */
+creatorsRouter.get("/:id/following", optionalAuthMakerShare, async (req, res, next) => {
+  try {
+    const creatorId = req.params.id;
+    if (!isValidObjectId(creatorId)) {
+      return res.status(400).json({ message: "Identifiant créateur invalide" });
+    }
+
+    const creator = await User.findById(creatorId).select("_id status").lean();
+    if (!creator || creator.status === "suspended") {
+      return res.status(404).json({ message: "Créateur introuvable ou inactif" });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const pipeline = [
+      { $match: { followerId: creator._id } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "creatorId",
+          foreignField: "_id",
+          as: "userDoc",
+        },
+      },
+      { $unwind: "$userDoc" },
+      { $match: { "userDoc.status": { $ne: "suspended" } } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      {
+        $facet: {
+          totalDocs: [{ $count: "count" }],
+          docs: [
+            { $skip: offset },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 0,
+                id: { $toString: "$_id" },
+                creator: {
+                  id: { $toString: "$userDoc._id" },
+                  name: "$userDoc.name",
+                  bio: { $ifNull: ["$userDoc.bio", ""] },
+                  hasAvatar: { $cond: [{ $ifNull: ["$userDoc.avatar.storedName", false] }, true, false] },
+                  avatarUrl: {
+                    $cond: [
+                      { $ifNull: ["$userDoc.avatar.storedName", false] },
+                      { $concat: ["/api/users/", { $toString: "$userDoc._id" }, "/avatar"] },
+                      null,
+                    ],
+                  },
+                },
+                createdAt: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = await Follow.aggregate(pipeline);
+    const totalDocs = result[0]?.totalDocs[0]?.count || 0;
+    const docs = result[0]?.docs || [];
+    const totalPages = Math.ceil(totalDocs / limit) || 1;
+
+    res.json({
+      docs,
+      items: docs,
+      totalDocs,
+      total: totalDocs,
+      limit,
+      page,
+      totalPages,
+      pages: totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
     });
   } catch (err) {
     next(err);

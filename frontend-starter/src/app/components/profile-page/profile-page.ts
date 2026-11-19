@@ -85,6 +85,12 @@ export class ProfilePageComponent implements OnInit {
   readonly totalFollows = signal(0);
   readonly unfollowingId = signal<string | null>(null);
 
+  // My followers state (users who follow me)
+  readonly loadingMyFollowers = signal(false);
+  readonly myFollowersError = signal('');
+  readonly myFollowers = signal<FollowItem[]>([]);
+  readonly totalMyFollowers = signal(0);
+
   // Active subscriptions state
   readonly loadingSubscriptions = signal(false);
   readonly subscriptionsError = signal('');
@@ -140,6 +146,7 @@ export class ProfilePageComponent implements OnInit {
       next: (user) => {
         this.loading.set(false);
         this.populateForm(user);
+        this.loadMyFollowers();
       },
       error: (err: unknown) => {
         this.loading.set(false);
@@ -301,7 +308,33 @@ export class ProfilePageComponent implements OnInit {
   loadDashboardData(): void {
     this.loadMetrics();
     this.loadFollows();
+    this.loadMyFollowers();
     this.loadSubscriptions();
+  }
+
+  /**
+   * Charge les utilisateurs qui me suivent (Mes Followers)
+   */
+  loadMyFollowers(): void {
+    const myId = this.auth.currentUser()?.id;
+    if (!myId || typeof this.creatorService.getCreatorFollowers !== 'function') {
+      return;
+    }
+
+    this.loadingMyFollowers.set(true);
+    this.myFollowersError.set('');
+
+    this.creatorService.getCreatorFollowers(myId, { page: 1, limit: 20 }).subscribe({
+      next: (res) => {
+        this.loadingMyFollowers.set(false);
+        this.myFollowers.set(res.docs ?? res.items ?? []);
+        this.totalMyFollowers.set(res.totalDocs ?? res.total ?? 0);
+      },
+      error: () => {
+        this.loadingMyFollowers.set(false);
+        this.myFollowersError.set('Impossible de charger vos followers.');
+      },
+    });
   }
 
   /**

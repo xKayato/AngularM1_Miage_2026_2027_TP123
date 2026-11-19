@@ -66,10 +66,27 @@
               <span class="metric-lbl">création{{ creator.creationsCount > 1 ? 's' : '' }}</span>
             </div>
             <div class="metric-sep" aria-hidden="true"></div>
-            <div class="metric-item">
+            <button
+              type="button"
+              class="metric-item metric-btn"
+              [class.active]="activeSocialTab() === 'followers'"
+              (click)="toggleSocialTab('followers')"
+              title="Voir les followers de {{ creator.name }}"
+            >
               <span class="metric-val font-display">{{ creator.followersCount }}</span>
-              <span class="metric-lbl">follower{{ creator.followersCount > 1 ? 's' : '' }}</span>
-            </div>
+              <span class="metric-lbl">👥 follower{{ creator.followersCount > 1 ? 's' : '' }} ▾</span>
+            </button>
+            <div class="metric-sep" aria-hidden="true"></div>
+            <button
+              type="button"
+              class="metric-item metric-btn"
+              [class.active]="activeSocialTab() === 'following'"
+              (click)="toggleSocialTab('following')"
+              title="Voir les créateurs suivis par {{ creator.name }}"
+            >
+              <span class="metric-val font-display">{{ creator.followingCount ?? 0 }}</span>
+              <span class="metric-lbl">➡️ suivi{{ (creator.followingCount ?? 0) > 1 ? 's' : '' }} ▾</span>
+            </button>
             <div class="metric-sep" aria-hidden="true"></div>
             <div class="metric-item">
               <span class="metric-val font-display">{{ creator.subscribersCount }}</span>
@@ -150,15 +167,131 @@
       }
     </header>
 
-    <!-- SECTION DES CRÉATIONS DU CRÉATEUR AVEC DATES VISIBLES (Frame 3G) -->
+    <!-- PANNEAU INTERACTIF : FOLLOWERS & UTILISATEURS SUIVIS -->
+    @if (activeSocialTab(); as tab) {
+      <section class="social-drawer-card card" aria-live="polite">
+        <div class="social-drawer-header">
+          <div class="social-tabs-group">
+            <button
+              type="button"
+              class="social-tab-btn"
+              [class.active]="tab === 'followers'"
+              (click)="toggleSocialTab('followers')"
+            >
+              👥 Followers de {{ creator.name }} ({{ creator.followersCount }})
+            </button>
+            <button
+              type="button"
+              class="social-tab-btn"
+              [class.active]="tab === 'following'"
+              (click)="toggleSocialTab('following')"
+            >
+              ➡️ Suivis par {{ creator.name }} ({{ creator.followingCount ?? 0 }})
+            </button>
+          </div>
+          <button type="button" class="btn-close-social" (click)="closeSocialTab()">
+            ✕ Fermer
+          </button>
+        </div>
+
+        @if (socialLoading()) {
+          <p class="loading-state">Chargement de la liste...</p>
+        } @else if (socialError()) {
+          <p class="action-feedback error">{{ socialError() }}</p>
+        } @else {
+          <div class="social-users-grid">
+            @for (item of socialItems(); track item.id) {
+              <div class="social-user-card">
+                <a [routerLink]="['/creators', item.creator.id]" class="social-user-identity">
+                  @if (item.creator.hasAvatar && item.creator.avatarUrl) {
+                    <img [src]="item.creator.avatarUrl" [alt]="item.creator.name" class="social-user-avatar-img" />
+                  } @else {
+                    <span class="social-user-avatar-initials">{{ getInitials(item.creator.name) }}</span>
+                  }
+                  <div class="social-user-texts">
+                    <span class="social-user-name">{{ item.creator.name }}</span>
+                    <small class="social-user-date">Depuis le {{ item.createdAt | date:'shortDate' }}</small>
+                  </div>
+                </a>
+                <div class="social-user-actions">
+                  <a [routerLink]="['/creators', item.creator.id]" class="btn-social-link">
+                    Profil
+                  </a>
+                  <a
+                    [routerLink]="['/posts']"
+                    [queryParams]="{ author: item.creator.id, authorName: item.creator.name }"
+                    class="btn-social-link primary"
+                  >
+                    Projets
+                  </a>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-social-msg">
+                {{ tab === 'followers' ? creator.name + " n'a aucun follower pour le moment." : creator.name + " ne suit aucun créateur pour le moment." }}
+              </p>
+            }
+          </div>
+
+          @if (socialTotalPages() > 1) {
+            <div class="social-pagination">
+              <button
+                type="button"
+                class="btn-social-page"
+                [disabled]="socialPage() <= 1"
+                (click)="goToSocialPage(socialPage() - 1)"
+              >
+                ← Précédent
+              </button>
+              <span>Page {{ socialPage() }} / {{ socialTotalPages() }}</span>
+              <button
+                type="button"
+                class="btn-social-page"
+                [disabled]="socialPage() >= socialTotalPages()"
+                (click)="goToSocialPage(socialPage() + 1)"
+              >
+                Suivant →
+              </button>
+            </div>
+          }
+        }
+      </section>
+    }
+
+    <!-- SECTION DES CRÉATIONS DU CRÉATEUR AVEC DATES VISIBLES & PAGINATION (Frame 3G) -->
     <section class="creations-section" aria-labelledby="creations-heading">
       <div class="creations-section-header">
-        <h2 id="creations-heading" class="font-display">Projets et tutoriels de {{ creator.name }}</h2>
-        <span class="creations-count-tag">{{ creator.creations.length }} projet{{ creator.creations.length > 1 ? 's' : '' }}</span>
+        <div class="creations-title-group">
+          <h2 id="creations-heading" class="font-display">Projets et tutoriels de {{ creator.name }}</h2>
+          <span class="creations-count-tag">{{ creator.creations.length }} projet{{ creator.creations.length > 1 ? 's' : '' }}</span>
+        </div>
+
+        <div class="creations-header-actions">
+          <div class="creations-limit-selector">
+            <span class="limit-lbl">Par page :</span>
+            @for (size of creationsPageSizeOptions; track size) {
+              <button
+                type="button"
+                class="btn-limit-chip"
+                [class.active]="creationsPageSize() === size"
+                (click)="setCreationsPageSize(size)"
+              >
+                {{ size }}
+              </button>
+            }
+          </div>
+          <a
+            [routerLink]="['/posts']"
+            [queryParams]="{ author: creator.id, authorName: creator.name }"
+            class="btn-search-creator-posts"
+          >
+            🔍 Rechercher dans ses projets
+          </a>
+        </div>
       </div>
 
       <div class="creations-grid">
-        @for (post of creator.creations; track post.id) {
+        @for (post of paginatedCreations(); track post.id) {
           <article class="post-preview-card card" [class.locked]="post.isLocked">
             <!-- Couverture avec badge de visibilité et date visible -->
             <div class="cover-box">
@@ -224,6 +357,30 @@
           </div>
         }
       </div>
+
+      @if (creationsTotalPages() > 1) {
+        <nav class="creations-pagination-bar" aria-label="Pagination des projets du créateur">
+          <button
+            type="button"
+            class="btn-social-page"
+            [disabled]="creationsPage() <= 1"
+            (click)="goToCreationsPage(creationsPage() - 1)"
+          >
+            ← Précédent
+          </button>
+          <span class="creations-page-info">
+            Page {{ creationsPage() }} sur {{ creationsTotalPages() }} ({{ creator.creations.length }} projets)
+          </span>
+          <button
+            type="button"
+            class="btn-social-page"
+            [disabled]="creationsPage() >= creationsTotalPages()"
+            (click)="goToCreationsPage(creationsPage() + 1)"
+          >
+            Suivant →
+          </button>
+        </nav>
+      }
     </section>
   }
 </div>

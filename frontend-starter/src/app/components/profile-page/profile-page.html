@@ -275,7 +275,7 @@
     <!-- SECTION 4 : Créateurs Suivis -->
     <section class="card follows-card">
       <div class="section-header">
-        <h2>Créateurs Suivis</h2>
+        <h2>Créateurs Suivis (Abonnements gratuits)</h2>
         <span class="badge counter-badge">{{ totalFollows() }}</span>
       </div>
 
@@ -289,12 +289,15 @@
             <li class="item-row">
               <div class="item-info">
                 <span class="item-title">
-                  <a [routerLink]="['/creators', f.creator.id]">{{ f.creator.name }}</a>
+                  <a [routerLink]="['/creators', f.creator.id]">👤 {{ f.creator.name }}</a>
                 </span>
                 <small class="item-sub">Suivi depuis le {{ f.createdAt | date:'shortDate' }}</small>
               </div>
               <div class="item-actions">
-                <a [routerLink]="['/posts']" [queryParams]="{ query: f.creator.name }" class="btn-link">
+                <a [routerLink]="['/creators', f.creator.id]" class="btn-link">
+                  Profil
+                </a>
+                <a [routerLink]="['/posts']" [queryParams]="{ author: f.creator.id, authorName: f.creator.name }" class="btn-link">
                   Projets
                 </a>
                 <button
@@ -309,6 +312,43 @@
             </li>
           } @empty {
             <li class="empty-state">Vous ne suivez aucun créateur pour le moment.</li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- SECTION 4B : Mes Followers -->
+    <section class="card followers-card">
+      <div class="section-header">
+        <h2>Mes Followers</h2>
+        <span class="badge counter-badge">{{ totalMyFollowers() }}</span>
+      </div>
+
+      @if (loadingMyFollowers()) {
+        <p class="loading-state">Chargement de vos followers...</p>
+      } @else if (myFollowersError()) {
+        <p class="feedback-msg error">{{ myFollowersError() }}</p>
+      } @else {
+        <ul class="items-list">
+          @for (fl of myFollowers(); track fl.id) {
+            <li class="item-row">
+              <div class="item-info">
+                <span class="item-title">
+                  <a [routerLink]="['/creators', fl.creator.id]">👥 {{ fl.creator.name }}</a>
+                </span>
+                <small class="item-sub">Vous suit depuis le {{ fl.createdAt | date:'shortDate' }}</small>
+              </div>
+              <div class="item-actions">
+                <a [routerLink]="['/creators', fl.creator.id]" class="btn-link">
+                  Profil
+                </a>
+                <a [routerLink]="['/posts']" [queryParams]="{ author: fl.creator.id, authorName: fl.creator.name }" class="btn-link">
+                  Projets
+                </a>
+              </div>
+            </li>
+          } @empty {
+            <li class="empty-state">Aucun utilisateur ne vous suit pour le moment.</li>
           }
         </ul>
       }
@@ -338,7 +378,10 @@
                 </small>
               </div>
               <div class="item-actions">
-                <a [routerLink]="['/posts']" [queryParams]="{ query: s.creator.name }" class="btn-link">
+                <a [routerLink]="['/creators', s.creator.id]" class="btn-link">
+                  Profil
+                </a>
+                <a [routerLink]="['/posts']" [queryParams]="{ author: s.creator.id, authorName: s.creator.name }" class="btn-link">
                   Accès exclusif
                 </a>
               </div>

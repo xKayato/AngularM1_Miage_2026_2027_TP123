@@ -23,6 +23,9 @@ export interface FollowItem {
   creator: {
     id: string;
     name: string;
+    bio?: string;
+    hasAvatar?: boolean;
+    avatarUrl?: string | null;
   };
   createdAt: string;
 }
@@ -32,6 +35,9 @@ export interface SubscriptionItem {
   creator: {
     id: string;
     name: string;
+    bio?: string;
+    hasAvatar?: boolean;
+    avatarUrl?: string | null;
   };
   active: boolean;
   expiresAt: string;
@@ -60,6 +66,7 @@ export interface CreatorPublicProfile {
   avatarUrl: string | null;
   createdAt: string;
   followersCount: number;
+  followingCount?: number;
   subscribersCount: number;
   creationsCount: number;
   isSelf: boolean;

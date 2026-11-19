@@ -121,5 +121,45 @@ export class CreatorService {
       `${this.baseUrl}/${encodeURIComponent(creatorId)}`,
     );
   }
+
+  /**
+   * Récupère la liste paginée des followers publics d'un créateur.
+   */
+  getCreatorFollowers(
+    creatorId: string,
+    params?: { page?: number; limit?: number },
+  ): Observable<Page<FollowItem>> {
+    let httpParams = new HttpParams();
+    if (params?.page) {
+      httpParams = httpParams.set('page', params.page.toString());
+    }
+    if (params?.limit) {
+      httpParams = httpParams.set('limit', params.limit.toString());
+    }
+    return this.http.get<Page<FollowItem>>(
+      `${this.baseUrl}/${encodeURIComponent(creatorId)}/followers`,
+      { params: httpParams },
+    );
+  }
+
+  /**
+   * Récupère la liste paginée des créateurs suivis par cet utilisateur.
+   */
+  getCreatorFollowing(
+    creatorId: string,
+    params?: { page?: number; limit?: number },
+  ): Observable<Page<FollowItem>> {
+    let httpParams = new HttpParams();
+    if (params?.page) {
+      httpParams = httpParams.set('page', params.page.toString());
+    }
+    if (params?.limit) {
+      httpParams = httpParams.set('limit', params.limit.toString());
+    }
+    return this.http.get<Page<FollowItem>>(
+      `${this.baseUrl}/${encodeURIComponent(creatorId)}/following`,
+      { params: httpParams },
+    );
+  }
 }
 

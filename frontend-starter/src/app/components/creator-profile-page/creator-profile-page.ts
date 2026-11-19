@@ -1,10 +1,11 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { CreatorService } from '../../shared/services/creator.service';
 import { AuthService } from '../../shared/services/auth.service';
 import { PostService } from '../../shared/services/post.service';
-import { CreatorPublicProfile } from '../../shared/models/creator.model';
+import { CreatorPublicProfile, FollowItem } from '../../shared/models/creator.model';
 import { PostPreview } from '../../shared/models/post.model';
 
 @Component({
@@ -19,6 +20,8 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   private readonly creatorService = inject(CreatorService);
   private readonly postService = inject(PostService, { optional: true });
   readonly auth = inject(AuthService);
+
+  private routeSub?: Subscription;
 
   readonly coverBlobUrls = signal<Record<string, string>>({});
   readonly failedCovers = signal<Record<string, boolean>>({});
@@ -38,6 +41,32 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   readonly shareToast = signal<string | null>(null);
   private shareTimeout?: any;
 
+  // Onglet social interactif : 'followers' | 'following' | null
+  readonly activeSocialTab = signal<'followers' | 'following' | null>(null);
+  readonly socialLoading = signal<boolean>(false);
+  readonly socialError = signal<string | null>(null);
+  readonly socialItems = signal<FollowItem[]>([]);
+  readonly socialPage = signal<number>(1);
+  readonly socialTotalPages = signal<number>(1);
+  readonly socialTotalDocs = signal<number>(0);
+
+  // Pagination et taille de page des créations du profil
+  readonly creationsPage = signal<number>(1);
+  readonly creationsPageSize = signal<number>(6);
+  readonly creationsPageSizeOptions = [6, 12, 24, 48];
+
+  readonly paginatedCreations = computed<PostPreview[]>(() => {
+    const all = this.profile()?.creations || [];
+    const size = this.creationsPageSize();
+    const start = (this.creationsPage() - 1) * size;
+    return all.slice(start, start + size);
+  });
+
+  readonly creationsTotalPages = computed<number>(() => {
+    const total = this.profile()?.creations?.length || 0;
+    return Math.max(1, Math.ceil(total / this.creationsPageSize()));
+  });
+
   readonly isSelf = computed(() => {
     const current = this.profile();
     if (!current) return false;
@@ -46,6 +75,7 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   });
 
   ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
     if (this.shareTimeout) clearTimeout(this.shareTimeout);
     for (const url of this.createdObjectUrls) {
       URL.revokeObjectURL(url);
@@ -77,13 +107,27 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
+    if (this.route.paramMap && typeof this.route.paramMap.subscribe === 'function') {
+      this.routeSub = this.route.paramMap.subscribe((params) => {
+        const id = params.get('id');
+        this.initForCreatorId(id);
+      });
+    } else {
+      const id = this.route.snapshot?.paramMap?.get('id') ?? null;
+      this.initForCreatorId(id);
+    }
+  }
+
+  private initForCreatorId(id: string | null): void {
     if (!id) {
       this.error.set('Identifiant créateur manquant.');
       this.loading.set(false);
       return;
     }
 
+    this.activeSocialTab.set(null);
+    this.socialItems.set([]);
+    this.creationsPage.set(1);
     this.creatorId.set(id);
     this.loadProfile(id);
   }
@@ -107,6 +151,72 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
         }
       },
     });
+  }
+
+  toggleSocialTab(tab: 'followers' | 'following'): void {
+    if (this.activeSocialTab() === tab) {
+      this.activeSocialTab.set(null);
+      return;
+    }
+    this.activeSocialTab.set(tab);
+    this.loadSocialList(tab, 1);
+  }
+
+  closeSocialTab(): void {
+    this.activeSocialTab.set(null);
+  }
+
+  loadSocialList(tab: 'followers' | 'following', page: number): void {
+    const id = this.profile()?.id || this.creatorId();
+    if (!id) return;
+
+    const method =
+      tab === 'followers'
+        ? this.creatorService.getCreatorFollowers
+        : this.creatorService.getCreatorFollowing;
+
+    if (typeof method !== 'function') return;
+
+    this.socialLoading.set(true);
+    this.socialError.set(null);
+
+    const obs$ =
+      tab === 'followers'
+        ? this.creatorService.getCreatorFollowers(id, { page, limit: 12 })
+        : this.creatorService.getCreatorFollowing(id, { page, limit: 12 });
+
+    obs$.subscribe({
+      next: (res) => {
+        this.socialLoading.set(false);
+        this.socialItems.set(res.docs || res.items || []);
+        this.socialPage.set(res.page || page);
+        this.socialTotalPages.set(res.totalPages || res.pages || 1);
+        this.socialTotalDocs.set(res.totalDocs ?? res.total ?? 0);
+      },
+      error: (err) => {
+        this.socialLoading.set(false);
+        this.socialError.set(err.error?.message || 'Impossible de charger cette liste.');
+      },
+    });
+  }
+
+  goToSocialPage(page: number): void {
+    const tab = this.activeSocialTab();
+    if (!tab || page < 1 || page > this.socialTotalPages() || page === this.socialPage()) return;
+    this.loadSocialList(tab, page);
+  }
+
+  setCreationsPageSize(size: number): void {
+    if (this.creationsPageSize() !== size) {
+      this.creationsPageSize.set(size);
+      this.creationsPage.set(1);
+    }
+  }
+
+  goToCreationsPage(page: number): void {
+    if (page >= 1 && page <= this.creationsTotalPages()) {
+      this.creationsPage.set(page);
+    }
   }
 
   follow(): void {
