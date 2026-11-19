@@ -402,3 +402,57 @@ test("Catalogue — filtre authorName et recherche par nom d'auteur", async (t) 
     assert.equal(body.totalDocs, 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Correctifs : catégories étendues et creationsCount réel
+// ---------------------------------------------------------------------------
+
+test("Catégories — Menuiserie, Électronique et Maroquinerie acceptées", async (t) => {
+  const { user: maker } = await createUser("Artisane Catégories");
+
+  for (const category of ["Menuiserie", "Électronique", "Maroquinerie"]) {
+    await t.test(`${category} : création en base et filtre catalogue`, async () => {
+      const post = await createPost(maker, { category });
+      const { status, body } = await getJson(
+        `/api/posts?author=${maker._id}&category=${encodeURIComponent(category)}`,
+      );
+      assert.equal(status, 200);
+      assert.equal(body.totalDocs, 1);
+      assert.equal(body.docs[0].id, String(post._id));
+    });
+  }
+
+  await t.test("Une catégorie inconnue reste refusée (400)", async () => {
+    const { status } = await getJson(`/api/posts?category=Jardinage`);
+    assert.equal(status, 400);
+  });
+
+  await t.test("Le modèle Mongoose refuse une catégorie inconnue", async () => {
+    await assert.rejects(() => createPost(maker, { category: "Jardinage" }), /category/);
+  });
+});
+
+test("Profil créateur — creationsCount reflète le total réel au-delà de 100", async () => {
+  const { user: prolific } = await createUser("Créateur Prolifique");
+  const now = Date.now();
+  await Post.insertMany(
+    Array.from({ length: 105 }, (_, i) => ({
+      author: prolific._id,
+      title: `Série ${i}`,
+      shortDescription: "Description de la série",
+      content: "Contenu",
+      category: "Lego",
+      tags: ["serie"],
+      visibility: "public",
+      status: "published",
+      publishedAt: new Date(now - i * 1000),
+    })),
+  );
+  await createPost(prolific, { title: "Brouillon caché", status: "draft", publishedAt: null });
+
+  const { status, body } = await getJson(`/api/creators/${prolific._id}`);
+  assert.equal(status, 200);
+  assert.equal(body.creationsCount, 105);
+  assert.equal(body.creations.length, 100);
+  assert.equal(body.creations[0].title, "Série 0");
+});

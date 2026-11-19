@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { VALID_CATEGORIES } from "../utils/postValidator.js";
 
 const MAX_ATTACHMENTS_PER_POST = 10;
 const MAX_CUMULATIVE_SIZE_BYTES = 50 * 1024 * 1024; // 50 Mo
@@ -50,7 +51,7 @@ const postSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ["Lego", "Papercraft", "Origami", "Musique", "Modèles 3D", "Autre"],
+      enum: Array.from(VALID_CATEGORIES),
     },
     tags: {
       type: [

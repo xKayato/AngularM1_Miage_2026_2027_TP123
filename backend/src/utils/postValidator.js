@@ -1,4 +1,7 @@
 export const VALID_CATEGORIES = new Set([
+  "Menuiserie",
+  "Électronique",
+  "Maroquinerie",
   "Lego",
   "Papercraft",
   "Origami",

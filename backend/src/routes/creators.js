@@ -12,6 +12,9 @@ import { optionalAuthMakerShare } from "../middlewares/optionalAuthMakerShare.js
 
 export const creatorsRouter = Router();
 
+/** Nombre maximal de créations embarquées dans GET /api/creators/:id (le total réel reste dans creationsCount). */
+export const CREATOR_PROFILE_CREATIONS_LIMIT = 100;
+
 /**
  * Valide si une chaîne est un ObjectId MongoDB valide.
  */
@@ -296,7 +299,10 @@ creatorsRouter.get("/my/subscriptions", authMakerShare, async (req, res, next) =
  * GET /api/creators/:id
  * Retourne le profil public d'un créateur avec ses compteurs réels et ses créations découvrables.
  * Exclut formellement les créateurs suspendus (404).
- * Ne divulgue jamais les emails, hash de mot de passe, ni la liste des comptes suivis.
+ * Ne divulgue jamais les emails ni les hash de mot de passe. Les listes de followers et de
+ * comptes suivis sont publiques (comme sur un réseau social classique) mais servies par les
+ * routes paginées dédiées /:id/followers et /:id/following, pas par ce profil.
+ * `creations` est limité aux 100 plus récentes ; `creationsCount` reste le total réel.
  */
 creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
   try {
@@ -345,7 +351,7 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
     };
 
     // Parallélisation massive : compteurs réels et récupération des posts en 1 seul round-trip
-    const [followersAgg, followingAgg, subscribersCount, creatorPosts] = await Promise.all([
+    const [followersAgg, followingAgg, subscribersCount, creatorPosts, creationsCount] = await Promise.all([
       Follow.aggregate([
         { $match: { creatorId: creator._id } },
         {
@@ -381,8 +387,9 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
       }),
       Post.find(postFilter)
         .sort({ publishedAt: -1, createdAt: -1, _id: -1 })
-        .limit(100)
+        .limit(CREATOR_PROFILE_CREATIONS_LIMIT)
         .lean(),
+      Post.countDocuments(postFilter),
     ]);
 
     const followersCount = followersAgg[0]?.count || 0;
@@ -420,8 +427,6 @@ creatorsRouter.get("/:id", optionalAuthMakerShare, async (req, res, next) => {
         authorName: creator.name,
       });
     });
-
-    const creationsCount = creations.length;
 
     res.json({
       id: String(creator._id),
