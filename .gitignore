@@ -7,3 +7,9 @@ Thumbs.db
 backend/data/
 *.seed-manifest.json
 seed-manifest.json
+GUIDE_FONCTIONNEMENT_SITE.md
+TRAME_VIDEO_PRESENTATION.md
+PRESENTATION_INTERACTIVE.html
+CONTEXTE_POUR_CLAUDE.md
+CLAUDE.md
+
