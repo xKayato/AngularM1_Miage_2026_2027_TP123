@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, ParamMap, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { describe, beforeEach, it, expect, vi } from 'vitest';
 import { CreatorProfilePageComponent } from './creator-profile-page';
 import { CreatorService } from '../../shared/services/creator.service';
@@ -187,6 +187,77 @@ describe('CreatorProfilePageComponent — followers / suivis et pagination des c
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
       expect(text).toMatch(/Followers/i);
       expect(text).toMatch(/Suivi/i);
+    });
+  });
+
+  describe('annulation des requêtes (régressions)', () => {
+    it('passer vite de Followers à Suivis ignore la réponse tardive des followers', () => {
+      const lateFollowers = new Subject<Page<FollowItem>>();
+      creatorServiceMock.getCreatorFollowers.mockReturnValueOnce(lateFollowers.asObservable());
+      component.toggleSocialTab('followers');
+      component.toggleSocialTab('following');
+      lateFollowers.next(makePage([followerItem]));
+      expect(component.activeSocialTab()).toBe('following');
+      expect(component.socialItems()).toEqual([]);
+      expect(lateFollowers.observed).toBe(false);
+    });
+
+    it('fermer le panneau annule la requête en cours et lève le chargement', () => {
+      const pending = new Subject<Page<FollowItem>>();
+      creatorServiceMock.getCreatorFollowers.mockReturnValueOnce(pending.asObservable());
+      component.toggleSocialTab('followers');
+      expect(component.socialLoading()).toBe(true);
+      component.closeSocialTab();
+      expect(pending.observed).toBe(false);
+      expect(component.socialLoading()).toBe(false);
+    });
+
+    it('changer de créateur annule la liste sociale en cours', () => {
+      const pending = new Subject<Page<FollowItem>>();
+      creatorServiceMock.getCreatorFollowers.mockReturnValueOnce(pending.asObservable());
+      component.toggleSocialTab('followers');
+      paramMap$.next(convertToParamMap({ id: 'creator-2' }));
+      expect(pending.observed).toBe(false);
+    });
+
+    it('la destruction du composant libère la requête en cours', () => {
+      const pending = new Subject<Page<FollowItem>>();
+      creatorServiceMock.getCreatorFollowers.mockReturnValueOnce(pending.asObservable());
+      component.toggleSocialTab('followers');
+      fixture.destroy();
+      expect(pending.observed).toBe(false);
+    });
+  });
+
+  describe('plus de 100 créations (régression creationsCount)', () => {
+    it('hasMoreCreations est faux quand tout est embarqué', () => {
+      expect(component.hasMoreCreations()).toBe(false);
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toContain('Voir tous ses projets dans le catalogue');
+    });
+
+    it('affiche un lien vers le catalogue filtré quand le total dépasse la liste', () => {
+      const big = { ...makeProfile('creator-9', 100), creationsCount: 140 };
+      creatorServiceMock.getCreatorProfile.mockReturnValueOnce(of(big));
+      paramMap$.next(convertToParamMap({ id: 'creator-9' }));
+      fixture.detectChanges();
+
+      expect(component.hasMoreCreations()).toBe(true);
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('sur 140');
+      const link = Array.from(el.querySelectorAll<HTMLAnchorElement>('a')).find((a) =>
+        a.textContent?.includes('Voir tous ses projets dans le catalogue'),
+      );
+      expect(link?.getAttribute('href')).toContain('author=creator-9');
+    });
+
+    it('n affiche jamais de fausse date de publication', () => {
+      const noDate = makeProfile('creator-4', 1);
+      noDate.creations[0] = { ...noDate.creations[0], publishedAt: '' };
+      creatorServiceMock.getCreatorProfile.mockReturnValueOnce(of(noDate));
+      paramMap$.next(convertToParamMap({ id: 'creator-4' }));
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('12 oct. 2026');
     });
   });
 

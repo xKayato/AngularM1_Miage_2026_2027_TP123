@@ -27,6 +27,9 @@ import {
 } from '../../shared/models/post.model';
 
 const CATEGORIES: Category[] = [
+  'Menuiserie',
+  'Électronique',
+  'Maroquinerie',
   'Lego',
   'Papercraft',
   'Origami',
@@ -78,7 +81,7 @@ export class PostsManagementPageComponent implements OnInit, OnDestroy {
   readonly generatedSecretUrl = signal<string | null>(null);
   readonly isGeneratingSecretLink = signal<boolean>(false);
   readonly secretLinkSuccessToast = signal<string | null>(null);
-  private secretToastTimeout?: any;
+  private secretToastTimeout?: ReturnType<typeof setTimeout>;
 
   // Modal / Gestion des pièces jointes (Mission 3)
   readonly attachmentsModalPost = signal<PostAuthorManagement | null>(null);
@@ -106,7 +109,7 @@ export class PostsManagementPageComponent implements OnInit, OnDestroy {
   lastSelectionEnd = 0;
   readonly isDragOverEditor = signal<boolean>(false);
   readonly insertionNotice = signal<string | null>(null);
-  private noticeTimeout?: any;
+  private noticeTimeout?: ReturnType<typeof setTimeout>;
   private readonly fileTempIds = new WeakMap<File, string>();
   private tempIdCounter = 0;
   private readonly objectUrlCache = new Map<File, string>();
@@ -1503,6 +1506,10 @@ export class PostsManagementPageComponent implements OnInit, OnDestroy {
         return '🤖';
       case 'Menuiserie':
         return '🪵';
+      case 'Électronique':
+        return '🔌';
+      case 'Maroquinerie':
+        return '👜';
       case 'Cosplay':
         return '🎭';
       case 'Musique':

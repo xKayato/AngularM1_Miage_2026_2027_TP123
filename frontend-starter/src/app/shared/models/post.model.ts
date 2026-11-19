@@ -1,4 +1,7 @@
 export type Category =
+  | 'Menuiserie'
+  | 'Électronique'
+  | 'Maroquinerie'
   | 'Lego'
   | 'Papercraft'
   | 'Origami'
@@ -45,6 +48,8 @@ export interface AttachmentInfo {
   family: AttachmentFamily;
   downloadUrl: string;
   isCover?: boolean;
+  /** Côté client uniquement : identifiant temporaire d'un fichier pas encore uploadé (aperçu Markdown). */
+  tempId?: string;
 }
 
 export interface UserInteractions {

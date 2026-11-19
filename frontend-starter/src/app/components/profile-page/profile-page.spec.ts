@@ -32,6 +32,7 @@ describe('ProfilePageComponent', () => {
   let mockCreatorService: {
     getMyFollows: ReturnType<typeof vi.fn>;
     getMySubscriptions: ReturnType<typeof vi.fn>;
+    getCreatorFollowers: ReturnType<typeof vi.fn>;
     unfollow: ReturnType<typeof vi.fn>;
   };
 
@@ -116,6 +117,9 @@ describe('ProfilePageComponent', () => {
           totalPages: 1,
           pages: 1,
         }),
+      ),
+      getCreatorFollowers: vi.fn().mockReturnValue(
+        of({ docs: [], items: [], totalDocs: 0, total: 0, page: 1, limit: 20, totalPages: 1, pages: 1 }),
       ),
       unfollow: vi.fn().mockReturnValue(of({ following: false })),
     };

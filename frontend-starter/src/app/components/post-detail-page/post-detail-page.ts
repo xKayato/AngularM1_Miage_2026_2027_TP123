@@ -82,7 +82,7 @@ export class PostDetailPageComponent implements OnInit, OnDestroy {
   // Gestion du partage & lien secret
   readonly shareToast = signal<string | null>(null);
   readonly isSharing = signal<boolean>(false);
-  private shareTimeout?: any;
+  private shareTimeout?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
     this.routeSub = this.route.paramMap.subscribe((params) => {

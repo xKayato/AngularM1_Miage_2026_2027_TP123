@@ -57,6 +57,7 @@ describe('PostsPageComponent — filtre auteur, taille de page et pagination num
   let queryParams$: BehaviorSubject<Params>;
   let postServiceMock: { getPosts: ReturnType<typeof vi.fn> };
   let creatorServiceMock: { getCreators: ReturnType<typeof vi.fn> };
+  let navigateSpy: ReturnType<typeof vi.spyOn>;
 
   function lastParams(): PostFilterParams {
     const calls = postServiceMock.getPosts.mock.calls;
@@ -82,7 +83,7 @@ describe('PostsPageComponent — filtre auteur, taille de page et pagination num
       ],
     }).compileComponents();
 
-    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(PostsPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -252,6 +253,95 @@ describe('PostsPageComponent — filtre auteur, taille de page et pagination num
       component.loadCreatorSuggestions('Mar');
       component.onDocumentClick({ target: document.body } as unknown as MouseEvent);
       expect(component.showCreatorSuggestions()).toBe(false);
+    });
+  });
+
+  describe('synchronisation avec l URL (régressions)', () => {
+    it('revenir sur /posts sans paramètres efface le filtre auteur et recharge', async () => {
+      await setup({ author: 'author-1', authorName: 'Marcel' });
+      postServiceMock.getPosts.mockClear();
+      queryParams$.next({});
+      expect(component.selectedAuthorId()).toBe('');
+      expect(component.selectedAuthorName()).toBe('');
+      expect(component.authorSearchControl.value).toBe('');
+      expect(postServiceMock.getPosts).toHaveBeenCalledTimes(1);
+      expect(lastParams().author).toBeUndefined();
+    });
+
+    it('revenir sans paramètres efface aussi catégorie, tag et recherche', async () => {
+      await setup({ query: 'grue', category: 'Origami', tag: 'pliage' });
+      queryParams$.next({});
+      expect(component.appliedQuery()).toBe('');
+      expect(component.selectedCategory()).toBe('');
+      expect(component.selectedTag()).toBe('');
+      expect(lastParams()).toMatchObject({ query: undefined, category: undefined, tags: undefined });
+    });
+
+    it('category=Toutes dans l URL équivaut à aucun filtre', async () => {
+      await setup({ category: 'Toutes' });
+      expect(component.selectedCategory()).toBe('');
+      expect(lastParams().category).toBeUndefined();
+    });
+
+    it('selectCreatorFilter écrit author et authorName dans l URL (replaceUrl)', async () => {
+      await setup();
+      component.selectCreatorFilter(creator);
+      expect(navigateSpy).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { author: 'author-1', authorName: 'Marcel' },
+          replaceUrl: true,
+        }),
+      );
+    });
+
+    it('clearAuthorFilter retire les paramètres de l URL', async () => {
+      await setup({ author: 'author-1', authorName: 'Marcel' });
+      component.clearAuthorFilter();
+      expect(navigateSpy).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: {} }));
+    });
+
+    it('catégorie, tag et recherche sont aussi reflétés dans l URL', async () => {
+      await setup();
+      component.selectCategory('Menuiserie');
+      component.selectTag('Bois');
+      component.searchControl.setValue('table', { emitEvent: false });
+      component.onSubmitSearch();
+      expect(navigateSpy).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: { query: 'table', category: 'Menuiserie', tag: 'bois' } }),
+      );
+    });
+
+    it('l écho de notre propre navigation ne provoque pas de second chargement', async () => {
+      await setup();
+      component.selectCreatorFilter(creator);
+      postServiceMock.getPosts.mockClear();
+      queryParams$.next({ author: 'author-1', authorName: 'Marcel' });
+      expect(postServiceMock.getPosts).not.toHaveBeenCalled();
+    });
+
+    it('changer de page ne touche pas à l URL', async () => {
+      await setup();
+      navigateSpy.mockClear();
+      component.goToPage(2);
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('catégories', () => {
+    it('propose les 9 catégories du backend en plus de Toutes', async () => {
+      await setup();
+      expect(component.categories).toEqual([
+        'Toutes', 'Menuiserie', 'Électronique', 'Maroquinerie', 'Lego',
+        'Papercraft', 'Origami', 'Musique', 'Modèles 3D', 'Autre',
+      ]);
+    });
+
+    it.each(['Menuiserie', 'Électronique', 'Maroquinerie'])('filtre sur %s', async (cat) => {
+      await setup();
+      component.selectCategory(cat);
+      expect(lastParams().category).toBe(cat);
     });
   });
 

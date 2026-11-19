@@ -323,7 +323,7 @@
               <!-- Date visible directement sur la carte avant le clic -->
               <div class="cover-bottom-row">
                 <span class="card-date-badge">
-                  📅 {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+                  📅 {{ (post.publishedAt | date:'dd MMM yyyy') || '—' }}
                 </span>
               </div>
             </div>
@@ -331,7 +331,7 @@
             <div class="card-body">
               <div class="card-meta">
                 <span class="meta-date-info">
-                  Ajouté le {{ (post.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}
+                  Ajouté le {{ (post.publishedAt | date:'dd MMM yyyy') || '—' }}
                 </span>
                 <div class="meta-stats card-interactive-element">
                   <span class="comments-tag" title="Commentaires">💬 {{ post.commentsCount }}</span>
@@ -380,6 +380,20 @@
             Suivant →
           </button>
         </nav>
+      }
+
+      @if (hasMoreCreations()) {
+        <p class="creations-overflow-note">
+          Seules les {{ creator.creations.length }} créations les plus récentes sont affichées ici
+          sur {{ creator.creationsCount }}.
+          <a
+            [routerLink]="['/posts']"
+            [queryParams]="{ author: creator.id, authorName: creator.name }"
+            class="btn-search-creator-posts"
+          >
+            Voir tous ses projets dans le catalogue →
+          </a>
+        </p>
       }
     </section>
   }

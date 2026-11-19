@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { PostService } from '../../shared/services/post.service';
@@ -9,6 +9,15 @@ import { PostFilterParams, PostPreview } from '../../shared/models/post.model';
 import { CreatorSummary } from '../../shared/models/creator.model';
 
 export type SortCriteria = 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance';
+
+/** Filtres du catalogue persistés dans l'URL. */
+interface CatalogFilters {
+  query: string;
+  author: string;
+  authorName: string;
+  category: string;
+  tag: string;
+}
 
 @Component({
   selector: 'app-posts-page',
@@ -19,7 +28,7 @@ export type SortCriteria = 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance'
 })
 export class PostsPageComponent implements OnInit, OnDestroy {
   private readonly postService = inject(PostService);
-  private readonly creatorService = inject(CreatorService, { optional: true });
+  private readonly creatorService = inject(CreatorService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly elementRef = inject(ElementRef);
@@ -121,28 +130,14 @@ export class PostsPageComponent implements OnInit, OnDestroy {
 
     if (this.route?.queryParams) {
       this.routeSubscription = this.route.queryParams.subscribe((params) => {
-        const q = typeof params['query'] === 'string' ? params['query'].trim() : '';
-        const author = typeof params['author'] === 'string' ? params['author'].trim() : '';
-        const authorName = typeof params['authorName'] === 'string' ? params['authorName'].trim() : '';
-        const cat = typeof params['category'] === 'string' ? params['category'].trim() : '';
-        const tag = typeof params['tag'] === 'string' ? params['tag'].trim().toLowerCase() : '';
-
-        const hasUrlFilters = Boolean(q || author || authorName || cat || tag);
-
-        if (hasUrlFilters) {
-          this.appliedQuery.set(q);
-          this.searchControl.setValue(q, { emitEvent: false });
-          this.selectedAuthorId.set(author);
-          this.selectedAuthorName.set(authorName);
-          this.authorSearchControl.setValue(authorName, { emitEvent: false });
-          if (cat) this.selectedCategory.set(cat);
-          if (tag) this.selectedTag.set(tag);
-          initialLoaded = true;
-          this.loadPosts(1);
-        } else if (!initialLoaded) {
-          initialLoaded = true;
-          this.loadPosts(1);
+        const incoming = this.parseFilterParams(params);
+        // L'URL est la source de vérité : on ignore seulement l'écho de notre propre syncUrl()
+        if (initialLoaded && this.sameFilters(incoming, this.currentFilters())) {
+          return;
         }
+        this.applyFilters(incoming);
+        initialLoaded = true;
+        this.loadPosts(1);
       });
     }
 
@@ -161,6 +156,63 @@ export class PostsPageComponent implements OnInit, OnDestroy {
       .subscribe((nameQuery) => {
         this.loadCreatorSuggestions(nameQuery);
       });
+  }
+
+  private parseFilterParams(params: Params): CatalogFilters {
+    const read = (key: string): string =>
+      typeof params[key] === 'string' ? (params[key] as string).trim() : '';
+    const category = read('category');
+    return {
+      query: read('query'),
+      author: read('author'),
+      authorName: read('authorName'),
+      category: category === 'Toutes' ? '' : category,
+      tag: read('tag').toLowerCase(),
+    };
+  }
+
+  private currentFilters(): CatalogFilters {
+    return {
+      query: this.appliedQuery().trim(),
+      author: this.selectedAuthorId().trim(),
+      authorName: this.selectedAuthorName().trim(),
+      category: this.selectedCategory(),
+      tag: this.selectedTag().trim(),
+    };
+  }
+
+  private sameFilters(a: CatalogFilters, b: CatalogFilters): boolean {
+    return (
+      a.query === b.query &&
+      a.author === b.author &&
+      a.authorName === b.authorName &&
+      a.category === b.category &&
+      a.tag === b.tag
+    );
+  }
+
+  private applyFilters(f: CatalogFilters): void {
+    this.appliedQuery.set(f.query);
+    this.searchControl.setValue(f.query, { emitEvent: false });
+    this.selectedAuthorId.set(f.author);
+    this.selectedAuthorName.set(f.authorName);
+    this.authorSearchControl.setValue(f.authorName, { emitEvent: false });
+    this.selectedCategory.set(f.category);
+    this.selectedTag.set(f.tag);
+  }
+
+  /**
+   * Reflète les filtres actifs dans l'URL (/posts?author=...&category=...) pour qu'un F5
+   * ou un lien partagé retrouve la même recherche. replaceUrl évite d'empiler l'historique.
+   */
+  private syncUrl(): void {
+    if (!this.route) return;
+    const f = this.currentFilters();
+    const queryParams: Params = {};
+    for (const [key, value] of Object.entries(f)) {
+      if (value) queryParams[key] = value;
+    }
+    void this.router.navigate([], { relativeTo: this.route, queryParams, replaceUrl: true });
   }
 
   ngOnDestroy(): void {
@@ -205,7 +257,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
 
   loadCreatorSuggestions(query: string): void {
     const trimmed = query.trim();
-    if (!trimmed || !this.creatorService || typeof this.creatorService.getCreators !== 'function') {
+    if (!trimmed) {
       this.creatorSuggestions.set([]);
       this.showCreatorSuggestions.set(false);
       return;
@@ -232,6 +284,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     this.selectedAuthorId.set(creator.id);
     this.selectedAuthorName.set(creator.name);
     this.authorSearchControl.setValue(creator.name, { emitEvent: false });
+    this.syncUrl();
     this.loadPosts(1);
   }
 
@@ -247,6 +300,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
       this.selectedAuthorId.set('');
       this.selectedAuthorName.set(val);
     }
+    this.syncUrl();
     this.loadPosts(1);
   }
 
@@ -256,6 +310,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     this.selectedAuthorId.set(author.id);
     this.selectedAuthorName.set(author.name);
     this.authorSearchControl.setValue(author.name, { emitEvent: false });
+    this.syncUrl();
     this.loadPosts(1);
   }
 
@@ -265,6 +320,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     if (this.selectedAuthorId() || this.selectedAuthorName()) {
       this.selectedAuthorId.set('');
       this.selectedAuthorName.set('');
+      this.syncUrl();
       this.loadPosts(1);
     }
   }
@@ -302,7 +358,6 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   }
 
   private preloadProtectedCovers(list: PostPreview[]): void {
-    if (typeof this.postService.getAttachmentBlob !== 'function') return;
     for (const post of list) {
       if (
         !post.isLocked &&
@@ -313,10 +368,8 @@ export class PostsPageComponent implements OnInit, OnDestroy {
       ) {
         const match = post.coverUrl.match(/\/api\/posts\/([^/]+)\/attachments\/([^/?#]+)/);
         if (!match) continue;
-        const obs$ = this.postService.getAttachmentBlob(match[1], match[2]);
-        if (!obs$ || typeof obs$.subscribe !== 'function') continue;
         this.loadingCoverIds.add(post.id);
-        obs$.subscribe({
+        this.postService.getAttachmentBlob(match[1], match[2]).subscribe({
           next: (blob) => {
             this.loadingCoverIds.delete(post.id);
             if (blob && typeof URL.createObjectURL === 'function') {
@@ -449,6 +502,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     if (query && this.sortCriteria() === 'date-desc') {
       this.sortCriteria.set('relevance');
     }
+    this.syncUrl();
     this.loadPosts(1);
   }
 
@@ -508,6 +562,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     if (this.selectedCategory() !== newCat) {
       this.closeSuggestions();
       this.selectedCategory.set(newCat);
+      this.syncUrl();
       this.loadPosts(1);
     }
   }
@@ -520,6 +575,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     } else {
       this.selectedTag.set(trimmed);
     }
+    this.syncUrl();
     this.loadPosts(1);
   }
 
@@ -527,6 +583,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     if (this.selectedTag()) {
       this.closeSuggestions();
       this.selectedTag.set('');
+      this.syncUrl();
       this.loadPosts(1);
     }
   }
@@ -539,6 +596,7 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     }
     if (this.appliedQuery()) {
       this.appliedQuery.set('');
+      this.syncUrl();
       this.loadPosts(1);
     }
   }

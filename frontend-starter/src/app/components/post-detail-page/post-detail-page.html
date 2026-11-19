@@ -26,7 +26,7 @@
         <h1 class="font-display">{{ preview.title }}</h1>
         <p class="author-sub">
           Créé par <b>{{ preview.author.name }}</b> • {{ preview.category }} •
-          <span class="date-badge">📅 {{ (preview.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</span> •
+          <span class="date-badge">📅 {{ (preview.publishedAt | date:'dd MMM yyyy') || '—' }}</span> •
           ❤️ {{ preview.likesCount }} j'aime
         </p>
       </div>
@@ -121,7 +121,7 @@
               }
             </span>
             <span class="category-pill">{{ detail.category }}</span>
-            <span class="date-published-text">📅 Publié le {{ (detail.publishedAt | date:'dd MMM yyyy') || '12 oct. 2026' }}</span>
+            <span class="date-published-text">📅 Publié le {{ (detail.publishedAt | date:'dd MMM yyyy') || '—' }}</span>
           </div>
 
           <!-- Actions d'en-tête (Like & Partage) -->

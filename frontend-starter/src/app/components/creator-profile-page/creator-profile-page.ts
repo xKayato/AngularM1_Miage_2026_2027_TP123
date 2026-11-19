@@ -18,10 +18,11 @@ import { PostPreview } from '../../shared/models/post.model';
 export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly creatorService = inject(CreatorService);
-  private readonly postService = inject(PostService, { optional: true });
+  private readonly postService = inject(PostService);
   readonly auth = inject(AuthService);
 
   private routeSub?: Subscription;
+  private socialSub?: Subscription;
 
   readonly coverBlobUrls = signal<Record<string, string>>({});
   readonly failedCovers = signal<Record<string, boolean>>({});
@@ -39,7 +40,7 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   readonly actionError = signal<string | null>(null);
 
   readonly shareToast = signal<string | null>(null);
-  private shareTimeout?: any;
+  private shareTimeout?: ReturnType<typeof setTimeout>;
 
   // Onglet social interactif : 'followers' | 'following' | null
   readonly activeSocialTab = signal<'followers' | 'following' | null>(null);
@@ -62,6 +63,12 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
     return all.slice(start, start + size);
   });
 
+  /** Le serveur n'embarque que les 100 créations les plus récentes ; creationsCount est le total réel. */
+  readonly hasMoreCreations = computed<boolean>(() => {
+    const prof = this.profile();
+    return Boolean(prof && prof.creationsCount > (prof.creations?.length ?? 0));
+  });
+
   readonly creationsTotalPages = computed<number>(() => {
     const total = this.profile()?.creations?.length || 0;
     return Math.max(1, Math.ceil(total / this.creationsPageSize()));
@@ -76,6 +83,7 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
+    this.socialSub?.unsubscribe();
     if (this.shareTimeout) clearTimeout(this.shareTimeout);
     for (const url of this.createdObjectUrls) {
       URL.revokeObjectURL(url);
@@ -125,6 +133,8 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.socialSub?.unsubscribe();
+    this.socialLoading.set(false);
     this.activeSocialTab.set(null);
     this.socialItems.set([]);
     this.creationsPage.set(1);
@@ -163,19 +173,14 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   }
 
   closeSocialTab(): void {
+    this.socialSub?.unsubscribe();
+    this.socialLoading.set(false);
     this.activeSocialTab.set(null);
   }
 
   loadSocialList(tab: 'followers' | 'following', page: number): void {
     const id = this.profile()?.id || this.creatorId();
     if (!id) return;
-
-    const method =
-      tab === 'followers'
-        ? this.creatorService.getCreatorFollowers
-        : this.creatorService.getCreatorFollowing;
-
-    if (typeof method !== 'function') return;
 
     this.socialLoading.set(true);
     this.socialError.set(null);
@@ -185,7 +190,10 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
         ? this.creatorService.getCreatorFollowers(id, { page, limit: 12 })
         : this.creatorService.getCreatorFollowing(id, { page, limit: 12 });
 
-    obs$.subscribe({
+    // Annule la requête précédente : un clic rapide Followers -> Suivis ne doit pas
+    // afficher la réponse de l'onglet abandonné.
+    this.socialSub?.unsubscribe();
+    this.socialSub = obs$.subscribe({
       next: (res) => {
         this.socialLoading.set(false);
         this.socialItems.set(res.docs || res.items || []);
@@ -342,7 +350,6 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
   }
 
   private preloadProtectedCovers(list: PostPreview[]): void {
-    if (!this.postService || typeof this.postService.getAttachmentBlob !== 'function') return;
     for (const post of list) {
       if (
         !post.isLocked &&
@@ -353,10 +360,8 @@ export class CreatorProfilePageComponent implements OnInit, OnDestroy {
       ) {
         const match = post.coverUrl.match(/\/api\/posts\/([^/]+)\/attachments\/([^/?#]+)/);
         if (!match) continue;
-        const obs$ = this.postService.getAttachmentBlob(match[1], match[2]);
-        if (!obs$ || typeof obs$.subscribe !== 'function') continue;
         this.loadingCoverIds.add(post.id);
-        obs$.subscribe({
+        this.postService.getAttachmentBlob(match[1], match[2]).subscribe({
           next: (blob) => {
             this.loadingCoverIds.delete(post.id);
             if (blob && typeof URL.createObjectURL === 'function') {

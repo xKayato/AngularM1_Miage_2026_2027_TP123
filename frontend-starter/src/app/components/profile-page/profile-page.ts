@@ -317,7 +317,7 @@ export class ProfilePageComponent implements OnInit {
    */
   loadMyFollowers(): void {
     const myId = this.auth.currentUser()?.id;
-    if (!myId || typeof this.creatorService.getCreatorFollowers !== 'function') {
+    if (!myId) {
       return;
     }
 

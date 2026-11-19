@@ -841,3 +841,13 @@ html.dark .vip-badge-active {
   border-color: var(--brand-primary);
   color: #FFFFFF;
 }
+
+.creations-overflow-note {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  color: var(--text-muted, #6b7280);
+  font-size: 0.9rem;
+}

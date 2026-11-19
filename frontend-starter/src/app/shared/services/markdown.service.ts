@@ -84,7 +84,7 @@ export class MarkdownService {
       if (src.startsWith('attachment:temp:')) {
         const tempToken = src.replace(/^attachment:temp:/, '').trim();
         targetAtt = attachments.find(
-          (a) => a.id === tempToken || (a as any).tempId === tempToken || a.originalName.toLowerCase() === cleanAlt,
+          (a) => a.id === tempToken || a.tempId === tempToken || a.originalName.toLowerCase() === cleanAlt,
         );
       } else if (src.startsWith('attachment:')) {
         const attId = src.replace(/^attachment:/, '').trim();
@@ -135,7 +135,7 @@ export class MarkdownService {
         if (decodedHref.startsWith('attachment:temp:')) {
           const tempToken = decodedHref.replace(/^attachment:temp:/, '').trim();
           targetAtt = attachments.find(
-            (a) => a.id === tempToken || (a as any).tempId === tempToken || a.originalName.toLowerCase() === linkText.toLowerCase(),
+            (a) => a.id === tempToken || a.tempId === tempToken || a.originalName.toLowerCase() === linkText.toLowerCase(),
           );
           if (!targetAtt) {
             return `<span class="intext-temp-badge"><span class="badge-icon">⏳</span> <span class="badge-name">${linkText}</span> <span class="badge-hint">[Pièce jointe en attente d'enregistrement]</span></span>`;
