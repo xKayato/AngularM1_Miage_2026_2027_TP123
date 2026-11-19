@@ -287,6 +287,15 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 9. Versions Docker prêtes à lancer (TP1-3 et TP4)
+
+- **Objectif :** pouvoir lancer chaque rendu sans installer Node.js ni créer de compte Atlas, par exemple pour la démo ou pour un correcteur.
+- **Réalisation :** un `Dockerfile` pour l'API (Node 24 Alpine, utilisateur non root), un `Dockerfile` multi-étapes pour le front (build Angular puis nginx, qui sert les routes Angular et redirige `/api` vers l'API) et un `docker-compose.yml` avec MongoDB 7 et des volumes pour la base et les fichiers téléversés. Pour MakerShare, `SEED_DEMO=true` charge le jeu de démonstration au démarrage (le script est idempotent). Les scripts `demarrer.bat` / `demarrer.sh` lancent tout en un clic.
+- **Version TP1-3 :** même principe sur une branche `release/tp1-3` créée depuis le tag `tp3-final`, sans toucher au code du rendu, taguée `v3.1.0` (port 8081). MakerShare est tagué `v4.1.0` (port 8080), donc les deux peuvent tourner en même temps.
+- **Vérifié :** les deux piles ont été construites et testées en local : santé de l'API, connexion, liens profonds Angular, couverture protégée servie via le proxy, upload et lecture d'une piste audio avec refus `401` sans jeton. Sans Atlas, la recherche MakerShare utilise bien le repli regex.
+
+---
+
 ## Bilan final des vérifications
 
 - **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **305 / 305 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).

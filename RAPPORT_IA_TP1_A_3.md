@@ -443,3 +443,11 @@
   - **Différence entre test unitaire et test d’intégration :**
     - *Test unitaire :* Teste une classe ou un composant isolé en remplaçant toutes ses dépendances par des simulations ou mocks (ex : tester `TracksPageComponent` avec un mock de `TrackService`).
     - *Test d'intégration :* Teste la collaboration réelle de plusieurs briques ensemble (composants, services, DOM) pour s'assurer que le flux global fonctionne sans rupture.
+
+---
+
+## Version Docker du rendu final (après le TP3)
+
+- Pour que le rendu des TP1 à TP3 reste facile à lancer, j'ai ajouté une version Docker sur une branche `release/tp1-3` créée à partir du tag `tp3-final`, sans modifier le code rendu : MongoDB, l'API et le site Angular (servi par nginx avec proxy `/api`) démarrent avec `docker compose up --build` ou `demarrer.bat`.
+- Elle est taguée `v3.1.0` et s'ouvre sur <http://localhost:8081> avec le compte `demo@example.com` créé automatiquement par l'API.
+- Testé en local : connexion, upload d'une piste WAV, liste paginée, lecture authentifiée et refus `401` sans jeton.

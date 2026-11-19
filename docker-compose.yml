@@ -1,0 +1,49 @@
+# MakerShare en une commande : docker compose up --build
+# Puis ouvrir http://localhost:8080
+#
+# Variables optionnelles (fichier .env à côté de ce fichier ou variables d'environnement) :
+#   APP_PORT       port d'accès au site (défaut 8080)
+#   JWT_SECRET     secret de signature des JWT (à changer hors démo)
+#   SEED_DEMO      true pour charger 10 créateurs et 100 posts de démonstration (défaut true)
+#   DEMO_PASSWORD  mot de passe des comptes demo.*@makershare.local
+
+name: makershare
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/makershare
+      JWT_SECRET: ${JWT_SECRET:-makershare-docker-local-secret-change-me}
+      PORT: 3000
+      SEED_DEMO: ${SEED_DEMO:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-MakerShare2026!}
+    volumes:
+      - uploads:/app/backend/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    build: ./frontend-starter
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:
+  uploads:

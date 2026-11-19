@@ -99,7 +99,35 @@ Les 8 collections : `users`, `posts`, `follows`, `subscriptions`, `likes`, `shar
 
 ---
 
-## Démarrer le projet
+## Lancer en un clic avec Docker
+
+Seul [Docker Desktop](https://www.docker.com/products/docker-desktop/) est nécessaire : pas de Node.js, pas de compte Atlas.
+
+1. Télécharger le projet (`git clone` ou archive `.zip` d'une version ci-dessous) et le décompresser.
+2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux). Équivalent manuel : `docker compose up --build -d`.
+3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement : 10 créateurs, 100 posts avec images, PDF et sons. Les comptes `demo.*@makershare.local` (par exemple `demo.alice.lego@makershare.local`) utilisent le mot de passe `MakerShare2026!`.
+
+Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site** Angular servi par nginx, qui redirige `/api` vers l'API. La base et les fichiers téléversés sont conservés dans des volumes entre deux lancements. Sans Atlas, la recherche utilise automatiquement le repli regex.
+
+| Besoin | Commande |
+|---|---|
+| Arrêter | `docker compose down` |
+| Tout effacer (base et fichiers) | `docker compose down -v` |
+| Voir les logs de l'API | `docker compose logs -f api` |
+| Changer le port, le secret JWT ou désactiver la démo | variables `APP_PORT`, `JWT_SECRET`, `SEED_DEMO=false`, `DEMO_PASSWORD` (voir `docker-compose.yml`) |
+
+### Versions téléchargeables
+
+| Version | Contenu | Accès local |
+|---|---|---|
+| [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) ([.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/archive/refs/tags/v3.1.0.zip)) | Guitar Practice Cloud, rendu final des TP1 à TP3, version Docker | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
+| [`v4.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v4.1.0) ([.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/archive/refs/tags/v4.1.0.zip)) | MakerShare (TP4 libre), version Docker | <http://localhost:8080> |
+
+Les deux versions utilisent des ports différents et peuvent tourner en même temps.
+
+---
+
+## Démarrer le projet en mode développement
 
 **Prérequis :** Node.js 24 (20.6 minimum pour `--env-file`), npm, et un cluster MongoDB Atlas ou une instance MongoDB locale. La connexion à Atlas est décrite dans [ATLAS_SETUP.md](ATLAS_SETUP.md) et les mappings de l'index `posts_search_index` dans [TP4_LIBRE.md](TP4_LIBRE.md) (section 7) ; sans cet index, la recherche passe simplement par le repli regex.
 
@@ -162,6 +190,11 @@ frontend-starter/
     components/       une page par dossier (catalogue, détail, gestion, profils, admin…)
     shared/           services, modèles TypeScript, intercepteur, guards
     routes.ts
+  Dockerfile          build Angular puis service nginx
+  nginx.conf          fichiers statiques, routes Angular et proxy /api
+backend/Dockerfile    image de l'API (charge la démo si SEED_DEMO=true)
+docker-compose.yml    MongoDB + API + site
+demarrer.bat / .sh    lancement en un clic
 ```
 
 ---
