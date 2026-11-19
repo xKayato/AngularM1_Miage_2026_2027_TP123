@@ -220,6 +220,41 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 5. Recherche par utilisateur, pagination avancée et exploration sociale (Followers / Suivis)
+
+- **Objectif :**
+  - Corriger le bouton « Projets » sur la page « Mon Profil » pour filtrer effectivement le catalogue par créateur.
+  - Ajouter un système de recherche et de filtrage par utilisateur/créateur directement dans le catalogue (`/posts`).
+  - Permettre de sélectionner le nombre de créations par page et de naviguer directement via des numéros de pages.
+  - Permettre de cliquer sur les **Followers** et les **Personnes suivies** sur le profil d'un créateur (`/creators/:id`) ainsi que sur « Mon Profil » (`/profile`).
+- **Réalisation :**
+  - **Recherche et filtrage par utilisateur (`backend/src/routes/posts.js`, `posts-page.ts`, `posts-page.html`) :**
+    - Ajout des paramètres `author` (ObjectId) et `authorName` (recherche insensible à la casse sur `authorDoc.name` après `$lookup`) dans `GET /api/posts`, ainsi que l'inclusion du nom de l'auteur dans la recherche plein texte de repli.
+    - Lecture réactive des `queryParams` (`ActivatedRoute`) dans `PostsPageComponent` pour appliquer immédiatement les filtres `author`, `authorName`, `query`, `category` et `tag` provenant des liens « Projets » ou « Accès exclusif ».
+    - Ajout d'un champ dédié « Rechercher par utilisateur / créateur » avec autocomplétion en temps réel des créateurs (`CreatorService.getCreators`) et badge de filtre actif.
+  - **Pagination numérotée et choix du nombre de postes par page (`posts-page.ts`, `creator-profile-page.ts`) :**
+    - Sélecteur interactif du nombre de créations par page (`3, 6, 9, 12, 16, 20` sur le catalogue ; `6, 12, 24, 48` sur le profil d'un créateur) et boutons de pages numérotés.
+  - **Exploration interactive des Followers et Suivis (`backend/src/routes/creators.js`, `creator-profile-page.ts`, `profile-page.ts`) :**
+    - Ajout du compteur `followingCount` sur `GET /api/creators/:id` et de deux routes publiques paginées `GET /api/creators/:id/followers` et `GET /api/creators/:id/following` (excluant systématiquement les comptes suspendus).
+    - Sur le profil d'un créateur (`/creators/:id`), les compteurs **Followers** et **Suivis** sont désormais cliquables et ouvrent un panneau listant les utilisateurs avec accès direct à leur profil et à leurs projets.
+    - Sur « Mon Profil » (`/profile`), ajout de la section **Mes Followers** en complément de **Créateurs Suivis** et **Abonnements Actifs**.
+
+---
+
+## 6. Fiche de révision pour l'oral (`FICHE_REVISION_ORAL.md`)
+
+- **Objectif :** Avoir une fiche simple pour expliquer le code Angular à l'oral et répondre aux questions des sujets TP1 à TP3 et du TP4.
+- **Réalisation :** J'ai demandé à l'IA de relire les sujets (`SUJET_ETUDIANT_TP1/2/3.md`, `TP4_LIBRE.md`) puis le vrai code (services, guards, intercepteur, `server.js`, routes) pour rédiger une fiche avec les bons fichiers :
+  - Signals vs `localStorage`, `computed`, `effect`, control flow, Reactive Forms ;
+  - Guards (et pourquoi ils ne sécurisent pas), intercepteur JWT et distinction 401/403 ;
+  - schéma du clic « Se connecter », fichiers front/back de la mise à jour du profil ;
+  - pagination, upload `FormData` + progression, Blob/ObjectURL et réponses aux questions mémoire/buffering/streaming ;
+  - partage par lien secret (hash SHA-256, 7 jours, `X-Share-Token`), Markdown anti-XSS, connexion MongoDB avec Mongoose, tests unitaires vs intégration.
+- **Vérification :** J'ai contrôlé les extraits cités avec le code (ex. test de l'intercepteur, `verifyPassword` avec bcrypt). Point relevé au passage : la route Angular `/tracks` redirige maintenant vers `/posts`, donc la page bibliothèque audio n'est plus accessible depuis le menu (à préciser pendant la démo).
+- **Pas de modification de code :** uniquement de la documentation, donc pas de nouveau lancement des tests.
+
+---
+
 ## Bilan final des vérifications
 
 - **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **248 / 248 tests passants** (5 suites, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
