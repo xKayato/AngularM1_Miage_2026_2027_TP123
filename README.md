@@ -120,10 +120,14 @@ Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site**
 
 | Version | Contenu | Accès local |
 |---|---|---|
-| [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) ([.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/archive/refs/tags/v3.1.0.zip)) | Guitar Practice Cloud, rendu final des TP1 à TP3, version Docker | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
-| `main` (pas encore de version figée) | MakerShare (TP4 à TP6), version Docker | <http://localhost:8080> |
+| [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) | Guitar Practice Cloud, rendu final des TP1 à TP3 | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
+| `main` (pas encore de version figée) | MakerShare (TP4 à TP6) | <http://localhost:8080> |
+
+Chaque Release GitHub propose un fichier **`<application>-<version>-docker.zip` prêt à lancer** : les images Docker y sont déjà construites, il suffit de décompresser puis de double-cliquer sur `demarrer.bat` (ou `./demarrer.sh`), sans sources ni compilation. Les archives *Source code* générées par GitHub contiennent le code complet, qui se lance avec `docker compose up --build`.
 
 MakerShare recevra un tag de version une fois le projet validé. En attendant, la branche `main` se lance de la même façon. Les deux applications utilisent des ports différents et peuvent tourner en même temps.
+
+**Préparer le paquet d'une version** (mainteneur, Docker démarré) : `python tools/package_release.py <tag>` construit les images depuis le tag et produit `release-assets/<application>-<tag>-docker.zip`, à joindre à la Release GitHub correspondante.
 
 ---
 
