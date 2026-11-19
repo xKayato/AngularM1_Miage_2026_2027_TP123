@@ -279,6 +279,14 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 8. Refonte du README
+
+- **Objectif :** que le README présente vraiment le projet et mette en avant ce qui le distingue, au lieu d'une liste de fonctionnalités.
+- **Réalisation :** nouvelle section « Ce qui rend le projet original » (fichiers jamais servis en statique et cache Blob LRU, lien secret hashé et passé par `X-Share-Token`, aperçu verrouillé vs détail, magic bytes et quotas atomiques, abonnement sans double activation, modération sans passe-droit, recherche Atlas avec repli testable, éditeur Markdown avec dépôt au curseur, non-régression TP1-3), tableau des pages, démarrage et tests à jour.
+- **Ce que j'ai vérifié :** l'IA a relu chaque affirmation dans le code. L'ancien README contenait des erreurs que j'ai retirées : GridFS (jamais utilisé), forme d'onde / boucle A-B / vitesse sur `/tracks` (inexistants), variable `MONGO_URI` au lieu de `MONGODB_URI`, compteurs de tests périmés, gain de performance chiffré non mesuré et lien vers un script local hors dépôt.
+
+---
+
 ## Bilan final des vérifications
 
 - **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **305 / 305 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
