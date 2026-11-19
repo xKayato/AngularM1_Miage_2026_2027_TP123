@@ -7,7 +7,7 @@
 >
 > Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 305 tests backend · 396 tests frontend
 
-MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le TP4 libre l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
+MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
 
 ---
 
@@ -121,9 +121,9 @@ Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site**
 | Version | Contenu | Accès local |
 |---|---|---|
 | [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) ([.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/archive/refs/tags/v3.1.0.zip)) | Guitar Practice Cloud, rendu final des TP1 à TP3, version Docker | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
-| [`v4.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v4.1.0) ([.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/archive/refs/tags/v4.1.0.zip)) | MakerShare (TP4 libre), version Docker | <http://localhost:8080> |
+| `main` (pas encore de version figée) | MakerShare (TP4 à TP6), version Docker | <http://localhost:8080> |
 
-Les deux versions utilisent des ports différents et peuvent tourner en même temps.
+MakerShare recevra un tag de version une fois le projet validé. En attendant, la branche `main` se lance de la même façon. Les deux applications utilisent des ports différents et peuvent tourner en même temps.
 
 ---
 
@@ -204,5 +204,5 @@ demarrer.bat / .sh    lancement en un clic
 - [API_CONTRACT.md](API_CONTRACT.md) — routes, DTOs, codes HTTP et matrice d'accès
 - [TP4_LIBRE.md](TP4_LIBRE.md) — cahier des charges et règles métier de MakerShare
 - [ATLAS_SETUP.md](ATLAS_SETUP.md) — configuration du cluster MongoDB Atlas
-- [RAPPORT_IA_LIBRE.md](RAPPORT_IA_LIBRE.md) — rapport d'utilisation de l'IA pour le TP4
+- [RAPPORT_IA_LIBRE.md](RAPPORT_IA_LIBRE.md) — rapport d'utilisation de l'IA pour MakerShare (TP4 à TP6)
 - [RAPPORT_IA_TP1_A_3.md](RAPPORT_IA_TP1_A_3.md) — rapport d'utilisation de l'IA pour les TP1 à TP3
