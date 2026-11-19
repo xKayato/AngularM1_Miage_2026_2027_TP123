@@ -255,8 +255,20 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 6. Renfort des tests sur la recherche par auteur et l'exploration sociale
+
+- **Objectif :** les fonctionnalités de la section 5 avaient été livrées sans tests dédiés, donc j'ai demandé à l'IA de les couvrir et de faire un audit des manques.
+- **Backend (`backend/test/social_author.test.js`, 50 tests) :**
+  - `GET /api/creators/:id/followers` et `/following` : 400/404 (id invalide, inconnu, suspendu), 401 sur jeton invalide, accès anonyme, tri du plus récent, exclusion des comptes suspendus, pagination (`limit` plafonné à 50), aucune fuite d'email ou de hash.
+  - `followingCount` sur le profil, cohérent avec le `totalDocs` de `/following`.
+  - Filtres `author` / `authorName` de `GET /api/posts` : 400 si ObjectId invalide ou nom > 100 caractères, seuls les posts publiés et découvrables, post `followers` toujours verrouillé sans `content`, auteur suspendu masqué, échappement des métacaractères regex (`.*` ne renvoie rien), combinaisons avec `category`, `query`, pagination et bornes de `limit` inchangées.
+- **Frontend (5 nouveaux fichiers `.spec.ts`, 76 tests) :** méthodes `getCreatorFollowers` / `getCreatorFollowing` du `CreatorService`, paramètres `author` / `authorName` du `PostService`, lecture des `queryParams` et autocomplétion debouncée sur `/posts`, taille de page et pagination numérotée, onglets Followers / Suivis et pagination locale du profil créateur, section « Mes Followers » et liens « Projets » par ID sur `/profile`.
+- **Ce que j'ai retenu :** écrire les tests après coup a permis de repérer quelques défauts (filtre auteur non réinitialisé quand on revient sur `/posts` sans paramètres, contrat d'API pas à jour pour les nouvelles routes), notés pour la suite.
+
+---
+
 ## Bilan final des vérifications
 
-- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **248 / 248 tests passants** (5 suites, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
-- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **301 / 301 tests passants** (20 suites Vitest, 0 échec).
+- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **298 / 298 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
+- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **377 / 377 tests passants** (25 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).
