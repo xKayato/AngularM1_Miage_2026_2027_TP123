@@ -1,0 +1,45 @@
+# Guitar Practice Cloud (TP1 à TP3) en une commande : docker compose up --build
+# Puis ouvrir http://localhost:8081 (compte de démonstration : demo@example.com / Demo1234!)
+#
+# Variables optionnelles (fichier .env à côté de ce fichier ou variables d'environnement) :
+#   APP_PORT    port d'accès au site (défaut 8081, pour pouvoir lancer MakerShare en parallèle sur 8080)
+#   JWT_SECRET  secret de signature des JWT (à changer hors démo)
+
+name: guitar-practice-cloud
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/guitar-practice-cloud
+      JWT_SECRET: ${JWT_SECRET:-gpc-docker-local-secret-change-me}
+      PORT: 3000
+    volumes:
+      - uploads:/app/backend/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    build: ./frontend-starter
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8081}:80"
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:
+  uploads:

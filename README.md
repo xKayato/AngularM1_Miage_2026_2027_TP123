@@ -3,6 +3,26 @@
 Ce dépôt contient uniquement les ressources nécessaires aux trois TP :
 `backend/` et `frontend-starter/`, ainsi que les sujets et documents utiles.
 
+## Lancer la version finale avec Docker (le plus simple)
+
+Aucune installation de Node.js ni de compte Atlas n'est nécessaire : seul
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) est requis.
+
+1. Télécharger l'archive de cette version (onglet *Releases* / *Tags* du dépôt GitHub, tag `v3.1.0`) et la décompresser.
+2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux).
+   Équivalent manuel : `docker compose up --build -d`.
+3. Ouvrir <http://localhost:8081> et se connecter avec le compte de démonstration
+   `demo@example.com` / `Demo1234!`.
+
+Docker démarre trois conteneurs : MongoDB, l'API Express et le site Angular servi par
+nginx (qui redirige `/api` vers l'API, comme `proxy.conf.json` en développement). Les
+pistes audio et la base sont conservées dans des volumes Docker entre deux lancements.
+
+- Arrêter : `docker compose down` (ajouter `-v` pour effacer aussi les données).
+- Changer de port : `APP_PORT=9000 docker compose up -d`.
+
+Le port par défaut est 8081 pour pouvoir lancer MakerShare (TP4) en parallèle sur 8080.
+
 ## Prérequis
 
 - Node.js 22 ou plus récent ;
