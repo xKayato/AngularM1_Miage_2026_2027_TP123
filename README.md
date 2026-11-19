@@ -80,7 +80,7 @@ Construite sur une architecture découplée **Angular 22** (Frontend) et **Node.
 - **Base de données** : MongoDB Atlas avec Mongoose.
 - **Performances** : Parallélisation systématique des requêtes indépendantes par `Promise.all` (gain de 10 à 16% sur la latence réseau TLS Atlas), pagination `$facet`.
 - **Stockage & Fichiers** : Multer avec inspection binaire des magic bytes, stockage disque organisé (`data/uploads/attachments`, `covers`, `avatars`).
-- **Tests** : 298 tests automatisés avec le test runner natif Node.js (`node --test`, 5 suites, 100% de réussite).
+- **Tests** : 305 tests automatisés avec le test runner natif Node.js (`node --test`, 5 suites, 100% de réussite).
 
 ---
 
@@ -166,7 +166,7 @@ cd AngularM1_Miage_2026_2027_TP123
 L'ensemble des composants, services et endpoints dispose d'une couverture de tests rigoureuse :
 
 ```bash
-# Lancer la suite de tests unitaires et d'intégration Backend (298 tests)
+# Lancer la suite de tests unitaires et d'intégration Backend (305 tests)
 cd backend
 npm test
 
@@ -201,7 +201,7 @@ Un script de contrôle automatisé ([`verify-mission7-browser.mjs`](file:///C:/U
 │   │   ├── models/                  # Post, User, Like, Follow, Subscription, ShareLink
 │   │   ├── routes/                  # posts, creators, users, auth, tracks
 │   │   └── utils/                   # Projections DTO, calculs d'accès
-│   └── test/                        # 5 suites de tests automatisés (298 tests passants)
+│   └── test/                        # 5 suites de tests automatisés (305 tests passants)
 │
 ├── frontend-starter/                # Application Client Angular 22 Standalone
 │   ├── src/

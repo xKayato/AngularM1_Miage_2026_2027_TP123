@@ -121,11 +121,14 @@ interface PostComment {
 ```typescript
 interface FollowItem {
   id: string;
-  creator: {
+  creator: {           // l'autre personne de la relation (créateur suivi, ou follower selon la route)
     id: string;
     name: string;
+    bio?: string;
+    hasAvatar?: boolean;
+    avatarUrl?: string | null; // /api/users/:id/avatar si configuré
   };
-  createdAt: string;
+  createdAt: string;   // date du follow
 }
 
 interface SubscriptionItem {
@@ -175,6 +178,10 @@ interface SubscriptionItem {
 | `/api/posts/:id/comments/:cid` | `DELETE` | 401 Unauthorized | 200 (si auteur du commentaire) sinon 403 | 200 (si auteur) sinon 403 | 200 (si auteur) sinon 403 | 200 (si auteur) sinon 403 | **200 (modération admin sans accès fichiers)** |
 | `/api/creators/my/follows` | `GET` | 401 Unauthorized | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> | 200 Page<FollowItem> |
 | `/api/creators/my/subscriptions` | `GET` | 401 Unauthorized | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> | 200 Page<SubscriptionItem> |
+| `/api/creators` | `GET` | 200 Page<CreatorSummary> | 200 | 200 | 200 | 200 | 200 |
+| `/api/creators/:id` | `GET` | 200 CreatorPublicProfile (404 si suspendu) | 200 | 200 | 200 | 200 | 200 |
+| `/api/creators/:id/followers` | `GET` | 200 Page<FollowItem> (404 si suspendu) | 200 | 200 | 200 | 200 | 200 |
+| `/api/creators/:id/following` | `GET` | 200 Page<FollowItem> (404 si suspendu) | 200 | 200 | 200 | 200 | 200 |
 | `/api/creators/:id/follow` | `POST`/`DELETE` | 401 Unauthorized | 200 (si non-auteur) | 200 (toggle/unfollow) | 200 | 400 (auto-follow interdit) | 200 (si non-auteur) |
 | `/api/creators/:id/subscribe` | `POST` | 401 Unauthorized | 201 (30j) ou 409 si actif | 201 (30j) ou 409 si actif | 409 Conflict (déjà actif) | 400 (auto-sub interdit) | 201 ou 409 |
 | `/api/creators/:id/status` | `GET` | 401 Unauthorized | 200 Status | 200 Status | 200 Status | 200 Status | 200 Status |
@@ -226,9 +233,13 @@ interface SubscriptionItem {
 ### Paramètres de Requête (`GET /api/posts`) :
 * `page` (optionnel) : Entier $\ge 1$, défaut : `1`. Rejet `400 Bad Request` si non entier ou $< 1$.
 * `limit` (optionnel) : Entier compris entre `1` et `20`, défaut : `10`. Rejet `400 Bad Request` si non entier, $< 1$ ou $> 20$ (`{ "message": "Le paramètre limit doit être un entier compris entre 1 et 20." }`).
-* `category` (optionnel) : Catégorie valide parmi la liste autorisée (`Lego`, `Papercraft`, `Origami`, `Musique`, `Modèles 3D`, `Autre`) ou `Toutes`. Rejet `400 Bad Request` si inconnue.
+* `category` (optionnel) : Catégorie valide parmi la liste autorisée (`Menuiserie`, `Électronique`, `Maroquinerie`, `Lego`, `Papercraft`, `Origami`, `Musique`, `Modèles 3D`, `Autre`) ou `Toutes`. Rejet `400 Bad Request` si inconnue. La même liste est imposée à la création / modification d'un post.
 * `tags` (optionnel) : Tag unique ou liste de tags séparés par des virgules. Règle `$all` (tous les tags demandés). Rejet `400 Bad Request` si non conformes au format `^[a-z0-9-]+$`.
-* `query` (optionnel) : Texte libre de recherche, maximum 150 caractères. Rejet `400 Bad Request` si $> 150$ caractères.
+* `query` (optionnel) : Texte libre de recherche, maximum 150 caractères. Rejet `400 Bad Request` si $> 150$ caractères. En repli regex, la recherche porte sur `title`, `shortDescription` et le nom de l'auteur (`mode=suggest` : préfixe de mot sur `title` ou nom de l'auteur).
+* `author` (optionnel) : ObjectId de l'auteur. Rejet `400 Bad Request` `{ "message": "Identifiant d'auteur invalide." }` si ce n'est pas un ObjectId. Un auteur inexistant ou suspendu donne simplement une page vide.
+* `authorName` (optionnel) : Fragment du nom de l'auteur, insensible à la casse, métacaractères regex échappés, maximum 100 caractères (`400 Bad Request` au-delà). Combinable avec `author` (les deux conditions s'appliquent).
+* Dès que `author` ou `authorName` est fourni, l'étape `$search` Atlas est ignorée et le pipeline B-tree + regex est utilisé (le nom de l'auteur n'est disponible qu'après le `$lookup`).
+* Les bornes de `page` et `limit` restent inchangées quel que soit le filtre.
 
 ### Ordre Séquentiel du Pipeline :
 1. **Étape 1 — Recherche textuelle éventuelle :**
@@ -336,3 +347,41 @@ Ces routes sont préservées intactes pour la non-régression et les tests exist
 | PUT | `/api/tracks/:id/cover` | multipart : `cover` + JWT | `200 Track` |
 | DELETE | `/api/tracks/:id/cover` | JWT | `204 No Content` |
 | DELETE | `/api/tracks/:id` | JWT | `204 No Content` (sans orphelin) |
+
+---
+
+## 8. Profils Créateurs et Listes Sociales Publiques
+
+Les listes de followers et de comptes suivis sont **publiques**, comme sur un réseau social classique : elles ne contiennent que le nom, la bio et l'avatar (jamais d'email ni de hash). Les comptes suspendus en sont exclus, au même titre que du catalogue.
+
+### `GET /api/creators/:id`
+* **Auth :** optionnelle (`optionalAuth`). Un jeton invalide renvoie `401`, un compte suspendu `403`.
+* **Réponse `200` — `CreatorPublicProfile` :**
+  ```typescript
+  interface CreatorPublicProfile {
+    id: string;
+    name: string;
+    bio: string;
+    profileTags: string[];
+    hasAvatar: boolean;
+    avatarUrl: string | null;
+    createdAt: string;
+    followersCount: number;   // followers non suspendus
+    followingCount: number;   // créateurs suivis non suspendus
+    subscribersCount: number; // abonnements actifs
+    creationsCount: number;   // total réel des posts publiés et découvrables
+    isSelf: boolean;
+    userInteractions: { isFollowing: boolean; isSubscribed: boolean; subscriptionExpiresAt: string | null };
+    creations: PostPreview[]; // 100 plus récents au maximum ; utiliser GET /api/posts?author=:id pour la suite
+  }
+  ```
+* **Erreurs :** `400` identifiant invalide, `404` créateur inexistant ou suspendu.
+
+### `GET /api/creators/:id/followers` et `GET /api/creators/:id/following`
+* **Auth :** optionnelle (`optionalAuth`), mêmes règles `401` / `403` que ci-dessus.
+* **Paramètres :** `page` (entier ≥ 1, défaut `1`), `limit` (défaut `20`, plafonné à `50`). Les valeurs invalides sont ramenées aux valeurs par défaut au lieu d'être rejetées.
+* **Réponse `200` — `Page<FollowItem>`** triée du follow le plus récent au plus ancien :
+  * `/followers` : `creator` désigne l'utilisateur qui suit `:id`.
+  * `/following` : `creator` désigne le créateur suivi par `:id`.
+  * Champs de pagination : `docs`/`items`, `totalDocs`/`total`, `page`, `limit`, `totalPages`/`pages`, `hasPrevPage`, `hasNextPage`.
+* **Erreurs :** `400` identifiant invalide, `404` créateur inexistant ou suspendu.

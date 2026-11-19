@@ -90,7 +90,7 @@ Un post appartient à un seul auteur. Il possède :
 - `title` : Titre du projet.
 - `shortDescription` : Description courte publique (utilisée dans l'aperçu et indexée pour la recherche).
 - `content` : Texte libre complet du tutoriel (réservé aux lecteurs autorisés).
-- `category` : Catégorie principale (Lego, Papercraft, Origami, Musique, Modèles 3D, Autre).
+- `category` : Catégorie principale (Menuiserie, Électronique, Maroquinerie, Lego, Papercraft, Origami, Musique, Modèles 3D, Autre).
 - `tags` : 1 à 10 tags normalisés (minuscules, sans accents, sans espaces, regex `^[a-z0-9\-]+$`).
 - `attachments` : Tableau de 0 à 10 pièces jointes (cumul $\le 50$ Mo).
 - `status` : `'draft' | 'published' | 'archived'`.

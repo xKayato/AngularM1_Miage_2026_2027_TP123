@@ -267,8 +267,20 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 7. Correction des défauts trouvés par l'audit
+
+- **Catégories incohérentes :** le catalogue proposait Menuiserie, Électronique et Maroquinerie mais le backend les refusait (`400`). J'ai aligné toute la chaîne sur 9 catégories : `VALID_CATEGORIES` sert maintenant aussi d'`enum` au modèle `Post` (une seule source de vérité), type `Category` et formulaire de création côté Angular.
+- **Filtres du catalogue et URL :** l'URL est devenue la source de vérité de `/posts`. Revenir sur `/posts` sans paramètres réinitialise bien le filtre auteur, et chaque filtre (recherche, auteur, catégorie, tag) est réécrit dans l'URL avec `replaceUrl` : un F5 ou un lien partagé retrouve la même recherche. L'écho de notre propre navigation est ignoré pour éviter un double chargement.
+- **`creationsCount` plafonné :** le profil ne charge que les 100 créations les plus récentes ; le compteur vient maintenant d'un `countDocuments` et un lien « Voir tous ses projets dans le catalogue » apparaît quand il y en a plus.
+- **Onglets Followers / Suivis :** la requête précédente est annulée (`unsubscribe`) quand on change d'onglet, de créateur ou qu'on ferme le panneau, donc plus de réponse tardive qui écrase la bonne liste.
+- **Qualité :** plus aucun `any` dans le code de production (timers typés `ReturnType<typeof setTimeout>`, champ client `tempId` ajouté à `AttachmentInfo`), suppression des gardes `typeof … !== 'function'` qui n'existaient que pour des mocks incomplets (les mocks ont été complétés), et suppression d'une fausse date « 12 oct. 2026 » affichée quand `publishedAt` manquait.
+- **Choix assumé :** les listes de followers et de suivis restent publiques (comme sur un réseau social classique), sans email ni hash ; c'est maintenant écrit dans le code et dans `API_CONTRACT.md` (nouvelle section 8, paramètres `author` / `authorName`, 9 catégories).
+- **Tests de régression :** 7 tests backend (catégories, total réel au-delà de 100) et 19 tests frontend (réinitialisation et écriture de l'URL, annulation des requêtes, lien vers le catalogue, absence de fausse date).
+
+---
+
 ## Bilan final des vérifications
 
-- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **298 / 298 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
-- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **377 / 377 tests passants** (25 fichiers Vitest, 0 échec).
+- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **305 / 305 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
+- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **396 / 396 tests passants** (25 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).
