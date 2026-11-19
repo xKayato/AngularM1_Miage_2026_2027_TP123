@@ -664,6 +664,111 @@
   cursor: not-allowed;
 }
 
+/* Ligne de tri et limite par page */
+.sort-and-limit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.limit-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0;
+}
+
+.limit-chip {
+  min-width: 2.2rem;
+  justify-content: center;
+  padding: 0.45rem 0.65rem;
+}
+
+.active-filters-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.author-profile-mini-link {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand-primary);
+  text-decoration: underline;
+}
+
+.author-footer-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.author-avatar-img {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.btn-filter-author {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-filter-author:hover {
+  background-color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #FFFFFF;
+}
+
+.pagination-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.page-numbers-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-page-num {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-page-num:hover:not(:disabled) {
+  background-color: var(--bg-subtle);
+  border-color: var(--brand-primary);
+}
+
+.btn-page-num.active {
+  background-color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #FFFFFF;
+}
+
 /* Responsif Mobile (Frame 4 - 390px) */
 @media (max-width: 768px) {
   .search-and-sort-grid {

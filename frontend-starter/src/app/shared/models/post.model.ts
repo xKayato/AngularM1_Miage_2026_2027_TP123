@@ -125,6 +125,8 @@ export interface PostFilterParams {
   query?: string;
   tags?: string | string[];
   category?: string;
+  author?: string;
+  authorName?: string;
   mode?: 'catalog' | 'suggest';
   sort?: 'date-desc' | 'likes-desc' | 'date-asc' | 'relevance';
 }

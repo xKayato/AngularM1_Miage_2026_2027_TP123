@@ -84,9 +84,12 @@
             }
           </div>
 
-          <div class="creator-card-bottom">
+          <div class="creator-card-bottom" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <a [routerLink]="['/creators', creator.id]" class="btn-view-profile">
               Consulter le profil →
+            </a>
+            <a [routerLink]="['/posts']" [queryParams]="{ author: creator.id, authorName: creator.name }" class="btn-view-profile">
+              Voir ses projets ({{ creator.creationsCount }})
             </a>
           </div>
         </article>

@@ -98,6 +98,29 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       }
     }
 
+    // 2b. Validation du filtre par auteur (ID ou nom d'utilisateur)
+    let authorIdFilter = null;
+    if (typeof req.query.author === "string" && req.query.author.trim()) {
+      const rawAuthor = req.query.author.trim();
+      if (!mongoose.Types.ObjectId.isValid(rawAuthor)) {
+        return res.status(400).json({
+          message: "Identifiant d'auteur invalide.",
+        });
+      }
+      authorIdFilter = new mongoose.Types.ObjectId(rawAuthor);
+    }
+
+    let authorNameFilter = null;
+    if (typeof req.query.authorName === "string" && req.query.authorName.trim()) {
+      const rawAuthorName = req.query.authorName.trim();
+      if (rawAuthorName.length > 100) {
+        return res.status(400).json({
+          message: "Le filtre nom d'auteur ne doit pas dépasser 100 caractères.",
+        });
+      }
+      authorNameFilter = rawAuthorName;
+    }
+
     // 3. Validation et normalisation des tags si fournis (tous les tags demandés)
     let tagList = [];
     if (req.query.tags !== undefined) {
@@ -290,14 +313,27 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       if (!useAtlasSearch && textQuery) {
         const escaped = textQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         if (mode === "suggest") {
-          // En mode suggestion : préfixe de mot insensible à la casse sur title
-          matchStage.title = { $regex: `\\b${escaped}`, $options: "i" };
+          // En mode suggestion : préfixe de mot insensible à la casse sur title ou nom d'auteur
+          matchStage.$or = [
+            { title: { $regex: `\\b${escaped}`, $options: "i" } },
+            { "authorDoc.name": { $regex: `\\b${escaped}`, $options: "i" } },
+          ];
         } else {
           matchStage.$or = [
             { title: { $regex: escaped, $options: "i" } },
             { shortDescription: { $regex: escaped, $options: "i" } },
+            { "authorDoc.name": { $regex: escaped, $options: "i" } },
           ];
         }
+      }
+
+      if (authorIdFilter) {
+        matchStage.author = authorIdFilter;
+      }
+
+      if (authorNameFilter) {
+        const escapedAuthor = authorNameFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        matchStage["authorDoc.name"] = { $regex: escapedAuthor, $options: "i" };
       }
 
       if (category) {
@@ -363,17 +399,20 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       return pipeline;
     };
 
-    // 6. Exécution avec tolérance d'environnement (Atlas Search si disponible, repli si test unitaire local)
+    // 6. Exécution avec tolérance d'environnement (Atlas Search si disponible, repli si test unitaire local ou recherche par nom d'auteur)
     let facetResult;
-    if (textQuery) {
+    if (textQuery && !authorIdFilter && !authorNameFilter) {
       try {
         facetResult = await Post.aggregate(buildPipeline(true));
+        if ((facetResult[0]?.totalDocs[0]?.count || 0) === 0) {
+          facetResult = await Post.aggregate(buildPipeline(false));
+        }
       } catch (searchErr) {
         // En environnement MongoMemoryServer ou si Atlas Search n'est pas configuré localement
         facetResult = await Post.aggregate(buildPipeline(false));
       }
     } else {
-      // Aucune recherche textuelle : étape $search omise, pipeline B-tree direct
+      // Aucune recherche textuelle ou filtre auteur : pipeline B-tree direct avec $lookup
       facetResult = await Post.aggregate(buildPipeline(false));
     }
 

@@ -7,7 +7,7 @@
       <p class="subtitle">Découvrez, apprenez et reproduisez les projets d'atelier, tutoriels DIY et modèles partagés par la communauté.</p>
     </div>
 
-    <!-- Barre d'outils : Recherche, Suggestions, Tris et Filtres -->
+    <!-- Barre d'outils : Recherche, Recherche par Utilisateur, Tris et Filtres -->
     <div class="controls-card">
       <div class="search-and-sort-grid">
         <!-- Recherche textuelle & Suggestions en temps réel -->
@@ -103,7 +103,72 @@
           </div>
         </div>
 
-        <!-- Bouton & Menu de Tri interactif Figma v2 -->
+        <!-- Recherche par Utilisateur / Créateur -->
+        <div class="search-col">
+          <label for="author-search-input" class="control-label">Rechercher par utilisateur / créateur</label>
+          <div class="search-box-wrapper">
+            <div class="search-box">
+              <span class="search-icon" aria-hidden="true">👤</span>
+              <input
+                id="author-search-input"
+                type="search"
+                placeholder="Ex. Alice, Bob, nom du créateur..."
+                [formControl]="authorSearchControl"
+                (keydown.enter)="$event.preventDefault(); applyAuthorNameFilter()"
+                autocomplete="off"
+              />
+              @if (authorSearchControl.value || selectedAuthorId() || selectedAuthorName()) {
+                <button
+                  type="button"
+                  class="btn-clear-search"
+                  (click)="clearAuthorFilter()"
+                  aria-label="Effacer le filtre utilisateur"
+                >
+                  ✕ Effacer
+                </button>
+              }
+              <button
+                type="button"
+                class="btn-search"
+                (click)="applyAuthorNameFilter()"
+                aria-label="Filtrer par utilisateur"
+              >
+                Filtrer
+              </button>
+            </div>
+
+            @if (showCreatorSuggestions() && creatorSuggestions().length > 0) {
+              <div class="suggestions-dropdown" role="listbox" aria-label="Suggestions de créateurs">
+                <div class="suggestions-dropdown-header">
+                  <span>Créateurs correspondants</span>
+                </div>
+                <ul class="suggestions-list">
+                  @for (creator of creatorSuggestions(); track creator.id) {
+                    <li
+                      role="option"
+                      class="suggestion-item"
+                      (click)="selectCreatorFilter(creator)"
+                    >
+                      <div class="suggestion-main">
+                        <span class="suggestion-title">👤 {{ creator.name }}</span>
+                        <span class="suggestion-meta">
+                          {{ creator.creationsCount }} projet{{ creator.creationsCount > 1 ? 's' : '' }} • {{ creator.followersCount }} follower{{ creator.followersCount > 1 ? 's' : '' }}
+                        </span>
+                      </div>
+                      <div class="suggestion-badges">
+                        <span class="suggestion-category">Voir ses posts →</span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Ligne de tri et sélection du nombre de posts par page -->
+      <div class="sort-and-limit-row">
         <div class="sort-col">
           <label class="control-label">Trier les créations par</label>
           <div class="sort-btn-group" role="group" aria-label="Critères de tri">
@@ -147,9 +212,25 @@
             </button>
           </div>
         </div>
+
+        <div class="limit-col">
+          <label for="page-size-select" class="control-label">Postes par page</label>
+          <div class="limit-btn-group" role="group" aria-label="Nombre de postes par page">
+            @for (size of pageSizeOptions; track size) {
+              <button
+                type="button"
+                class="sort-btn limit-chip"
+                [class.active]="pageSize() === size"
+                (click)="setPageSize(size)"
+              >
+                {{ size }}
+              </button>
+            }
+          </div>
+        </div>
       </div>
 
-      <!-- Filtres par catégorie et tags -->
+      <!-- Filtres par catégorie, tags et auteur actif -->
       <div class="filters-row">
         <div class="category-chips" role="radiogroup" aria-label="Filtrer par catégorie">
           <span class="filter-lbl">Catégories :</span>
@@ -165,19 +246,38 @@
           }
         </div>
 
-        @if (selectedTag()) {
-          <div class="active-tag-filter" role="status">
-            <span>Tag actif : <strong>#{{ selectedTag() }}</strong></span>
-            <button
-              type="button"
-              class="btn-clear-tag"
-              (click)="clearTag()"
-              aria-label="Effacer le filtre par tag"
-            >
-              ✕ Retirer
-            </button>
-          </div>
-        }
+        <div class="active-filters-group">
+          @if (selectedAuthorId() || selectedAuthorName()) {
+            <div class="active-tag-filter author-filter-pill" role="status">
+              <span>👤 Créateur : <strong>{{ selectedAuthorName() || 'Sélectionné' }}</strong></span>
+              @if (selectedAuthorId()) {
+                <a [routerLink]="['/creators', selectedAuthorId()]" class="author-profile-mini-link">Profil ↗</a>
+              }
+              <button
+                type="button"
+                class="btn-clear-tag"
+                (click)="clearAuthorFilter()"
+                aria-label="Effacer le filtre par créateur"
+              >
+                ✕ Retirer
+              </button>
+            </div>
+          }
+
+          @if (selectedTag()) {
+            <div class="active-tag-filter" role="status">
+              <span>Tag actif : <strong>#{{ selectedTag() }}</strong></span>
+              <button
+                type="button"
+                class="btn-clear-tag"
+                (click)="clearTag()"
+                aria-label="Effacer le filtre par tag"
+              >
+                ✕ Retirer
+              </button>
+            </div>
+          }
+        </div>
       </div>
     </div>
   </div>
@@ -274,20 +374,30 @@
 
             <!-- Pied de carte : Auteur avec avatar réel & Likes & Commentaires -->
             <div class="card-footer">
-              <a [routerLink]="['/creators', post.author.id]" class="author-link card-interactive-element" [title]="'Voir le profil de ' + post.author.name">
-                @if (post.author.hasAvatar && post.author.avatarUrl && !isAvatarFailed(post.author.id)) {
-                  <img
-                    [src]="post.author.avatarUrl"
-                    (error)="markAvatarFailed(post.author.id)"
-                    class="author-avatar-img"
-                    [alt]="post.author.name"
-                    loading="lazy"
-                  />
-                } @else {
-                  <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
-                }
-                <span class="author-name">{{ post.author.name }}</span>
-              </a>
+              <div class="author-footer-group card-interactive-element">
+                <a [routerLink]="['/creators', post.author.id]" class="author-link" [title]="'Voir le profil de ' + post.author.name">
+                  @if (post.author.hasAvatar && post.author.avatarUrl && !isAvatarFailed(post.author.id)) {
+                    <img
+                      [src]="post.author.avatarUrl"
+                      (error)="markAvatarFailed(post.author.id)"
+                      class="author-avatar-img"
+                      [alt]="post.author.name"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <span class="author-avatar">{{ getInitials(post.author.name) }}</span>
+                  }
+                  <span class="author-name">{{ post.author.name }}</span>
+                </a>
+                <button
+                  type="button"
+                  class="btn-filter-author"
+                  (click)="filterByPostAuthor(post.author, $event)"
+                  [title]="'Voir uniquement les projets de ' + post.author.name"
+                >
+                  Projets
+                </button>
+              </div>
 
               <div class="card-actions card-interactive-element">
                 <span class="comments-pill" title="Commentaires">
@@ -307,7 +417,7 @@
       }
     </div>
 
-    <!-- Barre de pagination -->
+    <!-- Barre de pagination complète avec numéros de pages et sélecteur de taille -->
     <nav class="pagination-bar" aria-label="Pagination des créations">
       <button
         type="button"
@@ -317,9 +427,26 @@
       >
         ← Précédent
       </button>
-      <span class="page-indicator">
-        Page {{ currentPage() }} sur {{ totalPages() }} ({{ totalDocs() }} création{{ totalDocs() > 1 ? 's' : '' }} au total)
-      </span>
+
+      <div class="pagination-center">
+        <div class="page-numbers-group" role="group" aria-label="Numéros de page">
+          @for (p of pageNumbers(); track p) {
+            <button
+              type="button"
+              class="btn-page-num"
+              [class.active]="p === currentPage()"
+              [disabled]="loading()"
+              (click)="goToPage(p)"
+            >
+              {{ p }}
+            </button>
+          }
+        </div>
+        <span class="page-indicator">
+          Page {{ currentPage() }} sur {{ totalPages() }} ({{ totalDocs() }} création{{ totalDocs() > 1 ? 's' : '' }} au total)
+        </span>
+      </div>
+
       <button
         type="button"
         class="btn-page"

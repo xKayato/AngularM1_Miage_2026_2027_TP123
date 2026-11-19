@@ -52,6 +52,12 @@ export class PostService {
       if (params.category?.trim()) {
         httpParams = httpParams.set('category', params.category.trim());
       }
+      if (params.author?.trim()) {
+        httpParams = httpParams.set('author', params.author.trim());
+      }
+      if (params.authorName?.trim()) {
+        httpParams = httpParams.set('authorName', params.authorName.trim());
+      }
       if (params.tags) {
         const tagsValue = Array.isArray(params.tags)
           ? params.tags.join(',')
