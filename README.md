@@ -5,7 +5,7 @@
 > Projet de Programmation Web — Master 1 MIAGE, Université Côte d'Azur (2026–2027)
 > Thomas DELOUP
 >
-> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 305 tests backend · 396 tests frontend
+> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 350 tests backend · 396 tests frontend
 
 MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
 
@@ -54,7 +54,7 @@ Côté session, un changement de mot de passe incrémente un `tokenVersion` qui 
 ### 7. Une recherche tolérante aux fautes, testable hors Atlas
 
 - **MongoDB Atlas Search** avec tolérance aux fautes (`fuzzy`), autocomplétion dès la première lettre (`mode=suggest`) et syntaxe mixte texte + tags : `château #lego #star-wars`.
-- Les tests tournent sur `mongodb-memory-server`, qui ne connaît pas Atlas Search : le backend bascule alors automatiquement sur un **pipeline de repli** (`$regex` échappé) qui renvoie les mêmes formes de réponse. La suite de tests reste 100 % isolée et déterministe.
+- Sans Atlas (tests, Docker), ou quand Atlas ne trouve rien, un **moteur de repli maison** prend le relais avec la même tolérance : accents et ligatures ignorés, pluriels, une faute par mot (lettre en trop, oubliée, remplacée ou inversée), recherche dans le titre, la description, l'auteur et les tags, et score de pertinence. Il essaie d'abord tous les mots sans faute, puis avec une faute, puis n'importe quel mot. « chateau », « drgaon » ou « guitare bluse » trouvent ce qu'on cherche, y compris dans l'autocomplétion.
 - Recherche **par créateur** (nom ou identifiant), pagination numérotée avec choix du nombre de résultats, et filtres **reflétés dans l'URL** : un F5 ou un lien partagé retrouve exactement la même recherche.
 
 ### 8. Un éditeur Markdown où l'on dépose les médias là où l'on écrit
@@ -168,7 +168,7 @@ npm start                 # http://localhost:4200, /api/* est redirigé vers le 
 ## Tests
 
 ```bash
-cd backend && npm test                          # 305 tests, 15 fichiers
+cd backend && npm test                          # 350 tests, 16 fichiers
 cd frontend-starter && npm test -- --watch=false  # 396 tests, 25 fichiers
 cd frontend-starter && npm run build            # build de production
 ```

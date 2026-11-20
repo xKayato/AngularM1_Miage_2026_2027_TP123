@@ -235,11 +235,22 @@ interface SubscriptionItem {
 * `limit` (optionnel) : Entier compris entre `1` et `20`, défaut : `10`. Rejet `400 Bad Request` si non entier, $< 1$ ou $> 20$ (`{ "message": "Le paramètre limit doit être un entier compris entre 1 et 20." }`).
 * `category` (optionnel) : Catégorie valide parmi la liste autorisée (`Menuiserie`, `Électronique`, `Maroquinerie`, `Lego`, `Papercraft`, `Origami`, `Musique`, `Modèles 3D`, `Autre`) ou `Toutes`. Rejet `400 Bad Request` si inconnue. La même liste est imposée à la création / modification d'un post.
 * `tags` (optionnel) : Tag unique ou liste de tags séparés par des virgules. Règle `$all` (tous les tags demandés). Rejet `400 Bad Request` si non conformes au format `^[a-z0-9-]+$`.
-* `query` (optionnel) : Texte libre de recherche, maximum 150 caractères. Rejet `400 Bad Request` si $> 150$ caractères. En repli regex, la recherche porte sur `title`, `shortDescription` et le nom de l'auteur (`mode=suggest` : préfixe de mot sur `title` ou nom de l'auteur).
+* `query` (optionnel) : Texte libre de recherche, maximum 150 caractères. Rejet `400 Bad Request` si $> 150$ caractères. Voir « Recherche textuelle et tolérance aux fautes » ci-dessous.
 * `author` (optionnel) : ObjectId de l'auteur. Rejet `400 Bad Request` `{ "message": "Identifiant d'auteur invalide." }` si ce n'est pas un ObjectId. Un auteur inexistant ou suspendu donne simplement une page vide.
 * `authorName` (optionnel) : Fragment du nom de l'auteur, insensible à la casse, métacaractères regex échappés, maximum 100 caractères (`400 Bad Request` au-delà). Combinable avec `author` (les deux conditions s'appliquent).
 * Dès que `author` ou `authorName` est fourni, l'étape `$search` Atlas est ignorée et le pipeline B-tree + regex est utilisé (le nom de l'auteur n'est disponible qu'après le `$lookup`).
 * Les bornes de `page` et `limit` restent inchangées quel que soit le filtre.
+
+### Recherche textuelle et tolérance aux fautes (`query`)
+
+* **Atlas Search (catalogue) :** clauses `should` sur `title` (boost 3, phrase exacte boost 5) et `shortDescription`, `fuzzy` `maxEdits: 1, prefixLength: 1` ; les mots de 8 lettres ou plus tolèrent `maxEdits: 2`. Si la requête contient plusieurs mots, un premier essai exige **tous les mots** (`matchCriteria: "all"`) ; s'il ne renvoie rien, on accepte n'importe quel mot. Tri `relevance` = `searchScore` Atlas.
+* **Repli tolérant** (`utils/fuzzySearch.js`) : utilisé sans Atlas (tests, Docker, MongoDB local), avec les filtres `author` / `authorName`, quand Atlas ne renvoie rien, et pour l'autocomplétion (l'index ne définit pas de champ `autocomplete`). Il porte sur `title`, `shortDescription`, le nom de l'auteur et les `tags` :
+  * casse, accents et ligatures ignorés (`chateau` → « Château », `coeur` → « cœur ») ;
+  * pluriels simples ramenés au singulier (`dragons`, `chateaux`) et mots vides ignorés (`de`, `la`, `les`…) ;
+  * une faute par mot de 5 lettres ou plus (lettre en trop, oubliée, remplacée ou deux lettres inversées, première lettre conservée) ; un mot plus court doit commencer un mot (`ali` → « Alice », pas « Kalimba ») ;
+  * niveaux essayés dans l'ordre jusqu'au premier non vide : tous les mots exacts → tous les mots avec une faute → au moins un mot ;
+  * tri `relevance` par score (titre > auteur / tags > description, exact > approché, bonus si tous les mots ou la phrase complète sont présents), puis date ;
+  * une requête sans aucun mot exploitable (`.*`, `?!`) renvoie une page vide. Les filtres de sécurité (statut, visibilité, auteur suspendu) s'appliquent toujours avant le score.
 
 ### Ordre Séquentiel du Pipeline :
 1. **Étape 1 — Recherche textuelle éventuelle :**

@@ -27,6 +27,7 @@ import {
   toPostPreview,
 } from "../utils/postProjections.js";
 import { canAccessPost } from "../utils/postAccessControl.js";
+import { buildFuzzySearch } from "../utils/fuzzySearch.js";
 
 export const postsRouter = Router();
 
@@ -214,7 +215,10 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     }
 
     // 5. Construction du pipeline d'agrégation MakerShare
-    const buildPipeline = (useAtlasSearch) => {
+    const fuzzySearch = textQuery ? buildFuzzySearch(textQuery) : null;
+
+    // level : "atlas-all" / "atlas-any" pour Atlas, "exact-all" / "fuzzy-all" / "fuzzy-any" pour le repli
+    const buildPipeline = (useAtlasSearch, level = "exact-all") => {
       const pipeline = [];
 
       // Étape 1 : $search si recherche textuelle et Atlas Search activé
@@ -254,18 +258,57 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
             minimumShouldMatch: 1,
           };
         } else {
-          // Mode catalogue : recherche plein texte standard avec analyseur français
-          compoundClauses = {
-            must: [
-              {
-                text: {
-                  query: textQuery,
-                  path: ["title", "shortDescription"],
-                  fuzzy: { maxEdits: 1, prefixLength: 1 },
-                },
+          // Mode catalogue : plein texte (analyseur français) avec tolérance aux fautes.
+          // Le titre pèse plus que la description, la phrase exacte encore plus, et les mots
+          // longs (8 lettres ou plus) tolèrent deux fautes au lieu d'une.
+          const shouldClauses = [
+            { phrase: { query: textQuery, path: "title", score: { boost: { value: 5 } } } },
+            {
+              text: {
+                query: textQuery,
+                path: "title",
+                fuzzy: { maxEdits: 1, prefixLength: 1 },
+                score: { boost: { value: 3 } },
               },
-            ],
-          };
+            },
+            {
+              text: {
+                query: textQuery,
+                path: "shortDescription",
+                fuzzy: { maxEdits: 1, prefixLength: 1 },
+              },
+            },
+          ];
+          const longWords = textQuery.split(/\s+/).filter((w) => w.length >= 8);
+          if (longWords.length > 0) {
+            shouldClauses.push({
+              text: {
+                query: longWords.join(" "),
+                path: ["title", "shortDescription"],
+                fuzzy: { maxEdits: 2, prefixLength: 1 },
+                score: { boost: { value: 0.5 } },
+              },
+            });
+          }
+          if (level === "atlas-all") {
+            // Premier essai : tous les mots doivent être présents (une faute tolérée par mot) ;
+            // les clauses should ne servent plus qu'à classer.
+            compoundClauses = {
+              must: [
+                {
+                  text: {
+                    query: textQuery,
+                    path: ["title", "shortDescription"],
+                    fuzzy: { maxEdits: 1, prefixLength: 1 },
+                    matchCriteria: "all",
+                  },
+                },
+              ],
+              should: shouldClauses,
+            };
+          } else {
+            compoundClauses = { should: shouldClauses, minimumShouldMatch: 1 };
+          }
         }
 
         const filterClauses = [];
@@ -309,22 +352,11 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
         "authorDoc.status": { $ne: "suspended" },
       };
 
-      // Si Atlas Search n'a pas été utilisé mais qu'une recherche textuelle est demandée (repli regex)
-      if (!useAtlasSearch && textQuery) {
-        const escaped = textQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        if (mode === "suggest") {
-          // En mode suggestion : préfixe de mot insensible à la casse sur title ou nom d'auteur
-          matchStage.$or = [
-            { title: { $regex: `\\b${escaped}`, $options: "i" } },
-            { "authorDoc.name": { $regex: `\\b${escaped}`, $options: "i" } },
-          ];
-        } else {
-          matchStage.$or = [
-            { title: { $regex: escaped, $options: "i" } },
-            { shortDescription: { $regex: escaped, $options: "i" } },
-            { "authorDoc.name": { $regex: escaped, $options: "i" } },
-          ];
-        }
+      // Repli sans Atlas Search : recherche tolérante (accents, pluriels, une faute par mot)
+      // sur le titre, la description, le nom de l'auteur et les tags (utils/fuzzySearch.js)
+      const useFuzzyFallback = !useAtlasSearch && fuzzySearch !== null;
+      if (useFuzzyFallback) {
+        Object.assign(matchStage, fuzzySearch.matchFor(level));
       }
 
       if (authorIdFilter) {
@@ -346,6 +378,11 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
       }
 
       pipeline.push({ $match: matchStage });
+
+      // Score de pertinence du repli, calculé seulement sur les documents déjà filtrés
+      if (useFuzzyFallback) {
+        pipeline.push(...fuzzySearch.scoreStages);
+      }
 
       // Étape 4 : Calcul des likes si tri likes_desc (après le match de sécurité)
       if (sortCriteria === "likes_desc") {
@@ -379,6 +416,8 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
         sortStage = { $sort: { publishedAt: 1, createdAt: 1, _id: 1 } };
       } else if (sortCriteria === "relevance" && useAtlasSearch && textQuery) {
         sortStage = { $sort: { score: { $meta: "searchScore" }, publishedAt: -1, _id: -1 } };
+      } else if (sortCriteria === "relevance" && useFuzzyFallback) {
+        sortStage = { $sort: { searchScore: -1, publishedAt: -1, _id: -1 } };
       } else {
         // date_desc par défaut (et repli pertinence regex)
         sortStage = { $sort: { publishedAt: -1, createdAt: -1, _id: -1 } };
@@ -400,20 +439,42 @@ postsRouter.get("/", optionalAuthMakerShare, async (req, res, next) => {
     };
 
     // 6. Exécution avec tolérance d'environnement (Atlas Search si disponible, repli si test unitaire local ou recherche par nom d'auteur)
+    const countOf = (result) => result[0]?.totalDocs[0]?.count || 0;
+
+    // Repli tolérant : on élargit niveau par niveau (exact → une faute → n'importe quel mot)
+    const runFallback = async () => {
+      // Requête sans aucun mot exploitable (« .* », « ?! ») : rien à chercher, page vide
+      if (textQuery && !fuzzySearch) return [{ totalDocs: [], docs: [] }];
+      if (!fuzzySearch) return Post.aggregate(buildPipeline(false));
+      let result;
+      for (const level of fuzzySearch.levels) {
+        result = await Post.aggregate(buildPipeline(false, level));
+        if (countOf(result) > 0) break;
+      }
+      return result;
+    };
+
     let facetResult;
     if (textQuery && !authorIdFilter && !authorNameFilter) {
       try {
-        facetResult = await Post.aggregate(buildPipeline(true));
-        if ((facetResult[0]?.totalDocs[0]?.count || 0) === 0) {
-          facetResult = await Post.aggregate(buildPipeline(false));
+        // Plusieurs mots : d'abord les documents qui les contiennent tous, sinon au moins un
+        const wordCount = textQuery.split(/[^\p{L}\p{N}]+/u).filter(Boolean).length;
+        const atlasLevels = mode !== "suggest" && wordCount > 1 ? ["atlas-all", "atlas-any"] : ["atlas-any"];
+        for (const level of atlasLevels) {
+          facetResult = await Post.aggregate(buildPipeline(true, level));
+          if (countOf(facetResult) > 0) break;
+        }
+        if (countOf(facetResult) === 0) {
+          // Atlas ne trouve rien (faute trop forte, nom d'auteur, autocomplétion non indexée…)
+          facetResult = await runFallback();
         }
       } catch (searchErr) {
         // En environnement MongoMemoryServer ou si Atlas Search n'est pas configuré localement
-        facetResult = await Post.aggregate(buildPipeline(false));
+        facetResult = await runFallback();
       }
     } else {
       // Aucune recherche textuelle ou filtre auteur : pipeline B-tree direct avec $lookup
-      facetResult = await Post.aggregate(buildPipeline(false));
+      facetResult = await runFallback();
     }
 
     const totalDocs = facetResult[0]?.totalDocs[0]?.count || 0;

@@ -297,8 +297,18 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 10. Recherche tolérante aux fautes
+
+- **Mesure avant correction :** j'ai écrit un petit banc d'essai (une trentaine de requêtes : accents, fautes, pluriels, plusieurs mots, auteur, autocomplétion) lancé sur le jeu de démo, en local et en lecture seule sur Atlas. Sur Atlas, le catalogue tolérait déjà une faute, mais l'autocomplétion non (l'index n'a pas de champ `autocomplete`, l'API retombait sur une regex) et deux fautes ne passaient jamais. Sans Atlas (tests, Docker), c'était pire : « chateau » ne trouvait pas « Château », « faucon lego » ne trouvait rien et aucune faute n'était tolérée.
+- **Repli tolérant (`backend/src/utils/fuzzySearch.js`) :** chaque mot devient une regex qui ignore accents et ligatures, ramène les pluriels au singulier et accepte une faute (variantes générées : lettre en trop, oubliée, remplacée, inversée, première lettre conservée comme le `prefixLength` d'Atlas). Les mots de moins de 5 lettres ne sont pas approchés et doivent commencer un mot, pour éviter le bruit. La recherche porte aussi sur l'auteur et les tags, et un score de pertinence est calculé en base (`$regexMatch`).
+- **Moins de bruit :** on essaie d'abord tous les mots sans faute, puis avec une faute, puis n'importe quel mot. « faucon lego » renvoie maintenant le seul Faucon en Lego au lieu de 18 résultats.
+- **Atlas :** la phrase exacte et le titre pèsent plus, les mots longs tolèrent deux fautes, et une requête de plusieurs mots exige d'abord tous les mots (`matchCriteria: "all"`) avant d'élargir. Vérifié en lecture seule sur le cluster, sans modifier l'index.
+- **Tests :** `backend/test/fuzzy_search.test.js` (45 tests) couvre le module et l'API : chaque type de faute, accents, ligature, pluriels, auteur, tags, plusieurs mots, élargissement, ordre de pertinence, tri explicite respecté, pagination, métacaractères regex, requête de 150 caractères et surtout l'absence de fuite de brouillons, liens secrets ou auteurs suspendus.
+
+---
+
 ## Bilan final des vérifications
 
-- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **305 / 305 tests passants** (15 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
+- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **350 / 350 tests passants** (16 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
 - **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **396 / 396 tests passants** (25 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).
