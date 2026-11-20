@@ -5,7 +5,7 @@
 > Projet de Programmation Web — Master 1 MIAGE, Université Côte d'Azur (2026–2027)
 > Thomas DELOUP
 >
-> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 350 tests backend · 396 tests frontend
+> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 350 tests backend · 403 tests frontend
 
 MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
 
@@ -169,7 +169,7 @@ npm start                 # http://localhost:4200, /api/* est redirigé vers le 
 
 ```bash
 cd backend && npm test                          # 350 tests, 16 fichiers
-cd frontend-starter && npm test -- --watch=false  # 396 tests, 25 fichiers
+cd frontend-starter && npm test -- --watch=false  # 403 tests, 25 fichiers
 cd frontend-starter && npm run build            # build de production
 ```
 

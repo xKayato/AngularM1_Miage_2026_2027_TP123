@@ -148,6 +148,12 @@ export class PostsPageComponent implements OnInit, OnDestroy {
     this.searchSubscription = this.searchControl.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged())
       .subscribe((query) => {
+        // Texte déjà lancé avec Entrée / « Chercher » : les résultats sont affichés, on ne
+        // rouvre pas la liste de suggestions par-dessus (le debounce arrive après la validation).
+        if (query.trim() && query.trim() === this.appliedQuery()) {
+          this.closeSuggestions();
+          return;
+        }
         this.loadSuggestions(query);
       });
 
@@ -192,6 +198,13 @@ export class PostsPageComponent implements OnInit, OnDestroy {
   }
 
   private applyFilters(f: CatalogFilters): void {
+    // Même règle que onSubmitSearch() : une recherche texte se classe par pertinence,
+    // pour qu'un lien partagé /posts?query=... donne le même ordre qu'une saisie + Entrée.
+    if (f.query && this.sortCriteria() === 'date-desc') {
+      this.sortCriteria.set('relevance');
+    } else if (!f.query && this.sortCriteria() === 'relevance') {
+      this.sortCriteria.set('date-desc');
+    }
     this.appliedQuery.set(f.query);
     this.searchControl.setValue(f.query, { emitEvent: false });
     this.selectedAuthorId.set(f.author);

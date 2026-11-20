@@ -345,6 +345,78 @@ describe('PostsPageComponent — filtre auteur, taille de page et pagination num
     });
   });
 
+  describe('champ de recherche (régressions vues dans le navigateur)', () => {
+    it('Entrée puis fin du debounce : la liste de suggestions ne se rouvre pas', async () => {
+      vi.useFakeTimers();
+      TestBed.resetTestingModule();
+      await setup();
+      component.searchControl.setValue('guitare bluse');
+      component.onSubmitSearch();
+      vi.advanceTimersByTime(350);
+      expect(component.showSuggestions()).toBe(false);
+      expect(postServiceMock.getPosts).not.toHaveBeenCalledWith(expect.objectContaining({ mode: 'suggest' }));
+    });
+
+    it('un nouveau texte après la validation propose de nouveau des suggestions', async () => {
+      vi.useFakeTimers();
+      TestBed.resetTestingModule();
+      await setup();
+      component.searchControl.setValue('guitare');
+      component.onSubmitSearch();
+      component.searchControl.setValue('guitare blues');
+      vi.advanceTimersByTime(350);
+      expect(component.showSuggestions()).toBe(true);
+      expect(postServiceMock.getPosts).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'suggest', query: 'guitare blues' }),
+      );
+    });
+
+    it('les boutons Effacer et Chercher sont regroupés et Effacer est une croix accessible', async () => {
+      await setup();
+      const el = fixture.nativeElement as HTMLElement;
+      // Saisie réelle dans le champ (événement input) comme dans le navigateur
+      const input = el.querySelector<HTMLInputElement>('#search-input');
+      input!.value = 'dragon';
+      input!.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      const actions = el.querySelector('#search-input + .search-actions');
+      expect(actions).not.toBeNull();
+      const clear = actions?.querySelector<HTMLButtonElement>('.btn-clear-search');
+      expect(clear?.textContent?.trim()).toBe('✕');
+      expect(clear?.getAttribute('aria-label')).toBe('Effacer la recherche');
+      expect(actions?.querySelector('.btn-search')?.textContent?.trim()).toBe('Chercher');
+      expect(el.querySelector('#search-input')?.classList.contains('with-clear')).toBe(true);
+    });
+
+    it('un lien /posts?query=... trie par pertinence, comme une saisie + Entrée', async () => {
+      await setup({ query: 'chateua' });
+      expect(component.sortCriteria()).toBe('relevance');
+      expect(lastParams()).toMatchObject({ query: 'chateua', sort: 'relevance' });
+    });
+
+    it('revenir sur /posts sans recherche repasse au tri par date', async () => {
+      await setup({ query: 'chateua' });
+      queryParams$.next({});
+      expect(component.sortCriteria()).toBe('date-desc');
+      expect(lastParams().sort).toBe('date-desc');
+    });
+
+    it('un tri choisi explicitement (likes) est conservé avec une recherche dans l URL', async () => {
+      await setup();
+      component.setSortCriteria('likes-desc');
+      queryParams$.next({ query: 'dragon' });
+      expect(component.sortCriteria()).toBe('likes-desc');
+    });
+
+    it('sans texte, pas de croix et pas de marge réservée', async () => {
+      await setup();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('#search-input + .search-actions .btn-clear-search')).toBeNull();
+      expect(el.querySelector('#search-input')?.classList.contains('with-clear')).toBe(false);
+    });
+  });
+
   describe('taille de page', () => {
     beforeEach(async () => {
       await setup();

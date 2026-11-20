@@ -26,27 +26,31 @@
                 [attr.aria-activedescendant]="highlightedIndex() >= 0 ? 'suggestion-item-' + highlightedIndex() : null"
                 placeholder="Ex. bois, établi, solaire, cuir..."
                 [formControl]="searchControl"
+                [class.with-clear]="searchControl.value"
                 (keydown)="onKeyDown($event)"
                 autocomplete="off"
               />
-              @if (searchControl.value) {
+              <div class="search-actions">
+                @if (searchControl.value) {
+                  <button
+                    type="button"
+                    class="btn-clear-search"
+                    (click)="clearSearch()"
+                    aria-label="Effacer la recherche"
+                    title="Effacer la recherche"
+                  >
+                    ✕
+                  </button>
+                }
                 <button
                   type="button"
-                  class="btn-clear-search"
-                  (click)="clearSearch()"
-                  aria-label="Effacer la recherche"
+                  class="btn-search"
+                  (click)="onSubmitSearch()"
+                  aria-label="Lancer la recherche"
                 >
-                  ✕ Effacer
+                  Chercher
                 </button>
-              }
-              <button
-                type="button"
-                class="btn-search"
-                (click)="onSubmitSearch()"
-                aria-label="Lancer la recherche"
-              >
-                Chercher
-              </button>
+              </div>
             </div>
 
             @if (showSuggestions()) {
@@ -114,27 +118,31 @@
                 type="search"
                 placeholder="Ex. Alice, Bob, nom du créateur..."
                 [formControl]="authorSearchControl"
+                [class.with-clear]="authorSearchControl.value || selectedAuthorId() || selectedAuthorName()"
                 (keydown.enter)="$event.preventDefault(); applyAuthorNameFilter()"
                 autocomplete="off"
               />
-              @if (authorSearchControl.value || selectedAuthorId() || selectedAuthorName()) {
+              <div class="search-actions">
+                @if (authorSearchControl.value || selectedAuthorId() || selectedAuthorName()) {
+                  <button
+                    type="button"
+                    class="btn-clear-search"
+                    (click)="clearAuthorFilter()"
+                    aria-label="Effacer le filtre utilisateur"
+                    title="Effacer le filtre utilisateur"
+                  >
+                    ✕
+                  </button>
+                }
                 <button
                   type="button"
-                  class="btn-clear-search"
-                  (click)="clearAuthorFilter()"
-                  aria-label="Effacer le filtre utilisateur"
+                  class="btn-search"
+                  (click)="applyAuthorNameFilter()"
+                  aria-label="Filtrer par utilisateur"
                 >
-                  ✕ Effacer
+                  Filtrer
                 </button>
-              }
-              <button
-                type="button"
-                class="btn-search"
-                (click)="applyAuthorNameFilter()"
-                aria-label="Filtrer par utilisateur"
-              >
-                Filtrer
-              </button>
+              </div>
             </div>
 
             @if (showCreatorSuggestions() && creatorSuggestions().length > 0) {
