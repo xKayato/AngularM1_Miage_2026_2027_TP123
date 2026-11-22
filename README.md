@@ -5,9 +5,34 @@
 > Projet de Programmation Web — Master 1 MIAGE, Université Côte d'Azur (2026–2027)
 > Thomas DELOUP
 >
-> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 365 tests backend · 424 tests frontend
+> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 366 tests backend · 424 tests frontend
 
 MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
+
+---
+
+## Essayer en 2 minutes
+
+1. Installer [Docker Desktop](https://www.docker.com/products/docker-desktop/) et le lancer.
+2. Télécharger **[makershare-v5.0.0-docker.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/download/v5.0.0/makershare-v5.0.0-docker.zip)** depuis la [Release v5.0.0](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0) et le décompresser.
+3. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux) : le site s'ouvre sur <http://localhost:8080>, déjà rempli comme s'il était utilisé depuis des mois.
+
+Tous les comptes de démonstration ont le mot de passe **`MakerShare2026!`** :
+
+| Rôle | Compte | Ce qu'il permet d'essayer |
+|---|---|---|
+| Créatrice | `demo.alice.lego@makershare.local` | publier et éditer un tutoriel, déposer des médias dans le texte, choisir la visibilité, générer un lien secret |
+| Membre | `demo.lea.member@makershare.local` | suivre un créateur, s'abonner, débloquer les posts réservés, liker, commenter |
+| Modération | `demo.admin@makershare.local` | `/admin` : archiver un post, suspendre ou réactiver un compte |
+
+**Petit parcours de démonstration :**
+1. Sans être connecté, ouvrir un post marqué « Followers » : il apparaît verrouillé, sans contenu ni couverture.
+2. Se connecter avec Léa, suivre l'auteur depuis son profil : le post se débloque, pièces jointes comprises.
+3. Chercher `drgaon` ou `guitare bluse` : la recherche corrige les fautes.
+4. Avec Alice, ouvrir « Mes créations », passer un post en visibilité « Lien secret », générer le lien et l'ouvrir en navigation privée : il se lit sans compte.
+5. Avec le compte de modération, archiver un post public depuis `/admin` (son identifiant est la fin de son URL) : les visiteurs voient « Ce projet a été archivé par la modération ».
+
+Le site est aussi utilisable sur téléphone (menu ☰).
 
 ---
 
@@ -104,9 +129,9 @@ Les 8 collections : `users`, `posts`, `follows`, `subscriptions`, `likes`, `shar
 
 Seul [Docker Desktop](https://www.docker.com/products/docker-desktop/) est nécessaire : pas de Node.js, pas de compte Atlas.
 
-1. Télécharger le projet (`git clone` ou archive `.zip` d'une version ci-dessous) et le décompresser.
-2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux). Équivalent manuel : `docker compose up --build -d`.
-3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement, comme si le site était déjà utilisé : 10 créateurs et 6 membres de la communauté avec photo de profil et bio, 100 projets illustrés par de vraies photos, des plans PDF et des extraits audio, environ 440 likes, 200 commentaires (avec réponses des auteurs), des follows et des abonnements. Tous les comptes `demo.*@makershare.local` (par exemple `demo.alice.lego@makershare.local` pour une créatrice, `demo.lea.member@makershare.local` pour une membre) utilisent le mot de passe `MakerShare2026!`.
+1. Télécharger le paquet prêt à lancer d'une version (tableau ci-dessous) ou le code source (`git clone`), puis décompresser.
+2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux). Depuis le code source, l'équivalent manuel est `docker compose up --build -d`.
+3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement, comme si le site était déjà utilisé : 10 créateurs, 6 membres de la communauté et 1 compte de modération, tous avec photo de profil et bio, 100 projets illustrés par de vraies photos, des plans PDF et des extraits audio, environ 440 likes, 200 commentaires (avec réponses des auteurs), des follows et des abonnements. Les comptes à utiliser sont listés dans [Essayer en 2 minutes](#essayer-en-2-minutes).
 
 Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site** Angular servi par nginx, qui redirige `/api` vers l'API. La base et les fichiers téléversés sont conservés dans des volumes entre deux lancements. Sans Atlas, la recherche utilise automatiquement le repli regex.
 
@@ -122,11 +147,11 @@ Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site**
 | Version | Contenu | Accès local |
 |---|---|---|
 | [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) | Guitar Practice Cloud, rendu final des TP1 à TP3 | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
-| `main` (pas encore de version figée) | MakerShare (TP4 à TP6) | <http://localhost:8080> |
+| [`v5.0.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0) · tag `TP4-5-6` | MakerShare, rendu final des TP4 à TP6 | <http://localhost:8080> · comptes `demo.*@makershare.local` / `MakerShare2026!` |
 
 Chaque Release GitHub propose un fichier **`<application>-<version>-docker.zip` prêt à lancer** : les images Docker y sont déjà construites, il suffit de décompresser puis de double-cliquer sur `demarrer.bat` (ou `./demarrer.sh`), sans sources ni compilation. Les archives *Source code* générées par GitHub contiennent le code complet, qui se lance avec `docker compose up --build`.
 
-MakerShare recevra un tag de version une fois le projet validé. En attendant, la branche `main` se lance de la même façon. Les deux applications utilisent des ports différents et peuvent tourner en même temps.
+Les deux applications utilisent des ports différents et peuvent tourner en même temps.
 
 **Préparer le paquet d'une version** (mainteneur, Docker démarré) : `python tools/package_release.py <tag>` construit les images depuis le tag et produit `release-assets/<application>-<tag>-docker.zip`, à joindre à la Release GitHub correspondante.
 
@@ -145,7 +170,7 @@ npm install
 npm start                 # http://localhost:3000
 ```
 
-Jeu de démonstration optionnel (10 créateurs, 6 membres, 100 posts illustrés, likes, commentaires et abonnements) :
+Jeu de démonstration optionnel (10 créateurs, 6 membres, 1 modérateur, 100 posts illustrés, likes, commentaires et abonnements) :
 
 ```bash
 # ajouter DEMO_PASSWORD=... dans .env, puis :
@@ -171,7 +196,7 @@ npm start                 # http://localhost:4200, /api/* est redirigé vers le 
 ## Tests
 
 ```bash
-cd backend && npm test                          # 365 tests, 17 fichiers
+cd backend && npm test                          # 366 tests, 17 fichiers
 cd frontend-starter && npm test -- --watch=false  # 424 tests, 27 fichiers
 cd frontend-starter && npm run build            # build de production
 ```
@@ -213,3 +238,10 @@ demarrer.bat / .sh    lancement en un clic
 - [ATLAS_SETUP.md](ATLAS_SETUP.md) — configuration du cluster MongoDB Atlas
 - [RAPPORT_IA_LIBRE.md](RAPPORT_IA_LIBRE.md) — rapport d'utilisation de l'IA pour MakerShare (TP4 à TP6)
 - [RAPPORT_IA_TP1_A_3.md](RAPPORT_IA_TP1_A_3.md) — rapport d'utilisation de l'IA pour les TP1 à TP3
+- [CREDITS.md](backend/scripts/seed-assets/CREDITS.md) — auteur et licence de chaque photo du jeu de démonstration
+
+---
+
+## Licence et crédits
+
+Code réalisé dans le cadre du Master 1 MIAGE de l'Université Côte d'Azur (2026–2027), à partir du dépôt de départ du cours. Les photos du jeu de démonstration proviennent de Wikimedia Commons et restent sous la licence de leurs auteurs (domaine public, CC0, CC BY ou CC BY-SA), détaillée dans [CREDITS.md](backend/scripts/seed-assets/CREDITS.md). Les comptes et les textes de démonstration sont fictifs.

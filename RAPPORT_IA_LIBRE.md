@@ -331,8 +331,16 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 13. Version finale v5.0.0 (tag `TP4-5-6`)
+
+- **Dernier manque trouvé avant la release :** le jeu de démo n'avait aucun compte administrateur, donc impossible d'essayer `/admin` sans modifier la base à la main. Ajout de `demo.admin@makershare.local` (rôle admin, sans like ni commentaire), avec son test.
+- **README final :** une section « Essayer en 2 minutes » en tête (téléchargement du zip, comptes créatrice / membre / modération, petit parcours de démonstration), le tableau des versions avec `v5.0.0`, et une section licence et crédits. Le parcours a été déroulé pour de vrai sur la version Docker : post verrouillé puis débloqué en suivant l'auteur, recherche avec fautes, lien secret lu sans compte, archivage par la modération (410).
+- **Release :** tags `TP4-5-6` et `v5.0.0` sur le même commit, paquet `makershare-v5.0.0-docker.zip` construit par `tools/package_release.py` (images déjà construites + compose + lanceurs + LISEZMOI) et testé depuis zéro.
+
+---
+
 ## Bilan final des vérifications
 
-- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **365 / 365 tests passants** (17 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
+- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **366 / 366 tests passants** (17 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
 - **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **424 / 424 tests passants** (27 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).

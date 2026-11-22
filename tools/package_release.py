@@ -32,9 +32,12 @@ DEMO_ACCOUNTS = {
     ),
     "makershare": (
         "MakerShare (TP4 à TP6)",
-        "Jeu de démonstration chargé au premier lancement (10 créateurs, 100 posts).\n"
-        "Comptes : demo.alice.lego@makershare.local, demo.bastien.paper@makershare.local, …\n"
-        "Mot de passe : MakerShare2026! (modifiable via DEMO_PASSWORD dans un fichier .env)",
+        "Jeu de démonstration chargé au premier lancement (environ une minute) : 10 créateurs,\n"
+        "6 membres, 1 modérateur, 100 projets illustrés, likes, commentaires et abonnements.\n"
+        "Mot de passe de tous les comptes : MakerShare2026!\n"
+        "  Créatrice  : demo.alice.lego@makershare.local\n"
+        "  Membre     : demo.lea.member@makershare.local\n"
+        "  Modération : demo.admin@makershare.local (page /admin)",
     ),
 }
 
