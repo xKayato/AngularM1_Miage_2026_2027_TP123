@@ -1,0 +1,814 @@
+{
+  "avatars/alice.jpg": {
+    "title": "File:Pile of light gray LEGO bricks at a LEGO store.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pile_of_light_gray_LEGO_bricks_at_a_LEGO_store.jpg",
+    "artist": "Grendelkhan",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/bastien.jpg": {
+    "title": "File:Craft supplies (Unsplash).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Craft_supplies_(Unsplash).jpg",
+    "artist": "Joanna Kosinska joannakosinska",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "avatars/camille.jpg": {
+    "title": "File:Vibrant Paper Mandala Art.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Vibrant_Paper_Mandala_Art.jpg",
+    "artist": "Jeevitha Madhaiyan",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/damien.jpg": {
+    "title": "File:In the workshop of a luthier 05.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:In_the_workshop_of_a_luthier_05.jpg",
+    "artist": "Kritzolina",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/elena.jpg": {
+    "title": "File:Prusa i3 - RepRap 3D printer printing.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Prusa_i3_-_RepRap_3D_printer_printing.jpg",
+    "artist": "John Abella",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "avatars/felix.jpg": {
+    "title": "File:Scope soldering iron assembly.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Scope_soldering_iron_assembly.jpg",
+    "artist": "Doug butler",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/gabriel.jpg": {
+    "title": "File:Carpenter-tools Beveled-edge-chisel-two-angle-gauges-and-carpenters-pencil-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Carpenter-tools_Beveled-edge-chisel-two-angle-gauges-and-carpenters-pencil-01.jpg",
+    "artist": "CEphoto, Uwe Aranas",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "avatars/helene.jpg": {
+    "title": "File:Vesta sewing machine IMGP0718.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Vesta_sewing_machine_IMGP0718.jpg",
+    "artist": "Nikodem Nijaki",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "avatars/ismail.jpg": {
+    "title": "File:00 Walden Acoustic Guitar D310e headstock.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:00_Walden_Acoustic_Guitar_D310e_headstock.jpg",
+    "artist": "Elmschrat",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/julie.jpg": {
+    "title": "File:Hands carrying a just sculpted clay bowl.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Hands_carrying_a_just_sculpted_clay_bowl.jpg",
+    "artist": "Ayorinde Ogundele",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/lea.jpg": {
+    "title": "File:Tabby cat with blue eyes-3336579.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Tabby_cat_with_blue_eyes-3336579.jpg",
+    "artist": "AdinaVoicu",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "avatars/marc.jpg": {
+    "title": "File:Mountains in snow, Mountain lake, Chola Valley, Nepal, Himalayas.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Mountains_in_snow,_Mountain_lake,_Chola_Valley,_Nepal,_Himalayas.jpg",
+    "artist": "Vyacheslav Argenberg",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "avatars/nina.jpg": {
+    "title": "File:Milk Coffee 2.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Milk_Coffee_2.jpg",
+    "artist": "Gaurav Dhwaj Khadka",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/omar.jpg": {
+    "title": "File:Colorful metal bicycle parking rack in Lysekil 2.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Colorful_metal_bicycle_parking_rack_in_Lysekil_2.jpg",
+    "artist": "W.carter",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "avatars/pauline.jpg": {
+    "title": "File:Sunflower head 2015 G1.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Sunflower_head_2015_G1.jpg",
+    "artist": "George Chernilevsky",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "avatars/quentin.jpg": {
+    "title": "File:Kazantip, Popovka, Crimea, Technics turntable, Vinyl turntable.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Kazantip,_Popovka,_Crimea,_Technics_turntable,_Vinyl_turntable.jpg",
+    "artist": "Vyacheslav Argenberg",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "covers/00.jpg": {
+    "title": "File:Millennium Falcon in LEGO.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Millennium_Falcon_in_LEGO.jpg",
+    "artist": "Robert Brink",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/01.jpg": {
+    "title": "File:Lego Technic Crane Truck.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_Technic_Crane_Truck.jpg",
+    "artist": "Samin Maverick Yasar",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/02.jpg": {
+    "title": "File:Volvo car made out of LEGO.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Volvo_car_made_out_of_LEGO.jpg",
+    "artist": "Crannofonix",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/03.jpg": {
+    "title": "File:Lego Modular - Set 10197 Fire Brigade (6963790173).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_Modular_-_Set_10197_Fire_Brigade_(6963790173).jpg",
+    "artist": "InSapphoWeTrust from Los Angeles, California, USA",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/04.jpg": {
+    "title": "File:Stefano Tucci Lego Guitar.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Stefano_Tucci_Lego_Guitar.jpg",
+    "artist": "AntonioFaida",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/05.jpg": {
+    "title": "File:Lego Castle - Set 10193 Medieval Market (7406183414).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_Castle_-_Set_10193_Medieval_Market_(7406183414).jpg",
+    "artist": "InSapphoWeTrust from Los Angeles, California, USA",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/06.jpg": {
+    "title": "File:LEGO 21104 NASA Mars Science Laboratory Curiosity Rover (45790393072).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:LEGO_21104_NASA_Mars_Science_Laboratory_Curiosity_Rover_(45790393072).jpg",
+    "artist": "Stephen Edmonds from Melbourne, Australia",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/07.jpg": {
+    "title": "File:Lego minifigure legs.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_minifigure_legs.jpg",
+    "artist": "Achim Raschka",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/08.jpg": {
+    "title": "File:Lego Deep Sea Explorer.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_Deep_Sea_Explorer.jpg",
+    "artist": "Andrew Lee from Hermosa Beach, United States",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/09.jpg": {
+    "title": "File:Lego Classic Space diorama 08.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lego_Classic_Space_diorama_08.jpg",
+    "artist": "Joris",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/10.jpg": {
+    "title": "File:Stormtrooper (52921606350).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Stormtrooper_(52921606350).jpg",
+    "artist": "Steven Miller",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/11.jpg": {
+    "title": "File:Millennium Falcon.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Millennium_Falcon.jpg",
+    "artist": "S. Backtable",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/12.jpg": {
+    "title": "File:-Stags Heads - Dibedale- MET DP148511.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:-Stags_Heads_-_Dibedale-_MET_DP148511.jpg",
+    "artist": "Horatio Ross",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/13.jpg": {
+    "title": "File:Paper dragon hand puppet.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Paper_dragon_hand_puppet.jpg",
+    "artist": "LunaEatsTuna",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/14.jpg": {
+    "title": "File:A Pokémon figure outside the Geek Retreat in Galashiels - geograph.org.uk - 7138893.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:A_Pok%C3%A9mon_figure_outside_the_Geek_Retreat_in_Galashiels_-_geograph.org.uk_-_7138893.jpg",
+    "artist": "Walter Baxter",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/15.jpg": {
+    "title": "File:Eiffel tower models.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Eiffel_tower_models.jpg",
+    "artist": "Ximeg",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/16.jpg": {
+    "title": "File:Oni mask, Used at setsubun.Image.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Oni_mask,_Used_at_setsubun.Image.jpg",
+    "artist": "Yutah123",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/17.jpg": {
+    "title": "File:Dassault Rafale model in Indo Defence 2024.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Dassault_Rafale_model_in_Indo_Defence_2024.jpg",
+    "artist": "Jauhsekali",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/18.jpg": {
+    "title": "File:SL02-Bled Castle-Castle model 3D.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:SL02-Bled_Castle-Castle_model_3D.jpg",
+    "artist": "VasuVR",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "covers/19.jpg": {
+    "title": "File:Paper mache mask laying.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Paper_mache_mask_laying.JPG",
+    "artist": "DvoraB",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/20.jpg": {
+    "title": "File:Cranes made by Origami paper.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cranes_made_by_Origami_paper.jpg",
+    "artist": "Laitche",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/21.jpg": {
+    "title": "File:Senbazuru at Kadoma Plaza 2025-01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Senbazuru_at_Kadoma_Plaza_2025-01.jpg",
+    "artist": "Mr.ちゅらさん",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/22.jpg": {
+    "title": "File:Lotus (Traditional Origami) (6387011701).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lotus_(Traditional_Origami)_(6387011701).jpg",
+    "artist": "Ancella Simoes from Atlanta",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/23.jpg": {
+    "title": "File:World's largest display of origami dragon lanterns 01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:World%27s_largest_display_of_origami_dragon_lanterns_01.jpg",
+    "artist": "SwarmCheng",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/24.jpg": {
+    "title": "File:Miura-ori origami tessellations.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Miura-ori_origami_tessellations.jpg",
+    "artist": "Origamicke",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/25.jpg": {
+    "title": "File:White origami box with eraser under it.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:White_origami_box_with_eraser_under_it.jpg",
+    "artist": "Douglas P Perkins",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/26.jpg": {
+    "title": "File:Traditional-origami-2025.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Traditional-origami-2025.jpg",
+    "artist": "ManuelJünior7000",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/27.jpg": {
+    "title": "File:Ilan Garibi - Origami - No Elephant Hide.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Ilan_Garibi_-_Origami_-_No_Elephant_Hide.jpg",
+    "artist": "Ilan Garibi",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/28.jpg": {
+    "title": "File:Origami Rose Tessellation.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Origami_Rose_Tessellation.jpg",
+    "artist": "Hotspot Observer",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/29.jpg": {
+    "title": "File:Origami Bird. - Flickr - rawdonfox.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Origami_Bird._-_Flickr_-_rawdonfox.jpg",
+    "artist": "rawdonfox from Leeds, Yorkshire",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/30.jpg": {
+    "title": "File:Colmmcsky's pedalboard (2013-03-30) - With my new Whammy DT and Boss NS-2, my guitar pedalboard is now basically full. (by Mike Prosser).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Colmmcsky%27s_pedalboard_(2013-03-30)_-_With_my_new_Whammy_DT_and_Boss_NS-2,_my_guitar_pedalboard_is_now_basically_full._(by_Mike_Prosser).jpg",
+    "artist": "Mike Prosser from Austin, TX, USA",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/31.jpg": {
+    "title": "File:Cigar Box Guitars @ Bristol Guitar Show 2010.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cigar_Box_Guitars_@_Bristol_Guitar_Show_2010.jpg",
+    "artist": "Andrew King",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/32.jpg": {
+    "title": "File:Setup con cajon pedal.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Setup_con_cajon_pedal.JPG",
+    "artist": "Ovidio venturoso",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/33.jpg": {
+    "title": "File:Eurorack Modular Synthesizer Closeup.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Eurorack_Modular_Synthesizer_Closeup.jpg",
+    "artist": "Nir Yaniv",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/34.jpg": {
+    "title": "File:Holding an mbira dzavadzimu.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Holding_an_mbira_dzavadzimu.jpg",
+    "artist": "Alex Weeks",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "covers/35.jpg": {
+    "title": "File:Fender Harvard 1.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Fender_Harvard_1.jpg",
+    "artist": "Mfretton",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/36.jpg": {
+    "title": "File:ShinyBox 46MXC Ribbon Microphone, LowSwing studio, Berlin, 2011-01-25 22 29 45.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:ShinyBox_46MXC_Ribbon_Microphone,_LowSwing_studio,_Berlin,_2011-01-25_22_29_45.jpg",
+    "artist": "Marc Wathieu from Huy, Belgium",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/37.jpg": {
+    "title": "File:1 body of Yamaha fretless bass guitar RBX250 F.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:1_body_of_Yamaha_fretless_bass_guitar_RBX250_F.jpg",
+    "artist": "Elmschrat",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/38.jpg": {
+    "title": "File:Keeley Fuzz Bender.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Keeley_Fuzz_Bender.jpg",
+    "artist": "Skimel",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/39.jpg": {
+    "title": "File:Soprano ukulele from China, made of laminated mahogany wood.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Soprano_ukulele_from_China,_made_of_laminated_mahogany_wood.jpg",
+    "artist": "Zapyon",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/40.jpg": {
+    "title": "File:Роботска рака (2).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D1%81%D0%BA%D0%B0_%D1%80%D0%B0%D0%BA%D0%B0_(2).jpg",
+    "artist": "Луната1999",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/41.jpg": {
+    "title": "File:DIY tablet smartphone stand 3.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:DIY_tablet_smartphone_stand_3.jpg",
+    "artist": "Klaus-Dieter Keller",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/42.jpg": {
+    "title": "File:Helical planetary gear (40069995811).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Helical_planetary_gear_(40069995811).jpg",
+    "artist": "Robbie Sproule from Montreal, Canada",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/43.jpg": {
+    "title": "File:J1900 SoC ITX Mainboard in Micro-ATX Computer Case IMG 1957.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:J1900_SoC_ITX_Mainboard_in_Micro-ATX_Computer_Case_IMG_1957.JPG",
+    "artist": "Hans Haase",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/44.jpg": {
+    "title": "File:Voronoi Ball.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Voronoi_Ball.jpg",
+    "artist": "Till Westermayer",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/45.jpg": {
+    "title": "File:Racing Drone.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Racing_Drone.jpg",
+    "artist": "Commanderbryce",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/46.jpg": {
+    "title": "File:Plastic pen stand from the 1970s in Sweden, front.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Plastic_pen_stand_from_the_1970s_in_Sweden,_front.jpg",
+    "artist": "W.carter",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "covers/47.jpg": {
+    "title": "File:Clock gears (1).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Clock_gears_(1).jpg",
+    "artist": "Przemek Pietrak",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/48.jpg": {
+    "title": "File:Computer Keyboard Macro.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Computer_Keyboard_Macro.jpg",
+    "artist": "Joseph L Ridgway II",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+  },
+  "covers/49.jpg": {
+    "title": "File:3-D Printed Prosthetic Hand (5229) (18306292659).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:3-D_Printed_Prosthetic_Hand_(5229)_(18306292659).jpg",
+    "artist": "The U.S. Food and Drug Administration",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/50.jpg": {
+    "title": "File:Mera-Poltik Ploter MDG-1 Pen Carousel Closeup.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Mera-Poltik_Ploter_MDG-1_Pen_Carousel_Closeup.jpg",
+    "artist": "Mogor",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/51.jpg": {
+    "title": "File:Futterautomat mit RFID - pet feeder, cat feeder, RFID controlled.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Futterautomat_mit_RFID_-_pet_feeder,_cat_feeder,_RFID_controlled.JPG",
+    "artist": "Giraldillo",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/52.jpg": {
+    "title": "File:Logia Home Weather Station.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Logia_Home_Weather_Station.jpg",
+    "artist": "Candeadly",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "covers/53.jpg": {
+    "title": "File:Seedling trays in the greenhouse at Selvans Social Farm, Daxi, Taoyuan.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Seedling_trays_in_the_greenhouse_at_Selvans_Social_Farm,_Daxi,_Taoyuan.jpg",
+    "artist": "TwHerbGrower",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/54.jpg": {
+    "title": "File:Infinity mirror, hand-washing sink and wardrobes in the spa of Amantaka luxury Resort & Hotel in Luang Prabang Laos.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Infinity_mirror,_hand-washing_sink_and_wardrobes_in_the_spa_of_Amantaka_luxury_Resort_%26_Hotel_in_Luang_Prabang_Laos.jpg",
+    "artist": "Basile Morin",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/55.jpg": {
+    "title": "File:Roboter zur Lösung Zauberwürfel (2019-11-28 Sp).JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Roboter_zur_L%C3%B6sung_Zauberw%C3%BCrfel_(2019-11-28_Sp).JPG",
+    "artist": "Lothar Spurzem",
+    "license": "CC BY-SA 2.0 de",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/de/deed.en"
+  },
+  "covers/56.png": {
+    "title": "File:Bc105 thermostat front view.png",
+    "page": "https://commons.wikimedia.org/wiki/File:Bc105_thermostat_front_view.png",
+    "artist": "Ayla Yang",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/57.jpg": {
+    "title": "File:VIUscan handheld 3D scanner in use.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:VIUscan_handheld_3D_scanner_in_use.jpg",
+    "artist": "Creative Tools from Halmdstad, Sweden",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/58.jpg": {
+    "title": "File:Cherry wood with binary computer engraving.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Cherry_wood_with_binary_computer_engraving.jpg",
+    "artist": "Jared Tarbell",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/59.jpg": {
+    "title": "File:Practical Regulated Power Supply Components.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Practical_Regulated_Power_Supply_Components.jpg",
+    "artist": "Siddharthdhodapkar",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/60.jpg": {
+    "title": "File:Joinery workbench 2 - 19c - Technical museum, Nizhny Novgorod.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Joinery_workbench_2_-_19c_-_Technical_museum,_Nizhny_Novgorod.jpg",
+    "artist": "Лапоть",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/61.jpg": {
+    "title": "File:Wooden cutting board 2017.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Wooden_cutting_board_2017.jpg",
+    "artist": "Fructibus",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/62.jpg": {
+    "title": "File:Japanese puzzle box (yosegi) - closed.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Japanese_puzzle_box_(yosegi)_-_closed.jpg",
+    "artist": "Eugene Alvin Villar (seav)",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/63.jpg": {
+    "title": "File:Anglepoise lamp, model 1208.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Anglepoise_lamp,_model_1208.jpg",
+    "artist": "Upphovsperson okänd",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/64.jpg": {
+    "title": "File:LEGO display, Deutsche Museum, München (8194869177).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:LEGO_display,_Deutsche_Museum,_M%C3%BCnchen_(8194869177).jpg",
+    "artist": "InSapphoWeTrust",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/65.jpg": {
+    "title": "File:Holzdrehbank.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Holzdrehbank.jpg",
+    "artist": "Hubsing 10:00, 30. Apr. 2010 (CEST)",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/66.jpg": {
+    "title": "File:CES 2012 - Ferrari headphones (6937499095).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:CES_2012_-_Ferrari_headphones_(6937499095).jpg",
+    "artist": "The Conmunity -  Pop Culture Geek from Los Angeles, CA, USA",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/67.jpg": {
+    "title": "File:Coffre à marqueterie-Musée de l'Œuvre Notre-Dame.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Coffre_%C3%A0_marqueterie-Mus%C3%A9e_de_l%27%C5%92uvre_Notre-Dame.jpg",
+    "artist": "Ji-Elle",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/68.jpg": {
+    "title": "File:Chess game Staunton No. 6 perfil view 8.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Chess_game_Staunton_No._6_perfil_view_8.jpg",
+    "artist": "Wilfredor",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/69.jpg": {
+    "title": "File:Intricate Wooden Table with Epoxy.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Intricate_Wooden_Table_with_Epoxy.jpg",
+    "artist": "masiberd",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/70.jpg": {
+    "title": "File:Saturday Cosplay Contest Mandalorian Cosplay at GalaxyCon Richmond 2022 04.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Saturday_Cosplay_Contest_Mandalorian_Cosplay_at_GalaxyCon_Richmond_2022_04.jpg",
+    "artist": "John Manard",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/71.jpg": {
+    "title": "File:Pennaceous feathers by Garrulus glandarius.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pennaceous_feathers_by_Garrulus_glandarius.jpg",
+    "artist": "Michael Gäbler",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0"
+  },
+  "covers/72.jpg": {
+    "title": "File:Spaceballs helmet (cropped).JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Spaceballs_helmet_(cropped).JPG",
+    "artist": "Egon Eagle",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/73.jpg": {
+    "title": "File:Metallic magic staff in the shape of a sun in Tel Aviv , April 2024 01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Metallic_magic_staff_in_the_shape_of_a_sun_in_Tel_Aviv_,_April_2024_01.jpg",
+    "artist": "Chenspec",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/74.jpg": {
+    "title": "File:Pair of Tournament Pauldrons (Shoulder Defenses) MET DP101955.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Pair_of_Tournament_Pauldrons_(Shoulder_Defenses)_MET_DP101955.jpg",
+    "artist": "Lorenz Helmschmied",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/75.jpg": {
+    "title": "File:Broderers' Company Master's Crown reconstruction.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Broderers%27_Company_Master%27s_Crown_reconstruction.jpg",
+    "artist": "The wub",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/76.jpg": {
+    "title": "File:23 Souvenir from Venice, Italy - small Venetian carnival mask magnet in gift shop.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:23_Souvenir_from_Venice,_Italy_-_small_Venetian_carnival_mask_magnet_in_gift_shop.jpg",
+    "artist": "Marek Ślusarczyk (Tupungato) Photo portfolio",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0"
+  },
+  "covers/77.jpg": {
+    "title": "File:Infinity Gauntlet - 2018 Atlanta Comic Con.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Infinity_Gauntlet_-_2018_Atlanta_Comic_Con.jpg",
+    "artist": "Thomson200",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/78.jpg": {
+    "title": "File:Post medieval, 19th century leather boot. Detail of rivets on sole. (FindID 204108).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Post_medieval,_19th_century_leather_boot._Detail_of_rivets_on_sole._(FindID_204108).jpg",
+    "artist": "Surrey County Council, David Williams, 2007-12-12 13:47:01",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/79.jpg": {
+    "title": "File:Tricorne MET DP-642-001.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Tricorne_MET_DP-642-001.jpg",
+    "artist": "Auteur inconnu",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/80.jpg": {
+    "title": "File:17 inch pocket ukulele branded \"ultnice\".jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:17_inch_pocket_ukulele_branded_%22ultnice%22.jpg",
+    "artist": "Zapyon",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/81.jpg": {
+    "title": "File:Acoustic foam closeup.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Acoustic_foam_closeup.jpg",
+    "artist": "Chlod Alejandro",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/82.jpg": {
+    "title": "File:4 Black and Blue Sound Diffusor Panels.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:4_Black_and_Blue_Sound_Diffusor_Panels.jpg",
+    "artist": "Jordansanicharan",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/83.jpg": {
+    "title": "File:Trumpet Cup Mute - Ullvén.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Trumpet_Cup_Mute_-_Ullv%C3%A9n.jpg",
+    "artist": "DrTrumpet",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/84.jpg": {
+    "title": "File:Yamaha FG720S-12 headstock with Bone Nut installed.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Yamaha_FG720S-12_headstock_with_Bone_Nut_installed.jpg",
+    "artist": "Roadside Guitars",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/85.jpg": {
+    "title": "File:Deluxe34 Lap Steel Stand - Mark Roeder's excellent steel guitar stands 2 - 2011 TSGA Jamboree.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Deluxe34_Lap_Steel_Stand_-_Mark_Roeder%27s_excellent_steel_guitar_stands_2_-_2011_TSGA_Jamboree.jpg",
+    "artist": "brad_bechtel",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/86.jpg": {
+    "title": "File:Kurzweil Synthesizer and MIDI Keyboard Controller PC3K6.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Kurzweil_Synthesizer_and_MIDI_Keyboard_Controller_PC3K6.jpg",
+    "artist": "Melissa Ursula Dawn Goldsmith",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/87.jpg": {
+    "title": "File:Gibson J-50 (SN 871234) in guitar case (photo by Henry Zbyszynski).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Gibson_J-50_(SN_871234)_in_guitar_case_(photo_by_Henry_Zbyszynski).jpg",
+    "artist": "Henry Zbyszynski from Cambridge, USA",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+  },
+  "covers/88.jpg": {
+    "title": "File:Roland TR-808 (large).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Roland_TR-808_(large).jpg",
+    "artist": "Roland_TR-808_&_909.jpg: Brandon Daniel\nderivative work: Clusternote (talk)",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/89.jpg": {
+    "title": "File:Electric Violin and Electromagnetic Pick by Leo Fender (1957).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Electric_Violin_and_Electromagnetic_Pick_by_Leo_Fender_(1957).jpg",
+    "artist": "Benedict Heaney",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/90.jpg": {
+    "title": "File:Porcelain vase 0083 - DPLA - 65d57df18f179c442c9d749ea0518be2.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Porcelain_vase_0083_-_DPLA_-_65d57df18f179c442c9d749ea0518be2.jpg",
+    "artist": "Auteur inconnu",
+    "license": "Public domain",
+    "licenseUrl": ""
+  },
+  "covers/91.jpg": {
+    "title": "File:Handmade male thief mug from hong kong.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Handmade_male_thief_mug_from_hong_kong.jpg",
+    "artist": "Geoffreyrabbit",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/92.jpg": {
+    "title": "File:Concrete Planters, Pensarn - geograph.org.uk - 6903096.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Concrete_Planters,_Pensarn_-_geograph.org.uk_-_6903096.jpg",
+    "artist": "David Bremner",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+  },
+  "covers/93.jpg": {
+    "title": "File:Lamp, table (AM 1991.208-5).jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Lamp,_table_(AM_1991.208-5).jpg",
+    "artist": "Unknown authorUnknown author",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+  },
+  "covers/94.jpg": {
+    "title": "File:Ručno izrađene keramiče šolje i tanjiri.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Ru%C4%8Dno_izra%C4%91ene_kerami%C4%8De_%C5%A1olje_i_tanjiri.jpg",
+    "artist": "Nikolina Šepić",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/95.jpg": {
+    "title": "File:Aromatas.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Aromatas.JPG",
+    "artist": "Original uploader was Hugo.arg at bat-smg.wikipedia",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "covers/96.jpg": {
+    "title": "File:Porcelain flower (one of a set of nine) - MET 2019.283.64.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Porcelain_flower_(one_of_a_set_of_nine)_-_MET_2019.283.64.jpg",
+    "artist": "Auteur inconnu",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  },
+  "covers/97.jpg": {
+    "title": "File:Simple modern style battery driven wall clock.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Simple_modern_style_battery_driven_wall_clock.jpg",
+    "artist": "Islander61",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/98.jpg": {
+    "title": "File:Kyūsu-top oblique PNr°1030.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Ky%C5%ABsu-top_oblique_PNr%C2%B01030.jpg",
+    "artist": "D-Kuru",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+  },
+  "covers/99.jpg": {
+    "title": "File:Incense burner at Sinheungsa 02.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Incense_burner_at_Sinheungsa_02.jpg",
+    "artist": "Bernard Gagnon",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+  }
+}

@@ -14,6 +14,7 @@ import { Follow } from "../src/models/Follow.js";
 import { Subscription } from "../src/models/Subscription.js";
 import { detectAndValidateAttachment } from "../src/utils/attachmentValidator.js";
 import { detectRealImageMime } from "../src/utils/imageValidator.js";
+import { buildDemoPosts, DEMO_CREATORS } from "./seed-demo.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -559,10 +560,158 @@ const MAKER_COMMENTS = [
 ];
 
 // ============================================================================
+// PHOTOS LIBRES DE DROITS (scripts/seed-assets, voir CREDITS.md)
+// ============================================================================
+
+const SEED_ASSETS_DIR = path.resolve(__dirname, "seed-assets");
+const SEED_CREDITS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(SEED_ASSETS_DIR, "credits.json"), "utf-8"));
+  } catch {
+    return {};
+  }
+})();
+
+/** Cherche scripts/seed-assets/<folder>/<baseName>.jpg|.jpeg|.png */
+export function findSeedAsset(folder, baseName) {
+  for (const ext of [".jpg", ".jpeg", ".png"]) {
+    const candidate = path.join(SEED_ASSETS_DIR, folder, `${baseName}${ext}`);
+    if (fs.existsSync(candidate)) {
+      return { path: candidate, ext: ext === ".jpeg" ? ".jpg" : ext, mimeType: ext === ".png" ? "image/png" : "image/jpeg" };
+    }
+  }
+  return null;
+}
+
+/** demo.alice.lego@makershare.local -> "alice" */
+export function avatarKeyFromEmail(email) {
+  return String(email).toLowerCase().split("@")[0].split(".")[1] || "membre";
+}
+
+function slugify(text) {
+  return String(text)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+/** Générateur pseudo-aléatoire déterministe (mulberry32) : même jeu de données à chaque exécution */
+function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Membres de la communauté : ils ne publient pas (encore), mais suivent, aiment et commentent
+export const COMMUNITY_MEMBERS = [
+  {
+    key: "lea",
+    email: "demo.lea.member@makershare.local",
+    name: "Léa Fontaine",
+    bio: "Prof de techno au collège. Je pioche ici des idées de projets pour mes élèves, surtout en origami et en Lego Technic.",
+    profileTags: ["education", "origami", "lego"],
+  },
+  {
+    key: "marc",
+    email: "demo.marc.member@makershare.local",
+    name: "Marc Lefèvre",
+    bio: "Ingénieur la semaine, bricoleur le week-end. Je me lance doucement dans la menuiserie avec un petit atelier au garage.",
+    profileTags: ["bois", "menuiserie", "debutant"],
+  },
+  {
+    key: "nina",
+    email: "demo.nina.member@makershare.local",
+    name: "Nina Rossi",
+    bio: "Illustratrice. Je découvre la céramique et le papercraft, et je documente mes premiers essais (souvent ratés, toujours drôles).",
+    profileTags: ["ceramique", "papercraft", "illustration"],
+  },
+  {
+    key: "omar",
+    email: "demo.omar.member@makershare.local",
+    name: "Omar Haddad",
+    bio: "Guitariste amateur et réparateur de vélos à mes heures. Toujours partant pour tester une pédale d'effet faite maison.",
+    profileTags: ["musique", "guitare", "electronique"],
+  },
+  {
+    key: "pauline",
+    email: "demo.pauline.member@makershare.local",
+    name: "Pauline Girard",
+    bio: "Jardinière sur un balcon de 4 m². Je cherche des idées de serres connectées, d'arrosage auto et de cache-pots.",
+    profileTags: ["jardin", "iot", "beton"],
+  },
+  {
+    key: "quentin",
+    email: "demo.quentin.member@makershare.local",
+    name: "Quentin Morel",
+    bio: "Collectionneur de vinyles et apprenti luthier. Mon rêve : finir un jour ma première guitare acoustique.",
+    profileTags: ["musique", "lutherie", "vinyle"],
+  },
+];
+
+// Commentaires propres à une catégorie (en plus des commentaires génériques MAKER_COMMENTS)
+const CATEGORY_COMMENTS = {
+  Lego: [
+    "Tu as utilisé combien de pièces au total ? J'aimerais tenter la même chose avec mon bac de vrac.",
+    "Les techniques SNOT sur les côtés sont super propres, je n'avais jamais pensé à cette astuce.",
+    "Mon fils de 9 ans veut absolument le construire ce week-end, merci pour la notice !",
+  ],
+  Papercraft: [
+    "Quel grammage de papier tu conseilles ? Mon 160 g se déforme un peu sur les petites languettes.",
+    "Imprimé, découpé et monté en deux soirées, il trône maintenant sur mon bureau.",
+  ],
+  Origami: [
+    "Je bloque à l'étape du pli inversé intérieur, tu aurais une vidéo ?",
+    "Fait avec du papier kraft, le rendu est plus brut mais j'aime bien aussi !",
+  ],
+  Musique: [
+    "Le son est vraiment chaud. Tu as mesuré le niveau de souffle à vide ?",
+    "Tu peux préciser la valeur des condensateurs du filtre ? Le schéma est un peu flou à cet endroit.",
+  ],
+  "Modèles 3D": [
+    "Imprimé en PETG à 0,2 mm, tout s'emboîte parfaitement. Merci pour les tolérances !",
+    "Tu as le fichier STEP en plus du STL ? J'aimerais adapter les dimensions.",
+  ],
+  Électronique: [
+    "Tu tiens combien de temps sur batterie avec ce montage ?",
+    "J'ai remplacé l'ESP32 par un ESP8266 et ça fonctionne aussi, à condition de baisser la fréquence de mesure.",
+  ],
+  Menuiserie: [
+    "Quelle essence de bois tu conseilles pour débuter ? Le frêne me fait un peu peur.",
+    "Les assemblages à queue d'aronde sont magnifiques, tu les fais à la main ou à la défonceuse ?",
+  ],
+  Maroquinerie: [
+    "Tu utilises quel fil pour les coutures sellier ? Le rendu est très régulier.",
+    "Le cuir a quelle épaisseur ? Je cherche à faire quelque chose de similaire.",
+  ],
+  Autre: [
+    "Tu as mis combien de temps du début à la fin ?",
+    "Le résultat est encore plus beau que sur les photos du tuto, je viens de finir le mien !",
+  ],
+};
+
+const AUTHOR_REPLIES = [
+  "Merci {prenom} ! N'hésite pas à poster une photo de ta version.",
+  "Bonne question {prenom}, je complète le tuto ce soir avec plus de détails.",
+  "Merci beaucoup {prenom}, ça fait plaisir de voir que ça sert !",
+  "Oui {prenom}, ça marche aussi, j'ajoute ta variante dans les astuces.",
+];
+
+// ============================================================================
 // 5. FONCTION PRINCIPALE D'ENRICHISSEMENT DU DATASET
 // ============================================================================
 
 export async function runEnrichMedia(options = {}) {
+  // uploadsDir permet aux tests d'écrire dans un dossier temporaire au lieu de data/uploads
+  const avatarsDir = options.uploadsDir ? path.join(options.uploadsDir, "avatars") : UPLOADS_AVATARS;
+  const attachmentsDir = options.uploadsDir ? path.join(options.uploadsDir, "attachments") : UPLOADS_ATTACHMENTS;
   const { silent = false } = options;
   const log = (...args) => {
     if (!silent) console.log(...args);
@@ -571,10 +720,37 @@ export async function runEnrichMedia(options = {}) {
   log("[enrich] Démarrage de l'enrichissement multimédia du jeu de données MakerShare...");
 
   // Création des dossiers cibles
-  await fsPromises.mkdir(UPLOADS_AVATARS, { recursive: true });
-  await fsPromises.mkdir(UPLOADS_ATTACHMENTS, { recursive: true });
+  await fsPromises.mkdir(avatarsDir, { recursive: true });
+  await fsPromises.mkdir(attachmentsDir, { recursive: true });
 
-  // 1. Récupération des 10 créateurs de démo
+  // 1. Membres de la communauté (comptes sans projet publié) : ils commentent, aiment et suivent
+  const demoPassword = options.demoPassword ?? process.env.DEMO_PASSWORD;
+  let membersCount = 0;
+  if (demoPassword) {
+    for (const member of COMMUNITY_MEMBERS) {
+      const existing = await User.findOne({ email: member.email.toLowerCase() });
+      if (existing && existing.seedBatch !== SEED_BATCH_TAG) {
+        throw new Error(`[enrich] COLLISION : '${member.email}' existe déjà hors du jeu de démonstration.`);
+      }
+      if (!existing) {
+        const user = new User({
+          name: member.name,
+          email: member.email,
+          role: "user",
+          status: "active",
+          seedBatch: SEED_BATCH_TAG,
+        });
+        user.password = demoPassword;
+        await user.save();
+        membersCount++;
+      }
+    }
+    log(`[enrich] ✅ ${COMMUNITY_MEMBERS.length} membres de la communauté prêts (${membersCount} créés).`);
+  } else {
+    log("[enrich] DEMO_PASSWORD absent : les membres de la communauté ne sont pas créés.");
+  }
+
+  // 2. Récupération des comptes de démo (créateurs + membres)
   const demoUsers = await User.find({ seedBatch: SEED_BATCH_TAG });
   log(`[enrich] ${demoUsers.length} comptes de démonstration trouvés.`);
 
@@ -588,24 +764,45 @@ export async function runEnrichMedia(options = {}) {
   for (const u of demoUsers) {
     userMap.set(u.email.toLowerCase(), u);
   }
+  const creatorEmails = new Set(CREATOR_PROFILES.map((p) => p.email.toLowerCase()));
+  const creators = demoUsers.filter((u) => creatorEmails.has(u.email.toLowerCase()));
+  const members = demoUsers.filter((u) => !creatorEmails.has(u.email.toLowerCase()));
 
-  // 2. Génération et assignation des avatars et profils riches
-  log("[enrich] Génération des avatars graphiques PNG et enrichissement des profils...");
+  // 3. Avatars (photos libres de droits) et profils riches
+  log("[enrich] Avatars et profils des créateurs et membres...");
   let avatarsCount = 0;
+  const profiles = [
+    ...CREATOR_PROFILES.map((p) => ({ ...p, key: avatarKeyFromEmail(p.email) })),
+    ...COMMUNITY_MEMBERS,
+  ];
 
-  for (const profile of CREATOR_PROFILES) {
+  for (const profile of profiles) {
     const user = userMap.get(profile.email.toLowerCase());
     if (!user) continue;
 
-    const avatarPng = generateAvatarPng(
-      profile.initials,
-      profile.color1,
-      profile.color2
-    );
-    const storedName = `demo-avatar-${user._id}.png`;
-    const avatarPath = path.join(UPLOADS_AVATARS, storedName);
+    const photo = findSeedAsset("avatars", profile.key);
+    let buffer;
+    let ext;
+    let mimeType;
+    if (photo) {
+      buffer = await fsPromises.readFile(photo.path);
+      ext = photo.ext;
+      mimeType = photo.mimeType;
+    } else {
+      // Repli hors ligne : avatar graphique généré avec les initiales
+      buffer = generateAvatarPng(profile.initials || "MS", profile.color1 || [99, 102, 241], profile.color2 || [236, 72, 153]);
+      ext = ".png";
+      mimeType = "image/png";
+    }
 
-    await fsPromises.writeFile(avatarPath, avatarPng);
+    const storedName = `demo-avatar-${user._id}${ext}`;
+    const avatarPath = path.join(avatarsDir, storedName);
+    for (const old of await fsPromises.readdir(avatarsDir)) {
+      if (old.startsWith(`demo-avatar-${user._id}`) && old !== storedName) {
+        await fsPromises.unlink(path.join(avatarsDir, old)).catch(() => {});
+      }
+    }
+    await fsPromises.writeFile(avatarPath, buffer);
 
     // Validation par les validateurs stricts du backend
     const validatedMime = await detectRealImageMime(avatarPath);
@@ -615,9 +812,9 @@ export async function runEnrichMedia(options = {}) {
 
     user.avatar = {
       storedName,
-      originalName: `avatar-${profile.initials.toLowerCase()}.png`,
-      mimeType: "image/png",
-      size: avatarPng.length,
+      originalName: `photo-profil-${profile.key}${ext}`,
+      mimeType: validatedMime,
+      size: buffer.length,
     };
     user.bio = profile.bio;
     user.profileTags = profile.profileTags;
@@ -625,56 +822,79 @@ export async function runEnrichMedia(options = {}) {
     await user.save();
     avatarsCount++;
   }
-  log(`[enrich] ✅ ${avatarsCount} avatars générés et profils mis à jour.`);
+  log(`[enrich] ✅ ${avatarsCount} avatars et profils mis à jour.`);
 
-  // 3. Récupération des 100 posts de démo
+  // 4. Récupération des 100 posts de démo, rattachés à leur index de buildDemoPosts()
   const demoPosts = await Post.find({ seedBatch: SEED_BATCH_TAG }).populate("author");
   log(`[enrich] ${demoPosts.length} posts de démonstration trouvés.`);
+  const templates = buildDemoPosts(DEMO_CREATORS.map(() => new mongoose.Types.ObjectId()));
+  const indexByTitle = new Map(templates.map((tpl, i) => [tpl.title, i]));
+  demoPosts.sort((a, b) => (indexByTitle.get(a.title) ?? 999) - (indexByTitle.get(b.title) ?? 999));
 
-  // 4. Nettoyage préventif des anciens fichiers d'enrichissement sur disque
-  const existingAttFiles = await fsPromises.readdir(UPLOADS_ATTACHMENTS);
+  // 5. Nettoyage préventif des anciens fichiers d'enrichissement sur disque
+  const existingAttFiles = await fsPromises.readdir(attachmentsDir);
   for (const f of existingAttFiles) {
     if (f.startsWith("demo-att-")) {
-      await fsPromises.unlink(path.join(UPLOADS_ATTACHMENTS, f)).catch(() => {});
+      await fsPromises.unlink(path.join(attachmentsDir, f)).catch(() => {});
     }
   }
 
-  // 5. Génération des pièces jointes et enrichissement du Markdown pour chaque post
-  log("[enrich] Génération des pièces jointes (Couvertures, Plans PDF, Extraits Audio)...");
+  // 6. Pièces jointes et Markdown de chaque post
+  log("[enrich] Pièces jointes (photos, plans PDF, extraits audio)...");
   let totalAttachmentsCreated = 0;
   let coversCount = 0;
+  let photoCoversCount = 0;
   let pdfsCount = 0;
   let audioCount = 0;
 
-  for (let idx = 0; idx < demoPosts.length; idx++) {
-    const post = demoPosts[idx];
+  for (const post of demoPosts) {
+    const idx = indexByTitle.get(post.title) ?? 0;
     const authorName = post.author?.name || "Créateur MakerShare";
     const attachments = [];
 
-    // A. Image de couverture obligatoire (isCover: true)
-    const coverPng = generateCoverPng(post.title, post.category, idx);
-    const coverStoredName = `demo-att-cover-${post._id}.png`;
-    const coverPath = path.join(UPLOADS_ATTACHMENTS, coverStoredName);
-    await fsPromises.writeFile(coverPath, coverPng);
+    // Catégorie et tags synchronisés avec la définition (utile sur une base déjà seedée)
+    const template = templates[idx];
+    if (template) {
+      post.category = template.category;
+    }
+
+    // A. Couverture : photo du sujet (Wikimedia Commons), sinon visuel généré
+    const photo = findSeedAsset("covers", String(idx).padStart(2, "0"));
+    let coverBuffer;
+    let coverExt;
+    let coverMime;
+    if (photo) {
+      coverBuffer = await fsPromises.readFile(photo.path);
+      coverExt = photo.ext;
+      coverMime = photo.mimeType;
+      photoCoversCount++;
+    } else {
+      coverBuffer = generateCoverPng(post.title, post.category, idx);
+      coverExt = ".png";
+      coverMime = "image/png";
+    }
+    const coverStoredName = `demo-att-cover-${post._id}${coverExt}`;
+    const coverPath = path.join(attachmentsDir, coverStoredName);
+    await fsPromises.writeFile(coverPath, coverBuffer);
 
     const coverAttId = new mongoose.Types.ObjectId();
-    const coverAttachment = {
+    attachments.push({
       _id: coverAttId,
-      originalName: "visuel-couverture.png",
+      originalName: `${slugify(post.title)}${coverExt}`,
       storedName: coverStoredName,
-      mimeType: "image/png",
-      size: coverPng.length,
+      mimeType: coverMime,
+      size: coverBuffer.length,
       family: "image",
       isCover: true,
-    };
-    attachments.push(coverAttachment);
+    });
     coversCount++;
 
-    // B. Plan technique PDF pour les créations adaptées (Papercraft, Origami, Lego, Modèles 3D, Wood)
+    // B. Plan technique PDF pour les créations adaptées
     const needsPdf =
       post.category === "Papercraft" ||
       post.category === "Origami" ||
       post.category === "Modèles 3D" ||
+      post.category === "Menuiserie" ||
       idx % 3 === 0;
 
     let pdfAttId = null;
@@ -686,20 +906,14 @@ export async function runEnrichMedia(options = {}) {
         "4. Encollage progressif avec une colle vinylique a prise rapide sans solvant.",
         "5. Assemblage final et maintien sous serre-joint pendant 15 minutes.",
       ];
-      const pdfBuffer = createStructuredPdf(
-        post.title,
-        authorName,
-        post.category,
-        pdfSteps
-      );
+      const pdfBuffer = createStructuredPdf(post.title, authorName, post.category, pdfSteps);
       const pdfStoredName = `demo-att-plan-${post._id}.pdf`;
-      const pdfPath = path.join(UPLOADS_ATTACHMENTS, pdfStoredName);
-      await fsPromises.writeFile(pdfPath, pdfBuffer);
+      await fsPromises.writeFile(path.join(attachmentsDir, pdfStoredName), pdfBuffer);
 
       pdfAttId = new mongoose.Types.ObjectId();
       attachments.push({
         _id: pdfAttId,
-        originalName: "plan-technique-complet.pdf",
+        originalName: `plan-${slugify(post.title)}.pdf`,
         storedName: pdfStoredName,
         mimeType: "application/pdf",
         size: pdfBuffer.length,
@@ -715,19 +929,18 @@ export async function runEnrichMedia(options = {}) {
       post.tags.includes("guitare") ||
       post.tags.includes("sonore") ||
       post.tags.includes("synthetiseur") ||
-      idx === 70; // Guitare lego
+      idx === 4;
 
     let audioAttId = null;
     if (needsAudio) {
       const mp3Buffer = createMp3(post.title);
       const audioStoredName = `demo-att-audio-${post._id}.mp3`;
-      const audioPath = path.join(UPLOADS_ATTACHMENTS, audioStoredName);
-      await fsPromises.writeFile(audioPath, mp3Buffer);
+      await fsPromises.writeFile(path.join(attachmentsDir, audioStoredName), mp3Buffer);
 
       audioAttId = new mongoose.Types.ObjectId();
       attachments.push({
         _id: audioAttId,
-        originalName: "extrait-audio-banc-essai.mp3",
+        originalName: `extrait-${slugify(post.title)}.mp3`,
         storedName: audioStoredName,
         mimeType: "audio/mpeg",
         size: mp3Buffer.length,
@@ -737,12 +950,11 @@ export async function runEnrichMedia(options = {}) {
       audioCount++;
     }
 
-    // Mise à jour des pièces jointes du Post
     post.attachments = attachments;
     totalAttachmentsCreated += attachments.length;
 
-    // D. Rédaction enrichie du contenu Markdown avec embeds visuels, PDF et Audio
-    let contentMd = `![Visuel de présentation de ${post.title}](attachment:${coverAttId})\n\n`;
+    // D. Contenu Markdown avec la photo, les plans, l'audio et le crédit photo
+    let contentMd = `![${post.title}](attachment:${coverAttId})\n\n`;
     contentMd += `${post.shortDescription}\n\n`;
     contentMd += `### 🛠️ Matériel et outillage recommandé\n\n`;
     contentMd += `- Matériau principal sélectionné pour sa durabilité et sa rigidité structurelle.\n`;
@@ -759,12 +971,17 @@ export async function runEnrichMedia(options = {}) {
 
     if (pdfAttId) {
       contentMd += `\n### 📄 Notice et gabarits d'assemblage\n`;
-      contentMd += `Téléchargez les plans cotés officiels de ce projet : [📄 Télécharger le plan technique complet (format A4)](attachment:${pdfAttId})\n`;
+      contentMd += `Téléchargez les plans cotés de ce projet : [📄 Télécharger le plan technique complet (format A4)](attachment:${pdfAttId})\n`;
     }
 
     if (audioAttId) {
-      contentMd += `\n### 🎵 Démonstration sonore en conditions réelles\n`;
-      contentMd += `Écoutez la capture audio brute réalisée au banc d'essai : [🎵 Écouter l'extrait audio du projet (MP3)](attachment:${audioAttId})\n`;
+      contentMd += `\n### 🎵 Démonstration sonore\n`;
+      contentMd += `Écoutez la prise de son réalisée au banc d'essai : [🎵 Écouter l'extrait audio du projet (MP3)](attachment:${audioAttId})\n`;
+    }
+
+    const credit = photo ? SEED_CREDITS[`covers/${path.basename(photo.path)}`] : null;
+    if (credit) {
+      contentMd += `\n---\n\n*Photo : ${credit.artist}, ${credit.license}, via [Wikimedia Commons](${credit.page}).*\n`;
     }
 
     post.content = contentMd;
@@ -772,16 +989,24 @@ export async function runEnrichMedia(options = {}) {
   }
 
   log(
-    `[enrich] ✅ ${demoPosts.length} posts enrichis (${totalAttachmentsCreated} pièces jointes : ${coversCount} couvertures, ${pdfsCount} plans PDF, ${audioCount} extraits MP3).`
+    `[enrich] ✅ ${demoPosts.length} posts enrichis (${totalAttachmentsCreated} pièces jointes : ${coversCount} couvertures dont ${photoCoversCount} photos, ${pdfsCount} plans PDF, ${audioCount} extraits MP3).`
   );
 
-  // 6. Génération des interactions sociales (Likes, Commentaires, Abonnements, Follows)
-  log("[enrich] Génération des interactions sociales réalistes de la communauté...");
+  // 7. Interactions sociales : les membres et les créateurs se suivent, aiment et commentent
+  log("[enrich] Génération des interactions sociales de la communauté...");
+  const random = seededRandom(20261122);
+  const pickDistinct = (pool, count) => {
+    const copy = [...pool];
+    const out = [];
+    while (copy.length > 0 && out.length < count) {
+      out.push(copy.splice(Math.floor(random() * copy.length), 1)[0]);
+    }
+    return out;
+  };
 
   const postIds = demoPosts.map((p) => p._id);
   const userIds = demoUsers.map((u) => u._id);
 
-  // Nettoyage préalable des interactions démo
   await Like.deleteMany({ postId: { $in: postIds } });
   await Comment.deleteMany({ postId: { $in: postIds } });
   await Follow.deleteMany({
@@ -791,68 +1016,52 @@ export async function runEnrichMedia(options = {}) {
     $or: [{ creatorId: { $in: userIds } }, { subscriberId: { $in: userIds } }],
   });
 
-  // A. Distribution des Likes (~160 likes distribués pour rendre le tri "Plus populaires" réaliste)
-  const likesToInsert = [];
-  for (let i = 0; i < demoPosts.length; i++) {
-    const post = demoPosts[i];
-    // Les premiers posts de chaque catégorie sont plus populaires (8 à 10 likes)
-    let numLikes = 0;
-    if (i % 10 === 0 || i % 10 === 7) {
-      numLikes = 8 + (i % 3); // 8 à 10 likes
-    } else if (i % 10 <= 3) {
-      numLikes = 4 + (i % 3); // 4 à 6 likes
-    } else if (i % 10 <= 6) {
-      numLikes = 2 + (i % 2); // 2 à 3 likes
-    } else {
-      numLikes = i % 2; // 0 ou 1 like
-    }
+  const visiblePosts = demoPosts.filter((p) => p.status === "published");
+  const authorIdOf = (post) => String(post.author?._id || post.author);
 
-    // Sélection d'utilisateurs distincts pour chaque like (sans auto-like obligatoire)
-    const shuffledUsers = [...demoUsers].sort(() => 0.5 - Math.random());
-    for (let uIdx = 0; uIdx < numLikes && uIdx < shuffledUsers.length; uIdx++) {
-      likesToInsert.push({
-        postId: post._id,
-        userId: shuffledUsers[uIdx]._id,
-      });
+  // A. Likes : quelques projets très populaires, beaucoup de moyens, certains sans like
+  const likesToInsert = [];
+  for (const post of visiblePosts) {
+    const roll = random();
+    const wanted = roll > 0.85 ? 9 + Math.floor(random() * 6) : roll > 0.4 ? 2 + Math.floor(random() * 5) : Math.floor(random() * 2);
+    const fans = pickDistinct(demoUsers.filter((u) => String(u._id) !== authorIdOf(post)), wanted);
+    for (const fan of fans) {
+      likesToInsert.push({ postId: post._id, userId: fan._id });
     }
   }
   await Like.insertMany(likesToInsert);
   log(`[enrich] ✅ ${likesToInsert.length} likes distribués sur le catalogue.`);
 
-  // B. Distribution des Commentaires (~45 commentaires pertinents)
+  // B. Commentaires : questions, retours d'essai et réponses de l'auteur, étalés dans le temps
   const commentsToInsert = [];
-  for (let i = 0; i < demoPosts.length; i++) {
-    // 1 post sur 2 reçoit un commentaire, les plus populaires en reçoivent 2
-    if (i % 2 === 0) {
-      const post = demoPosts[i];
-      const otherUsers = demoUsers.filter(
-        (u) => String(u._id) !== String(post.author?._id || post.author)
-      );
-      const commenter = otherUsers[i % otherUsers.length];
-      const commentText = MAKER_COMMENTS[i % MAKER_COMMENTS.length];
-
+  for (const post of visiblePosts) {
+    const count = Math.floor(random() * 4); // 0 à 3 commentaires
+    const commenters = pickDistinct(demoUsers.filter((u) => String(u._id) !== authorIdOf(post)), count);
+    const published = new Date(post.publishedAt || post.createdAt).getTime();
+    const span = Math.max(Date.now() - published, 3600000);
+    let last = published;
+    for (const commenter of commenters) {
+      last = Math.min(Date.now() - 60000, last + Math.floor(random() * span * 0.5) + 1800000);
+      const pool = CATEGORY_COMMENTS[post.category] || [];
+      const text = pool.length > 0 && random() < 0.5
+        ? pool[Math.floor(random() * pool.length)]
+        : MAKER_COMMENTS[Math.floor(random() * MAKER_COMMENTS.length)];
       commentsToInsert.push({
         postId: post._id,
-        author: {
-          id: commenter._id,
-          name: commenter.name,
-        },
-        text: commentText,
-        createdAt: new Date(Date.now() - (demoPosts.length - i) * 3600000),
+        author: { id: commenter._id, name: commenter.name },
+        text,
+        createdAt: new Date(last),
       });
 
-      if (i % 6 === 0) {
-        const secondCommenter = otherUsers[(i + 3) % otherUsers.length];
-        const secondText =
-          MAKER_COMMENTS[(i + 7) % MAKER_COMMENTS.length];
+      // L'auteur répond une fois sur trois
+      if (random() < 0.33 && post.author?._id) {
+        const firstName = commenter.name.split(" ")[0];
+        last = Math.min(Date.now() - 30000, last + Math.floor(random() * 86400000) + 600000);
         commentsToInsert.push({
           postId: post._id,
-          author: {
-            id: secondCommenter._id,
-            name: secondCommenter.name,
-          },
-          text: secondText,
-          createdAt: new Date(Date.now() - (demoPosts.length - i) * 1800000),
+          author: { id: post.author._id, name: post.author.name },
+          text: AUTHOR_REPLIES[Math.floor(random() * AUTHOR_REPLIES.length)].replace("{prenom}", firstName),
+          createdAt: new Date(last),
         });
       }
     }
@@ -860,54 +1069,52 @@ export async function runEnrichMedia(options = {}) {
   await Comment.insertMany(commentsToInsert);
   log(`[enrich] ✅ ${commentsToInsert.length} commentaires communautaires insérés.`);
 
-  // C. Distribution des Follows entre créateurs (~30 follows)
+  // C. Follows : chaque créateur suit 2 collègues, chaque membre suit 3 à 5 créateurs
   const followsToInsert = [];
-  for (let i = 0; i < demoUsers.length; i++) {
-    const follower = demoUsers[i];
-    // Chaque créateur suit 2 à 3 collègues
-    const next1 = demoUsers[(i + 1) % demoUsers.length];
-    const next2 = demoUsers[(i + 3) % demoUsers.length];
-    followsToInsert.push({ followerId: follower._id, creatorId: next1._id });
-    followsToInsert.push({ followerId: follower._id, creatorId: next2._id });
+  for (let i = 0; i < creators.length; i++) {
+    followsToInsert.push({ followerId: creators[i]._id, creatorId: creators[(i + 1) % creators.length]._id });
+    followsToInsert.push({ followerId: creators[i]._id, creatorId: creators[(i + 3) % creators.length]._id });
+  }
+  for (const member of members) {
+    for (const creator of pickDistinct(creators, 3 + Math.floor(random() * 3))) {
+      followsToInsert.push({ followerId: member._id, creatorId: creator._id });
+    }
   }
   await Follow.insertMany(followsToInsert);
   log(`[enrich] ✅ ${followsToInsert.length} relations de suivi (follows) créées.`);
 
-  // D. Distribution d'abonnements VIP actifs (30 jours de validité)
-  const subsToInsert = [
-    {
-      subscriberId: demoUsers[0]._id, // Alice s'abonne à Damien
-      creatorId: demoUsers[3]._id,
-      expiresAt: new Date(Date.now() + 30 * 86400000),
-      active: true,
-    },
-    {
-      subscriberId: demoUsers[1]._id, // Bastien s'abonne à Elena
-      creatorId: demoUsers[4]._id,
-      expiresAt: new Date(Date.now() + 30 * 86400000),
-      active: true,
-    },
-    {
-      subscriberId: demoUsers[2]._id, // Camille s'abonne à Gabriel
-      creatorId: demoUsers[6]._id,
-      expiresAt: new Date(Date.now() + 30 * 86400000),
-      active: true,
-    },
-    {
-      subscriberId: demoUsers[5]._id, // Félix s'abonne à Hélène
-      creatorId: demoUsers[7]._id,
-      expiresAt: new Date(Date.now() + 30 * 86400000),
-      active: true,
-    },
+  // D. Abonnements simulés actifs (30 jours), commencés à des dates différentes
+  const byKey = new Map(demoUsers.map((u) => [avatarKeyFromEmail(u.email), u]));
+  const SUBSCRIPTIONS = [
+    ["alice", "damien", 3],
+    ["bastien", "elena", 10],
+    ["camille", "gabriel", 1],
+    ["felix", "helene", 21],
+    ["lea", "camille", 6],
+    ["omar", "damien", 14],
+    ["pauline", "felix", 2],
+    ["quentin", "ismail", 25],
   ];
+  const subsToInsert = [];
+  for (const [subscriber, creator, daysAgo] of SUBSCRIPTIONS) {
+    const s = byKey.get(subscriber);
+    const c = byKey.get(creator);
+    if (!s || !c) continue;
+    subsToInsert.push({
+      subscriberId: s._id,
+      creatorId: c._id,
+      expiresAt: new Date(Date.now() + (30 - daysAgo) * 86400000),
+      active: true,
+    });
+  }
   await Subscription.insertMany(subsToInsert);
   log(`[enrich] ✅ ${subsToInsert.length} abonnements VIP actifs créés.`);
 
   log("[enrich] ========================================================");
   log(`[enrich] SUCCÈS : Dataset MakerShare enrichi avec succès !`);
-  log(`[enrich] - Avatars créateurs : ${avatarsCount}`);
+  log(`[enrich] - Comptes (créateurs + membres) avec photo de profil : ${avatarsCount}`);
   log(`[enrich] - Pièces jointes totales : ${totalAttachmentsCreated}`);
-  log(`[enrich]   * Couvertures graphiques : ${coversCount}`);
+  log(`[enrich]   * Couvertures : ${coversCount} (dont ${photoCoversCount} photos Wikimedia Commons)`);
   log(`[enrich]   * Plans PDF d'atelier : ${pdfsCount}`);
   log(`[enrich]   * Extraits audio MP3 : ${audioCount}`);
   log(`[enrich] - Likes communautaires : ${likesToInsert.length}`);
@@ -918,6 +1125,8 @@ export async function runEnrichMedia(options = {}) {
 
   return {
     avatarsCount,
+    membersCount,
+    photoCoversCount,
     totalAttachmentsCreated,
     coversCount,
     pdfsCount,
