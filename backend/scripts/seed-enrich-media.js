@@ -656,6 +656,16 @@ export const COMMUNITY_MEMBERS = [
   },
 ];
 
+// Compte de modération de la démo : permet d'essayer /admin (archivage, suspension) sans toucher à la base
+export const DEMO_ADMIN = {
+  key: "admin",
+  email: "demo.admin@makershare.local",
+  name: "Modération MakerShare",
+  bio: "Compte de modération de la démonstration : archivage des posts signalés et suspension des comptes. Aucun accès aux fichiers privés des créateurs.",
+  profileTags: ["moderation"],
+  role: "admin",
+};
+
 // Commentaires propres à une catégorie (en plus des commentaires génériques MAKER_COMMENTS)
 const CATEGORY_COMMENTS = {
   Lego: [
@@ -727,7 +737,7 @@ export async function runEnrichMedia(options = {}) {
   const demoPassword = options.demoPassword ?? process.env.DEMO_PASSWORD;
   let membersCount = 0;
   if (demoPassword) {
-    for (const member of COMMUNITY_MEMBERS) {
+    for (const member of [...COMMUNITY_MEMBERS, DEMO_ADMIN]) {
       const existing = await User.findOne({ email: member.email.toLowerCase() });
       if (existing && existing.seedBatch !== SEED_BATCH_TAG) {
         throw new Error(`[enrich] COLLISION : '${member.email}' existe déjà hors du jeu de démonstration.`);
@@ -736,16 +746,19 @@ export async function runEnrichMedia(options = {}) {
         const user = new User({
           name: member.name,
           email: member.email,
-          role: "user",
+          role: member.role || "user",
           status: "active",
           seedBatch: SEED_BATCH_TAG,
         });
         user.password = demoPassword;
         await user.save();
         membersCount++;
+      } else if (existing.role !== (member.role || "user")) {
+        existing.role = member.role || "user";
+        await existing.save();
       }
     }
-    log(`[enrich] ✅ ${COMMUNITY_MEMBERS.length} membres de la communauté prêts (${membersCount} créés).`);
+    log(`[enrich] ✅ ${COMMUNITY_MEMBERS.length} membres de la communauté et 1 compte de modération prêts (${membersCount} créés).`);
   } else {
     log("[enrich] DEMO_PASSWORD absent : les membres de la communauté ne sont pas créés.");
   }
@@ -766,7 +779,9 @@ export async function runEnrichMedia(options = {}) {
   }
   const creatorEmails = new Set(CREATOR_PROFILES.map((p) => p.email.toLowerCase()));
   const creators = demoUsers.filter((u) => creatorEmails.has(u.email.toLowerCase()));
-  const members = demoUsers.filter((u) => !creatorEmails.has(u.email.toLowerCase()));
+  // Le compte de modération ne like ni ne commente : il n'entre pas dans la communauté
+  const community = demoUsers.filter((u) => u.role !== "admin");
+  const members = community.filter((u) => !creatorEmails.has(u.email.toLowerCase()));
 
   // 3. Avatars (photos libres de droits) et profils riches
   log("[enrich] Avatars et profils des créateurs et membres...");
@@ -774,6 +789,7 @@ export async function runEnrichMedia(options = {}) {
   const profiles = [
     ...CREATOR_PROFILES.map((p) => ({ ...p, key: avatarKeyFromEmail(p.email) })),
     ...COMMUNITY_MEMBERS,
+    DEMO_ADMIN,
   ];
 
   for (const profile of profiles) {
@@ -1024,7 +1040,7 @@ export async function runEnrichMedia(options = {}) {
   for (const post of visiblePosts) {
     const roll = random();
     const wanted = roll > 0.85 ? 9 + Math.floor(random() * 6) : roll > 0.4 ? 2 + Math.floor(random() * 5) : Math.floor(random() * 2);
-    const fans = pickDistinct(demoUsers.filter((u) => String(u._id) !== authorIdOf(post)), wanted);
+    const fans = pickDistinct(community.filter((u) => String(u._id) !== authorIdOf(post)), wanted);
     for (const fan of fans) {
       likesToInsert.push({ postId: post._id, userId: fan._id });
     }
@@ -1036,7 +1052,7 @@ export async function runEnrichMedia(options = {}) {
   const commentsToInsert = [];
   for (const post of visiblePosts) {
     const count = Math.floor(random() * 4); // 0 à 3 commentaires
-    const commenters = pickDistinct(demoUsers.filter((u) => String(u._id) !== authorIdOf(post)), count);
+    const commenters = pickDistinct(community.filter((u) => String(u._id) !== authorIdOf(post)), count);
     const published = new Date(post.publishedAt || post.createdAt).getTime();
     const span = Math.max(Date.now() - published, 3600000);
     let last = published;

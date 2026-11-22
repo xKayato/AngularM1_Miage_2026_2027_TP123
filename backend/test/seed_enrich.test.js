@@ -16,6 +16,7 @@ import { runSeed, SEED_BATCH_TAG, DEMO_CREATORS } from "../scripts/seed-demo.js"
 import {
   runEnrichMedia,
   COMMUNITY_MEMBERS,
+  DEMO_ADMIN,
   findSeedAsset,
   avatarKeyFromEmail,
 } from "../scripts/seed-enrich-media.js";
@@ -61,7 +62,7 @@ test("Jeu de démo — photos libres de droits versionnées", async (t) => {
       assert.ok(isImage(asset.path), `couverture ${i} n'est ni JPEG ni PNG`);
       assert.ok(fs.statSync(asset.path).size < 1024 * 1024, `couverture ${i} > 1 Mo`);
     }
-    const keys = [...DEMO_CREATORS.map((c) => avatarKeyFromEmail(c.email)), ...COMMUNITY_MEMBERS.map((m) => m.key)];
+    const keys = [...DEMO_CREATORS.map((c) => avatarKeyFromEmail(c.email)), ...COMMUNITY_MEMBERS.map((m) => m.key), DEMO_ADMIN.key];
     for (const key of keys) {
       const asset = findSeedAsset("avatars", key);
       assert.ok(asset, `avatar ${key} manquant`);
@@ -71,7 +72,7 @@ test("Jeu de démo — photos libres de droits versionnées", async (t) => {
 
   await t.test("chaque photo a un crédit (auteur, licence libre, page source)", () => {
     const credits = JSON.parse(fs.readFileSync(new URL("../scripts/seed-assets/credits.json", import.meta.url), "utf-8"));
-    assert.equal(Object.keys(credits).length, 116);
+    assert.equal(Object.keys(credits).length, 117);
     for (const [file, c] of Object.entries(credits)) {
       assert.match(c.license, /^(public domain|pd|cc0|cc by(-sa)? [0-9.]+)/i, file);
       assert.match(c.page, /^https:\/\/commons\.wikimedia\.org\//, file);
@@ -81,9 +82,9 @@ test("Jeu de démo — photos libres de droits versionnées", async (t) => {
 });
 
 test("Jeu de démo — comptes et profils réalistes", async (t) => {
-  await t.test("10 créateurs + 6 membres de la communauté, tous avec photo de profil", async () => {
+  await t.test("10 créateurs + 6 membres + 1 modérateur, tous avec photo de profil", async () => {
     const users = await User.find({ seedBatch: SEED_BATCH_TAG });
-    assert.equal(users.length, 16);
+    assert.equal(users.length, 17);
     for (const u of users) {
       assert.ok(u.avatar?.storedName, `${u.email} sans avatar`);
       assert.ok(isImage(path.join(uploadsDir, "avatars", u.avatar.storedName)));
@@ -103,6 +104,24 @@ test("Jeu de démo — comptes et profils réalistes", async (t) => {
       const user = await User.findOne({ email: m.email });
       assert.equal(await Post.countDocuments({ author: user._id }), 0);
     }
+  });
+
+  await t.test("le compte de modération est admin, accède à /api/admin et n'interagit pas", async () => {
+    const res = await fetch(`${base}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: DEMO_ADMIN.email, password: PASSWORD }),
+    });
+    assert.equal(res.status, 200);
+    const { token, user } = await res.json();
+    assert.equal(user.role, "admin");
+    const target = await User.findOne({ email: COMMUNITY_MEMBERS[0].email });
+    const adminRes = await fetch(`${base}/api/admin/users/${target._id}`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(adminRes.status, 200);
+    const admin = await User.findOne({ email: DEMO_ADMIN.email });
+    assert.equal(await Like.countDocuments({ userId: admin._id }), 0);
+    assert.equal(await Comment.countDocuments({ "author.id": admin._id }), 0);
+    assert.equal(await Post.countDocuments({ author: admin._id }), 0);
   });
 
   await t.test("la photo de profil est servie par l'API", async () => {
@@ -187,7 +206,7 @@ test("Jeu de démo — interactions crédibles", async (t) => {
   await t.test("relancer l'enrichissement est idempotent (mêmes volumes, pas de doublon)", async () => {
     const second = await runEnrichMedia({ silent: true, demoPassword: PASSWORD, uploadsDir });
     assert.equal(second.membersCount, 0);
-    assert.equal(await User.countDocuments({ seedBatch: SEED_BATCH_TAG }), 16);
+    assert.equal(await User.countDocuments({ seedBatch: SEED_BATCH_TAG }), 17);
     assert.equal(second.likesCount, firstRun.likesCount);
     assert.equal(second.commentsCount, firstRun.commentsCount);
     const files = fs.readdirSync(path.join(uploadsDir, "attachments")).filter((f) => f.startsWith("demo-att-cover-"));

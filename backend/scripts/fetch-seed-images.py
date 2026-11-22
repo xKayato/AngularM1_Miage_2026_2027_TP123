@@ -163,6 +163,8 @@ AVATARS: dict[str, list[str]] = {
     "nina": ["latte art coffee", "cup of coffee"],
     "omar": ["bicycle parked", "vintage bicycle"],
     "pauline": ["sunflower", "sunflower field"],
+    # Compte de modération de la démo
+    "admin": ["lighthouse", "lighthouse coast"],
     "quentin": ["turntable vinyl", "vinyl records"],
 }
 

@@ -6,6 +6,7 @@ Les avatars ne montrent volontairement aucun visage : les comptes de démo sont 
 
 | Fichier | Photo d'origine | Auteur | Licence |
 |---|---|---|---|
+| `avatars/admin.jpg` | [Leuchtturm in Westerheversand crop.jpg](https://commons.wikimedia.org/wiki/File:Leuchtturm_in_Westerheversand_crop.jpg) | Marco Leiter | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
 | `avatars/alice.jpg` | [Pile of light gray LEGO bricks at a LEGO store.jpg](https://commons.wikimedia.org/wiki/File:Pile_of_light_gray_LEGO_bricks_at_a_LEGO_store.jpg) | Grendelkhan | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
 | `avatars/bastien.jpg` | [Craft supplies (Unsplash).jpg](https://commons.wikimedia.org/wiki/File:Craft_supplies_(Unsplash).jpg) | Joanna Kosinska joannakosinska | [CC0](http://creativecommons.org/publicdomain/zero/1.0/deed.en) |
 | `avatars/camille.jpg` | [Vibrant Paper Mandala Art.jpg](https://commons.wikimedia.org/wiki/File:Vibrant_Paper_Mandala_Art.jpg) | Jeevitha Madhaiyan | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
