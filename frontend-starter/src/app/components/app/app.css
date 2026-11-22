@@ -295,3 +295,41 @@
     cursor: pointer;
   }
 }
+
+/* Téléphones : l'en-tête doit tenir dans 320-600 px. Connexion / Inscription / Déconnexion
+   sont déjà dans le menu ☰, on ne garde en haut que le logo, le thème (icône) et le menu. */
+@media (max-width: 600px) {
+  .header-inner {
+    padding: 0.6rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .header-actions {
+    gap: 0.5rem;
+  }
+
+  .brand-title {
+    font-size: 1.1rem;
+  }
+
+  .theme-text,
+  .nav-auth-login,
+  .nav-auth-register,
+  .btn-logout {
+    display: none;
+  }
+
+  .theme-switch-btn {
+    padding: 0.4rem 0.55rem;
+  }
+
+  .mobile-drawer {
+    padding: 0.85rem 1rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .brand-title {
+    display: none;
+  }
+}

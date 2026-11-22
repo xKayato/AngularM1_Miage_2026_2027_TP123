@@ -308,8 +308,19 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 11. Audit final : téléphone et performances
+
+- **Audit des critères du projet :** l'upload public / privé, la gestion des utilisateurs et le duo MongoDB / Angular étaient solides. En vérifiant pour de vrai dans le navigateur à 375 px et en mesurant la version Docker, deux critères avaient des trous : le site n'était pas vraiment utilisable sur téléphone, et il envoyait trop de JavaScript.
+- **Téléphone :** l'en-tête faisait 563 px de large sur un écran de 375 px, donc le bouton ☰ et « Inscription » sortaient de l'écran sur toutes les pages. Sur téléphone, l'en-tête ne garde plus que le logo, l'icône du thème et le menu ☰ (qui contient déjà Connexion, Inscription et Déconnexion). La barre de compteurs du profil créateur passe aussi à la ligne. Vérifié sur 6 pages : plus aucun débordement.
+- **Chargement à la demande :** les 12 pages étaient dans un seul `main.js` de 670 Ko. Seul le catalogue (page d'accueil) reste dans le bundle principal, les autres pages passent en `loadComponent` et sont préchargées en arrière-plan (`PreloadAllModules` était déjà configuré mais ne servait à rien).
+- **Compression et cache :** nginx ne compressait rien. J'ai activé gzip et les empreintes dans les noms de fichiers (`outputHashing`) : les fichiers à empreinte sont mis en cache un an, `index.html` est revalidé à chaque visite. Mesuré : à l'ouverture, 124 Ko transférés au lieu de 692 Ko (−82 %), et les réponses JSON de l'API sont 4 fois plus légères.
+- **Index MongoDB :** j'avais d'abord cru qu'il manquait des index sur les follows, likes et abonnements, mais ils sont déclarés directement sur les champs (`index: true`). Je l'ai vérifié avec `getIndexes()` et `explain()` sur la base (`IXSCAN creatorId_1`, `postId_1`) : rien à ajouter. Bonne leçon : vérifier avant de corriger.
+- **Tests :** 21 nouveaux tests frontend (routes chargées à la demande et gardes conservées, contenu du menu mobile pour visiteur, membre et admin).
+
+---
+
 ## Bilan final des vérifications
 
 - **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **350 / 350 tests passants** (16 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
-- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **403 / 403 tests passants** (25 fichiers Vitest, 0 échec).
+- **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **424 / 424 tests passants** (27 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).

@@ -12,6 +12,7 @@
                         "browser": "src/main.ts",
                         "index": "src/index.html",
                         "baseHref": "/",
+                        "outputHashing": "all",
                         "tsConfig": "tsconfig.app.json",
                         "assets": [
                             {
