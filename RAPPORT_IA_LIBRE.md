@@ -319,8 +319,20 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 12. Un jeu de démonstration qui ressemble à un vrai site
+
+- **Objectif :** avant le tag final, que le site ait l'air utilisé par de vraies personnes : de vraies photos adaptées à chaque projet, des photos de profil, une communauté qui commente et suit.
+- **Source des images :** j'ai d'abord essayé la banque d'images intégrée à l'outil (Unsplash), mais pour 100 sujets très précis les résultats étaient souvent hors sujet (« lego millennium falcon » renvoyait des vues aériennes de Johannesburg) et chaque recherche était énorme. On est passé par **Wikimedia Commons**, dont l'API publique donne aussi l'auteur et la licence : le script `backend/scripts/fetch-seed-images.py` cherche une photo par projet et ne garde que les licences libres (domaine public, CC0, CC BY, CC BY-SA).
+- **Relecture image par image :** une planche contact de 100 vignettes a permis de rejeter une trentaine de choix automatiques (une machine à laver pour une boîte à rythmes, le skyline de San Diego pour un diffuseur acoustique, un drone militaire, des images générées par IA, des personnes reconnaissables, une fresque de Pompéi…), puis d'en épingler quelques-unes à la main. Les images sont réduites (960 px / 256 px, 16 Mo au total) et versionnées avec leurs crédits (`credits.json`, `CREDITS.md`), et le crédit est rappelé en bas de chaque projet.
+- **Avatars sans visages :** les comptes sont fictifs, donc pas de portrait d'une vraie personne. Les créateurs ont une photo de leur atelier ou de leurs outils, les membres ce que les gens mettent souvent (un chat, un paysage, un café, un vélo…).
+- **Communauté :** 6 membres sans projet (prof de techno, ingénieur bricoleur, illustratrice…) qui suivent 3 à 5 créateurs, likent et commentent ; commentaires propres à chaque catégorie, réponses des auteurs, dates étalées après la publication, plus d'auto-like, et un générateur pseudo-aléatoire à graine fixe pour que le seed reste reproductible. Les projets bois, électronique et cuir sont enfin rangés dans Menuiserie, Électronique et Maroquinerie (ces catégories étaient vides).
+- **Bug trouvé au passage :** après le reseed, les anciens avatars restaient affichés, car l'API demandait au navigateur de garder un avatar 24 h sous la même URL. Un utilisateur qui changeait sa photo n'était donc pas vu avant le lendemain. L'avatar est maintenant revalidé à chaque affichage (`no-cache` + ETag, réponse 304 si rien n'a changé).
+- **Tests :** `backend/test/seed_enrich.test.js` (15 tests) vérifie les 116 photos et leurs licences, les 16 comptes avec avatar et bio, la connexion des membres, les 100 couvertures JPEG/PNG valides, les catégories remplies, l'absence d'auto-like, la cohérence des dates des commentaires et l'idempotence. Le script écrit dans un dossier temporaire pendant les tests pour ne jamais écraser `data/uploads`.
+
+---
+
 ## Bilan final des vérifications
 
-- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **350 / 350 tests passants** (16 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
+- **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **365 / 365 tests passants** (17 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).
 - **Tests unitaires Frontend (`cd frontend-starter && npm test -- --watch=false`) :** **424 / 424 tests passants** (27 fichiers Vitest, 0 échec).
 - **Build de production Angular (`cd frontend-starter && npm run build`) :** Compilation réussie sans erreur ni warning (`dist/gpc`).

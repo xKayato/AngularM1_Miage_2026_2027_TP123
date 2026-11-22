@@ -5,7 +5,7 @@
 > Projet de Programmation Web — Master 1 MIAGE, Université Côte d'Azur (2026–2027)
 > Thomas DELOUP
 >
-> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 350 tests backend · 424 tests frontend
+> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 365 tests backend · 424 tests frontend
 
 MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
 
@@ -106,7 +106,7 @@ Seul [Docker Desktop](https://www.docker.com/products/docker-desktop/) est néce
 
 1. Télécharger le projet (`git clone` ou archive `.zip` d'une version ci-dessous) et le décompresser.
 2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux). Équivalent manuel : `docker compose up --build -d`.
-3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement : 10 créateurs, 100 posts avec images, PDF et sons. Les comptes `demo.*@makershare.local` (par exemple `demo.alice.lego@makershare.local`) utilisent le mot de passe `MakerShare2026!`.
+3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement, comme si le site était déjà utilisé : 10 créateurs et 6 membres de la communauté avec photo de profil et bio, 100 projets illustrés par de vraies photos, des plans PDF et des extraits audio, environ 440 likes, 200 commentaires (avec réponses des auteurs), des follows et des abonnements. Tous les comptes `demo.*@makershare.local` (par exemple `demo.alice.lego@makershare.local` pour une créatrice, `demo.lea.member@makershare.local` pour une membre) utilisent le mot de passe `MakerShare2026!`.
 
 Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site** Angular servi par nginx, qui redirige `/api` vers l'API. La base et les fichiers téléversés sont conservés dans des volumes entre deux lancements. Sans Atlas, la recherche utilise automatiquement le repli regex.
 
@@ -145,16 +145,18 @@ npm install
 npm start                 # http://localhost:3000
 ```
 
-Jeu de démonstration optionnel (10 créateurs, 100 posts, médias générés) :
+Jeu de démonstration optionnel (10 créateurs, 6 membres, 100 posts illustrés, likes, commentaires et abonnements) :
 
 ```bash
 # ajouter DEMO_PASSWORD=... dans .env, puis :
 npm run seed:demo         # comptes demo.*@makershare.local
-npm run seed:enrich       # images, PDF et MP3 de démonstration
+npm run seed:enrich       # photos, avatars, PDF, MP3 et interactions de la communauté
 npm run seed:clean        # retire uniquement les données de démo
 ```
 
 Le script est idempotent : le relancer ne crée pas de doublons et il ne touche jamais aux comptes réels.
+
+Les photos (une par projet, plus les avatars) viennent de **Wikimedia Commons**, sous licence libre (domaine public, CC0, CC BY, CC BY-SA). Elles sont versionnées dans `backend/scripts/seed-assets/`, donc le seed fonctionne sans internet. L'auteur et la licence de chaque photo sont listés dans [CREDITS.md](backend/scripts/seed-assets/CREDITS.md) et rappelés en bas du projet qui l'utilise. Les avatars ne montrent aucun visage : les comptes de démo sont fictifs, on n'y associe donc pas la photo d'une vraie personne.
 
 ### Frontend
 
@@ -169,7 +171,7 @@ npm start                 # http://localhost:4200, /api/* est redirigé vers le 
 ## Tests
 
 ```bash
-cd backend && npm test                          # 350 tests, 16 fichiers
+cd backend && npm test                          # 365 tests, 17 fichiers
 cd frontend-starter && npm test -- --watch=false  # 424 tests, 27 fichiers
 cd frontend-starter && npm run build            # build de production
 ```
