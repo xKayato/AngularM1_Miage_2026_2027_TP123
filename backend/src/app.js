@@ -596,7 +596,9 @@ export function createApp() {
         return res.status(404).json({ message: "Fichier avatar introuvable" });
       }
 
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      // L'URL de l'avatar ne change pas quand l'utilisateur change de photo : le navigateur doit
+      // donc revalider à chaque affichage (304 grâce à l'ETag) au lieu de garder l'ancienne 24 h.
+      res.setHeader("Cache-Control", "public, no-cache");
       res.type(user.avatar.mimeType || "image/jpeg");
       res.sendFile(avatarPath, (err) => {
         if (err && !res.headersSent) next(err);

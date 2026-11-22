@@ -203,10 +203,21 @@ test.describe("Mission 2 — Gestion de l'Avatar (POST, GET, DELETE)", () => {
     const getRes = await fetch(`${base}/api/users/${user._id}/avatar`);
     assert.equal(getRes.status, 200);
     assert.equal(getRes.headers.get("content-type"), "image/png");
-    assert.ok(getRes.headers.get("cache-control")?.includes("max-age=86400"));
+    // Revalidation à chaque affichage : une nouvelle photo de profil est visible tout de suite
+    assert.ok(getRes.headers.get("cache-control")?.includes("no-cache"));
+    const etag = getRes.headers.get("etag");
+    assert.ok(etag);
 
     const imgBytes = await getRes.arrayBuffer();
     assert.equal(imgBytes.byteLength, VALID_PNG_BUFFER.byteLength);
+
+    // Avatar inchangé : réponse 304 légère grâce à l'ETag
+    // (fetch ajoute « Cache-Control: no-cache » aux requêtes conditionnelles, comme le prévoit la
+    // spécification : on fixe nous-mêmes l'en-tête pour reproduire la revalidation d'un navigateur)
+    const revalidated = await fetch(`${base}/api/users/${user._id}/avatar`, {
+      headers: { "If-None-Match": etag, "Cache-Control": "max-age=0" },
+    });
+    assert.equal(revalidated.status, 304);
 
     // 3. Remplacement de l'avatar (vérifie que l'ancien fichier sur disque est nettoyé)
     const userBeforeSecondUpload = await User.findById(user._id);
