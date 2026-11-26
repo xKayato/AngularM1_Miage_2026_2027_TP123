@@ -31,25 +31,14 @@ MakerShare permet de publier des tutoriels en Markdown avec photos, plans PDF et
 
 ## 🎬 Vidéos
 
-<!--
-  Vidéo de présentation : remplacer LIEN_VIDEO_PRESENTATION par le lien YouTube / Drive.
-  La publicité est dans docs/readme/makershare-pub-30s.mp4 (720p, 3,4 Mo) : la vignette l'ouvre dans le navigateur.
-  Pour un lecteur intégré dans la page, éditer ce README sur github.com et glisser le .mp4 sur une ligne vide :
-  GitHub remplace alors le fichier par une adresse https://github.com/user-attachments/assets/… qui s'affiche en lecteur.
--->
+**Publicité** — MakerShare en 30 secondes
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <a href="LIEN_VIDEO_PRESENTATION"><img src="docs/readme/video-presentation.svg" alt="Vidéo de présentation de MakerShare"></a><br>
-      <b>Présentation</b> — le projet en 5 minutes
-    </td>
-    <td width="50%" align="center">
-      <a href="https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/raw/main/docs/readme/makershare-pub-30s.mp4"><img src="docs/readme/video-publicite.svg" alt="Publicité MakerShare"></a><br>
-      <b>Publicité</b> — MakerShare en 30 secondes
-    </td>
-  </tr>
-</table>
+https://github.com/user-attachments/assets/da447e78-1821-477e-822f-c43a050700b4
+
+**Présentation** — le projet en 5 minutes
+
+<!-- Remplacer LIEN_VIDEO_PRESENTATION par le lien YouTube / Drive de la vidéo de présentation. -->
+<a href="LIEN_VIDEO_PRESENTATION"><img src="docs/readme/video-presentation.svg" alt="Vidéo de présentation de MakerShare" width="60%"></a>
 
 ## 🚀 Essayer en 2 minutes
 
