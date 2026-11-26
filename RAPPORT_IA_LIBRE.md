@@ -339,6 +339,14 @@ MakerShare prolonge le socle de *Guitar Practice Cloud* tout en conservant 100 %
 
 ---
 
+## 14. README visuel
+
+- **Objectif :** un README plus court et plus visuel, qui respecte les règles habituelles (bannière, badges, description en une phrase, démarrage rapide, captures, documentation, crédits) et qui laisse la place aux deux vidéos (présentation et publicité).
+- **Réalisation :** bannière SVG aux couleurs de l'appli avec trois photos du jeu de démo, badges, vignettes vidéo tirées des vidéos elles-mêmes (le lien est à remplacer par l'adresse YouTube ou GitHub), et six vraies captures prises automatiquement sur la version Docker (Chrome sans interface piloté par le protocole DevTools, sans dépendance). Le détail des mécanismes originaux est passé dans `docs/POINTS_FORTS.md`, pour garder le README autour de 140 lignes.
+- **Vérifié :** rendu passé par l'API Markdown de GitHub pour voir le résultat réel (ancres, tableaux, images) avant de proposer le commit.
+
+---
+
 ## Bilan final des vérifications
 
 - **Tests d'intégration et unitaires Backend (`cd backend && npm test`) :** **366 / 366 tests passants** (17 fichiers, 0 échec) sur base isolée `mongodb-memory-server` (non-régression TP1-3, modèles/DTOs, cycle de vie des posts, concurrence sur quotas d'upload et d'abonnements, matrice d'accès, liens secrets, likes, recherche et mode suggest, modération admin, profil/avatar/révocation JWT, commentaires, couvertures et seed).

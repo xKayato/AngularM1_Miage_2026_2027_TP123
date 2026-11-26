@@ -1,247 +1,158 @@
-# MakerShare
+<p align="center">
+  <img src="docs/readme/banner.svg" alt="MakerShare — Partage ce que tu fabriques" width="100%">
+</p>
 
-**La plateforme de partage de créations et tutoriels DIY** — menuiserie, électronique, maroquinerie, Lego, papercraft, origami, musique, modèles 3D…
+<p align="center">
+  <a href="https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0"><img alt="Release" src="https://img.shields.io/badge/release-v5.0.0-E06D44?style=flat-square"></a>
+  <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?style=flat-square&logo=angular&logoColor=white">
+  <img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white">
+  <img alt="Express 5" src="https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white">
+  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-prêt-2496ED?style=flat-square&logo=docker&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-790%20passants-2EA44F?style=flat-square">
+</p>
 
-> Projet de Programmation Web — Master 1 MIAGE, Université Côte d'Azur (2026–2027)
-> Thomas DELOUP
->
-> Angular 22 · Node.js / Express 5 · MongoDB Atlas (Mongoose 9) · 366 tests backend · 424 tests frontend
+<p align="center">
+  <b>Plateforme de partage de tutoriels DIY</b> : menuiserie, électronique, Lego, origami, musique, impression 3D…<br>
+  Projet libre des TP4 à TP6 · Master 1 MIAGE · Université Côte d'Azur · 2026–2027
+</p>
 
-MakerShare est né d'une application existante, *Guitar Practice Cloud* (TP1 à TP3), qui gérait des pistes audio d'entraînement. Le projet libre des TP4 à TP6 l'a transformée en réseau social de makers : on y publie des tutoriels en Markdown avec images, PDF et audio, on choisit qui peut les lire, on suit des créateurs, on s'abonne à leurs contenus exclusifs et on commente. Toute l'API historique continue de fonctionner à l'identique.
+<p align="center">
+  <a href="#-essayer-en-2-minutes"><b>Essayer</b></a> ·
+  <a href="#-vidéos"><b>Vidéos</b></a> ·
+  <a href="#-aperçu"><b>Aperçu</b></a> ·
+  <a href="docs/POINTS_FORTS.md"><b>Points forts techniques</b></a> ·
+  <a href="API_CONTRACT.md"><b>API</b></a>
+</p>
 
 ---
 
-## Essayer en 2 minutes
+MakerShare permet de publier des tutoriels en Markdown avec photos, plans PDF et extraits audio, puis de **choisir qui peut les lire** : tout le monde, les followers, les abonnés, ou les seules personnes qui ont un lien secret. On y suit des créateurs, on s'abonne à leurs contenus exclusifs, on like et on commente. Le projet est né de *Guitar Practice Cloud* (TP1 à TP3), dont toute l'API continue de fonctionner.
 
-1. Installer [Docker Desktop](https://www.docker.com/products/docker-desktop/) et le lancer.
-2. Télécharger **[makershare-v5.0.0-docker.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/download/v5.0.0/makershare-v5.0.0-docker.zip)** depuis la [Release v5.0.0](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0) et le décompresser.
-3. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux) : le site s'ouvre sur <http://localhost:8080>, déjà rempli comme s'il était utilisé depuis des mois.
+## 🎬 Vidéos
 
-Tous les comptes de démonstration ont le mot de passe **`MakerShare2026!`** :
+<!--
+  Vidéo de présentation : remplacer LIEN_VIDEO_PRESENTATION par le lien YouTube / Drive.
+  La publicité est dans docs/readme/makershare-pub-30s.mp4 (720p, 3,4 Mo) : la vignette l'ouvre dans le navigateur.
+  Pour un lecteur intégré dans la page, éditer ce README sur github.com et glisser le .mp4 sur une ligne vide :
+  GitHub remplace alors le fichier par une adresse https://github.com/user-attachments/assets/… qui s'affiche en lecteur.
+-->
 
-| Rôle | Compte | Ce qu'il permet d'essayer |
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="LIEN_VIDEO_PRESENTATION"><img src="docs/readme/video-presentation.svg" alt="Vidéo de présentation de MakerShare"></a><br>
+      <b>Présentation</b> — le projet en 5 minutes
+    </td>
+    <td width="50%" align="center">
+      <a href="https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/raw/main/docs/readme/makershare-pub-30s.mp4"><img src="docs/readme/video-publicite.svg" alt="Publicité MakerShare"></a><br>
+      <b>Publicité</b> — MakerShare en 30 secondes
+    </td>
+  </tr>
+</table>
+
+## 🚀 Essayer en 2 minutes
+
+1. Installer et lancer [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Télécharger **[makershare-v5.0.0-docker.zip](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/download/v5.0.0/makershare-v5.0.0-docker.zip)** et le décompresser.
+3. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux), puis ouvrir <http://localhost:8080>.
+
+Aucune installation de Node.js ni de base de données : le site démarre déjà rempli (17 comptes, 100 projets illustrés, likes, commentaires, abonnements). Tous les comptes ont le mot de passe **`MakerShare2026!`** :
+
+| Rôle | Compte | À essayer |
 |---|---|---|
-| Créatrice | `demo.alice.lego@makershare.local` | publier et éditer un tutoriel, déposer des médias dans le texte, choisir la visibilité, générer un lien secret |
-| Membre | `demo.lea.member@makershare.local` | suivre un créateur, s'abonner, débloquer les posts réservés, liker, commenter |
-| Modération | `demo.admin@makershare.local` | `/admin` : archiver un post, suspendre ou réactiver un compte |
+| Créatrice | `demo.alice.lego@makershare.local` | publier un tutoriel, déposer des médias dans le texte, générer un lien secret |
+| Membre | `demo.lea.member@makershare.local` | suivre, s'abonner, débloquer un projet réservé, liker, commenter |
+| Modération | `demo.admin@makershare.local` | `/admin` : archiver un projet, suspendre un compte |
 
-**Petit parcours de démonstration :**
-1. Sans être connecté, ouvrir un post marqué « Followers » : il apparaît verrouillé, sans contenu ni couverture.
-2. Se connecter avec Léa, suivre l'auteur depuis son profil : le post se débloque, pièces jointes comprises.
-3. Chercher `drgaon` ou `guitare bluse` : la recherche corrige les fautes.
-4. Avec Alice, ouvrir « Mes créations », passer un post en visibilité « Lien secret », générer le lien et l'ouvrir en navigation privée : il se lit sans compte.
-5. Avec le compte de modération, archiver un post public depuis `/admin` (son identifiant est la fin de son URL) : les visiteurs voient « Ce projet a été archivé par la modération ».
+## 📸 Aperçu
 
-Le site est aussi utilisable sur téléphone (menu ☰).
+<table>
+  <tr>
+    <td width="77%"><img src="docs/readme/catalogue.jpg" alt="Catalogue des créations"></td>
+    <td width="23%"><img src="docs/readme/mobile.jpg" alt="Version mobile"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Catalogue</b> : 100 projets illustrés, filtres, tri, pagination</sub></td>
+    <td align="center"><sub><b>Mobile</b> : vérifié à 375 px</sub></td>
+  </tr>
+</table>
 
----
+<table>
+  <tr>
+    <td width="50%"><img src="docs/readme/recherche.jpg" alt="Recherche tolérante aux fautes"></td>
+    <td width="50%"><img src="docs/readme/detail.jpg" alt="Page d'un tutoriel"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Recherche</b> : « drgaon » trouve les dragons</sub></td>
+    <td align="center"><sub><b>Tutoriel</b> : Markdown, photos, plans PDF</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/readme/reserve.jpg" alt="Projet réservé aux followers"></td>
+    <td><img src="docs/readme/editeur.jpg" alt="Espace Mes créations"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Contenu réservé</b> : aperçu sans rien divulguer</sub></td>
+    <td align="center"><sub><b>Mes créations</b> : brouillon → publié → archivé</sub></td>
+  </tr>
+</table>
 
-## Ce qui rend le projet original
+## ✨ Fonctionnalités
 
-L'essentiel du travail n'est pas dans les écrans mais dans la façon dont l'application **protège les contenus privés sans casser l'expérience**. Voici les mécanismes dont je suis le plus fier.
+- **Publication** — éditeur Markdown, glisser-déposer d'images, PDF et sons à l'endroit du curseur, cycle brouillon / publié / archivé, choix de la couverture.
+- **4 visibilités** — public, followers, abonnés (abonnement simulé de 30 jours) et lien secret valable 7 jours.
+- **Communauté** — annuaire et profils de créateurs, follows, likes, commentaires, listes de followers.
+- **Recherche** — tolérante aux fautes, aux accents et aux pluriels, autocomplétion, filtres par catégorie, tag ou créateur, partageables par URL.
+- **Comptes** — inscription, profil, photo, changement de mot de passe qui déconnecte les autres sessions.
+- **Modération** — archivage des projets et suspension des comptes, sans aucun accès aux fichiers privés.
 
-### 1. Aucun fichier n'est servi en statique
+## 🛡️ Sous le capot
 
-Les pièces jointes, couvertures et avatars sont stockés sur disque, mais **aucun dossier d'upload n'est exposé**. Chaque téléchargement passe par une route Express qui vérifie les droits du lecteur sur le post (`canAccessPost`) et bloque les chemins piégés (`resolveSafeAttachmentPath`, anti *path traversal*).
+Ce qui distingue le projet, détaillé dans **[docs/POINTS_FORTS.md](docs/POINTS_FORTS.md)** :
 
-Problème : une balise `<img src>` n'envoie ni JWT ni en-tête personnalisé. Le front télécharge donc les images protégées via `HttpClient` en `Blob`, les garde dans un **cache LRU de 80 entrées** (`PostService`) et les affiche avec `URL.createObjectURL()`, révoquées à la destruction du composant.
+- **Aucun fichier servi en statique** : chaque téléchargement vérifie les droits ; les images privées arrivent en `Blob` avec un cache LRU.
+- **Lien secret qui ne fuit pas** : seul son hash SHA-256 est stocké, et il passe par un en-tête, jamais dans l'URL des fichiers.
+- **Uploads vérifiés octet par octet** (*magic bytes*) et **quotas atomiques** qui tiennent même avec des envois simultanés.
+- **Recherche Atlas Search** avec un moteur de repli maison tout aussi tolérant, pour les tests et Docker.
+- **Rapide** : pages chargées à la demande, gzip et cache long (124 Ko à l'ouverture), API en 20 à 50 ms.
 
-### 2. Un lien de partage secret qui ne fuit nulle part
+| Front | Back | Données | Qualité |
+|---|---|---|---|
+| Angular 22 (standalone, Signals, TypeScript strict) | Node.js 24, Express 5, JWT, Multer | MongoDB Atlas + Mongoose 9, fichiers sur disque | 366 tests API + 424 tests Angular, Docker |
 
-Un post en visibilité `link` est invisible du catalogue et lisible par quiconque possède son URL `/share/:token`, sans compte.
+## 🛠️ Développement
 
-- le secret (32 octets aléatoires) n'est **jamais stocké** : la base ne garde que son **hash SHA-256** ;
-- il apparaît dans l'URL de la page, mais **jamais dans les URL des fichiers** : pour télécharger une pièce jointe ou lire les commentaires, Angular l'envoie dans l'en-tête `X-Share-Token`. Il n'atterrit donc ni dans l'historique, ni dans les logs d'accès, ni dans un `Referer` ;
-- il expire après 7 jours, l'auteur peut le révoquer (réponse `410 Gone`) ou le régénérer ; les logs serveur affichent `[REDACTED_SHARE_TOKEN]`.
+```bash
+# API : http://localhost:3000
+cd backend && cp .env.example .env   # renseigner MONGODB_URI, JWT_SECRET (et DEMO_PASSWORD pour la démo)
+npm install && npm start
+npm run seed:demo && npm run seed:enrich   # jeu de démonstration (facultatif)
 
-### 3. Découvrable sans rien divulguer : aperçu ≠ détail
+# Site : http://localhost:4200 (/api redirigé vers le backend)
+cd frontend-starter && npm install && npm start
+```
 
-Un post réservé aux followers ou aux abonnés reste visible dans le catalogue, mais sous forme d'**aperçu verrouillé** (`isLocked: true`). Les projections DTO (`postProjections.js`) garantissent qu'un aperçu ne contient jamais le `content`, ni les noms de fichiers internes, et que la couverture d'un post verrouillé est forcée à `null` côté serveur.
+```bash
+cd backend && npm test                             # 366 tests, vraie base MongoDB en mémoire
+cd frontend-starter && npm test -- --watch=false   # 424 tests Vitest
+```
 
-En cas de refus (`401`/`403`), l'API ne renvoie qu'un message : le front appelle alors une route dédiée `/api/posts/:id/preview` pour afficher le cadenas. Les erreurs restent homogènes et ne laissent rien filtrer.
+Depuis le code source, `docker compose up --build -d` lance tout (MongoDB, API, site) sur <http://localhost:8080>.
 
-### 4. Des uploads vérifiés octet par octet, et des quotas qui tiennent en concurrence
+## 📚 Documentation
 
-- Le type MIME annoncé par le navigateur ne suffit pas : le serveur lit les **premiers octets réels** du fichier (*magic bytes*) pour reconnaître JPEG, PNG, WebP, PDF, MP3, WAV, OGG et M4A, avec une limite par famille (5 / 10 / 25 Mo).
-- Les quotas par post (10 fichiers, 50 Mo cumulés) sont appliqués par un **`findOneAndUpdate` conditionnel avec `$expr`** : deux uploads simultanés ne peuvent pas dépasser la limite, ce qu'un simple contrôle en mémoire laisserait passer.
-- En cas d'échec (validation, base, disque), les fichiers déjà écrits sont supprimés immédiatement.
-
-### 5. Un abonnement simulé sans double activation
-
-L'abonnement « VIP » de 30 jours (sans paiement, clairement affiché comme simulation) s'appuie sur un **index unique `{ subscriberId, creatorId }`** et une mise à jour atomique conditionnelle. Un double-clic ou deux requêtes parallèles produisent un seul abonnement et un `409 Conflict` explicite (« Abonnement déjà actif jusqu'au … »), jamais un doublon ni une prolongation silencieuse.
-
-### 6. Une modération puissante, mais sans passe-droit
-
-L'administrateur peut **archiver un post** (les visiteurs reçoivent `410 Gone`) et **suspendre un compte** : connexion refusée, JWT déjà émis rejeté immédiatement (`403`), posts retirés du catalogue. En revanche, il **n'a aucun accès implicite aux fichiers privés** des créateurs : sans être follower, abonné ou détenteur du lien, il reçoit `403` comme tout le monde.
-
-Côté session, un changement de mot de passe incrémente un `tokenVersion` qui **révoque tous les anciens JWT**. Et l'intercepteur Angular distingue `401` (session expirée → déconnexion) de `403` (droits insuffisants → on reste connecté et on affiche un message).
-
-### 7. Une recherche tolérante aux fautes, testable hors Atlas
-
-- **MongoDB Atlas Search** avec tolérance aux fautes (`fuzzy`), autocomplétion dès la première lettre (`mode=suggest`) et syntaxe mixte texte + tags : `château #lego #star-wars`.
-- Sans Atlas (tests, Docker), ou quand Atlas ne trouve rien, un **moteur de repli maison** prend le relais avec la même tolérance : accents et ligatures ignorés, pluriels, une faute par mot (lettre en trop, oubliée, remplacée ou inversée), recherche dans le titre, la description, l'auteur et les tags, et score de pertinence. Il essaie d'abord tous les mots sans faute, puis avec une faute, puis n'importe quel mot. « chateau », « drgaon » ou « guitare bluse » trouvent ce qu'on cherche, y compris dans l'autocomplétion.
-- Recherche **par créateur** (nom ou identifiant), pagination numérotée avec choix du nombre de résultats, et filtres **reflétés dans l'URL** : un F5 ou un lien partagé retrouve exactement la même recherche.
-
-### 8. Un éditeur Markdown où l'on dépose les médias là où l'on écrit
-
-Dans l'espace « Mes créations », on glisse une image, un PDF ou un son **à l'endroit précis du texte** où se trouve la souris (`document.caretPositionFromPoint`). Les fichiers d'un post pas encore enregistré reçoivent un jeton temporaire `attachment:temp:…`, converti en vraie référence à la sauvegarde.
-
-Le rendu Markdown est écrit à la main avec **échappement HTML strict** (scripts, attributs `on*`, liens `javascript:` neutralisés), sans jamais recourir à `bypassSecurityTrustHtml`. Les PDF s'ouvrent dans une visionneuse intégrée et les sons dans un lecteur audio.
-
-### 9. Une évolution sans régression
-
-MakerShare ajoute 8 modèles et des dizaines de routes **sans toucher au contrat de l'application d'origine** : `/api/auth*`, `/api/users/me` et `/api/tracks*` (upload audio Multer, couvertures, pagination, streaming authentifié) sont conservées telles quelles et couvertes par leurs tests historiques. Les anciennes pistes ne sont pas converties en posts ; les comptes créés avant l'ajout des rôles sont traités comme `user` / `active` partout, y compris dans les agrégations.
-
----
-
-## Fonctionnalités
-
-| Page | Ce qu'on y fait |
+| Document | Contenu |
 |---|---|
-| `/posts` | Catalogue paginé, recherche avec suggestions, filtres catégorie / tag / créateur, tri par date, popularité ou pertinence |
-| `/posts/:id` | Lecture du tutoriel Markdown, pièces jointes (images, visionneuse PDF, lecteur audio), likes, commentaires, aperçu verrouillé si accès refusé |
-| `/share/:token` | Lecture d'un post non répertorié via son lien secret, sans compte |
-| `/my-posts` | Création et édition (brouillon → publié → dépublié), visibilité, pièces jointes, choix de la couverture, gestion du lien de partage |
-| `/creators`, `/creators/:id` | Annuaire des makers, profil public, listes de followers et de comptes suivis, follow et abonnement simulé |
-| `/profile` | Nom, bio, tags de compétences, avatar, mot de passe, créateurs suivis, mes followers, abonnements actifs |
-| `/admin` | Inspection d'un post ou d'un compte, archivage / restauration, suspension / réactivation |
+| [docs/POINTS_FORTS.md](docs/POINTS_FORTS.md) | les mécanismes originaux expliqués un par un |
+| [API_CONTRACT.md](API_CONTRACT.md) | routes, DTOs, codes HTTP et matrice d'accès |
+| [TP4_LIBRE.md](TP4_LIBRE.md) | cahier des charges et règles métier |
+| [ATLAS_SETUP.md](ATLAS_SETUP.md) | configuration de MongoDB Atlas |
+| [RAPPORT_IA_LIBRE.md](RAPPORT_IA_LIBRE.md) · [RAPPORT_IA_TP1_A_3.md](RAPPORT_IA_TP1_A_3.md) | rapports d'utilisation de l'IA |
 
-**Visibilités d'un post :** `public` (tout le monde), `followers`, `subscribers` (abonnés actifs) et `link` (lien secret).
-**Catégories :** Menuiserie, Électronique, Maroquinerie, Lego, Papercraft, Origami, Musique, Modèles 3D, Autre.
+**Versions :** [v5.0.0](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0) — MakerShare (TP4 à TP6) · [v3.1.0](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) — Guitar Practice Cloud (TP1 à TP3, port 8081).
 
----
+## 👤 Auteur et crédits
 
-## Stack et architecture
+**Thomas DELOUP** — Master 1 MIAGE, Université Côte d'Azur, cours de Programmation Web 2026–2027.
 
-| | |
-|---|---|
-| **Frontend** | Angular 22 : composants standalone, `inject()`, Signals (`signal`, `computed`), control flow `@if` / `@for`, formulaires réactifs, TypeScript strict sans `any`, pages chargées à la demande, interface adaptée au téléphone (vérifiée à 375 px) |
-| **Performance** | API entre 20 et 50 ms ; à l'ouverture du site, 124 Ko transférés (JS + CSS compressés en gzip, fichiers à empreinte mis en cache un an) au lieu de 692 Ko ; index MongoDB sur toutes les relations |
-| **Backend** | Node.js / Express 5 en ES Modules, Mongoose 9, Multer, JWT (`jsonwebtoken`), `bcryptjs` |
-| **Données** | MongoDB Atlas pour les métadonnées et les relations, disque local (`backend/data/uploads/`) pour les fichiers |
-| **Tests** | `node --test` + `mongodb-memory-server` côté API, Vitest côté Angular |
-
-Les 8 collections : `users`, `posts`, `follows`, `subscriptions`, `likes`, `sharelinks`, `comments` et `tracks` (historique). Les relations uniques (follow, like, abonnement) sont garanties par des index composés uniques, et les compteurs (likes, followers) sont calculés à la volée plutôt que dénormalisés.
-
----
-
-## Lancer en un clic avec Docker
-
-Seul [Docker Desktop](https://www.docker.com/products/docker-desktop/) est nécessaire : pas de Node.js, pas de compte Atlas.
-
-1. Télécharger le paquet prêt à lancer d'une version (tableau ci-dessous) ou le code source (`git clone`), puis décompresser.
-2. Double-cliquer sur `demarrer.bat` (Windows) ou lancer `./demarrer.sh` (macOS / Linux). Depuis le code source, l'équivalent manuel est `docker compose up --build -d`.
-3. Ouvrir <http://localhost:8080>. Le jeu de démonstration est chargé automatiquement, comme si le site était déjà utilisé : 10 créateurs, 6 membres de la communauté et 1 compte de modération, tous avec photo de profil et bio, 100 projets illustrés par de vraies photos, des plans PDF et des extraits audio, environ 440 likes, 200 commentaires (avec réponses des auteurs), des follows et des abonnements. Les comptes à utiliser sont listés dans [Essayer en 2 minutes](#essayer-en-2-minutes).
-
-Docker démarre trois conteneurs : **MongoDB**, l'**API** Express et le **site** Angular servi par nginx, qui redirige `/api` vers l'API. La base et les fichiers téléversés sont conservés dans des volumes entre deux lancements. Sans Atlas, la recherche utilise automatiquement le repli regex.
-
-| Besoin | Commande |
-|---|---|
-| Arrêter | `docker compose down` |
-| Tout effacer (base et fichiers) | `docker compose down -v` |
-| Voir les logs de l'API | `docker compose logs -f api` |
-| Changer le port, le secret JWT ou désactiver la démo | variables `APP_PORT`, `JWT_SECRET`, `SEED_DEMO=false`, `DEMO_PASSWORD` (voir `docker-compose.yml`) |
-
-### Versions téléchargeables
-
-| Version | Contenu | Accès local |
-|---|---|---|
-| [`v3.1.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v3.1.0) | Guitar Practice Cloud, rendu final des TP1 à TP3 | <http://localhost:8081> · `demo@example.com` / `Demo1234!` |
-| [`v5.0.0`](https://github.com/xKayato/AngularM1_Miage_2026_2027_TP123/releases/tag/v5.0.0) · tag `TP4-5-6` | MakerShare, rendu final des TP4 à TP6 | <http://localhost:8080> · comptes `demo.*@makershare.local` / `MakerShare2026!` |
-
-Chaque Release GitHub propose un fichier **`<application>-<version>-docker.zip` prêt à lancer** : les images Docker y sont déjà construites, il suffit de décompresser puis de double-cliquer sur `demarrer.bat` (ou `./demarrer.sh`), sans sources ni compilation. Les archives *Source code* générées par GitHub contiennent le code complet, qui se lance avec `docker compose up --build`.
-
-Les deux applications utilisent des ports différents et peuvent tourner en même temps.
-
-**Préparer le paquet d'une version** (mainteneur, Docker démarré) : `python tools/package_release.py <tag>` construit les images depuis le tag et produit `release-assets/<application>-<tag>-docker.zip`, à joindre à la Release GitHub correspondante.
-
----
-
-## Démarrer le projet en mode développement
-
-**Prérequis :** Node.js 24 (20.6 minimum pour `--env-file`), npm, et un cluster MongoDB Atlas ou une instance MongoDB locale. La connexion à Atlas est décrite dans [ATLAS_SETUP.md](ATLAS_SETUP.md) et les mappings de l'index `posts_search_index` dans [TP4_LIBRE.md](TP4_LIBRE.md) (section 7) ; sans cet index, la recherche passe simplement par le repli regex.
-
-### Backend
-
-```bash
-cd backend
-cp .env.example .env      # puis renseigner MONGODB_URI et JWT_SECRET
-npm install
-npm start                 # http://localhost:3000
-```
-
-Jeu de démonstration optionnel (10 créateurs, 6 membres, 1 modérateur, 100 posts illustrés, likes, commentaires et abonnements) :
-
-```bash
-# ajouter DEMO_PASSWORD=... dans .env, puis :
-npm run seed:demo         # comptes demo.*@makershare.local
-npm run seed:enrich       # photos, avatars, PDF, MP3 et interactions de la communauté
-npm run seed:clean        # retire uniquement les données de démo
-```
-
-Le script est idempotent : le relancer ne crée pas de doublons et il ne touche jamais aux comptes réels.
-
-Les photos (une par projet, plus les avatars) viennent de **Wikimedia Commons**, sous licence libre (domaine public, CC0, CC BY, CC BY-SA). Elles sont versionnées dans `backend/scripts/seed-assets/`, donc le seed fonctionne sans internet. L'auteur et la licence de chaque photo sont listés dans [CREDITS.md](backend/scripts/seed-assets/CREDITS.md) et rappelés en bas du projet qui l'utilise. Les avatars ne montrent aucun visage : les comptes de démo sont fictifs, on n'y associe donc pas la photo d'une vraie personne.
-
-### Frontend
-
-```bash
-cd frontend-starter
-npm install
-npm start                 # http://localhost:4200, /api/* est redirigé vers le backend
-```
-
----
-
-## Tests
-
-```bash
-cd backend && npm test                          # 366 tests, 17 fichiers
-cd frontend-starter && npm test -- --watch=false  # 424 tests, 27 fichiers
-cd frontend-starter && npm run build            # build de production
-```
-
-Les tests backend démarrent une vraie base MongoDB en mémoire et appellent l'API en HTTP. Ils couvrent notamment la matrice d'accès complète (visiteur, connecté, follower, abonné, auteur, admin), les liens secrets, la concurrence sur les quotas et les abonnements, la modération, la révocation des JWT et la non-régression des TP1 à TP3.
-
----
-
-## Organisation du dépôt
-
-```text
-backend/
-  src/
-    app.js            routes historiques (auth, users, tracks) et montage des routeurs
-    routes/           posts, creators, admin
-    middlewares/      authentification et upload des pièces jointes
-    models/           les 8 modèles Mongoose
-    utils/            contrôle d'accès, projections DTO, validation binaire
-  scripts/            jeux de données de démonstration
-  test/               tests d'intégration
-frontend-starter/
-  src/app/
-    components/       une page par dossier (catalogue, détail, gestion, profils, admin…)
-    shared/           services, modèles TypeScript, intercepteur, guards
-    routes.ts
-  Dockerfile          build Angular puis service nginx
-  nginx.conf          fichiers statiques, routes Angular et proxy /api
-backend/Dockerfile    image de l'API (charge la démo si SEED_DEMO=true)
-docker-compose.yml    MongoDB + API + site
-demarrer.bat / .sh    lancement en un clic
-```
-
----
-
-## Documentation
-
-- [API_CONTRACT.md](API_CONTRACT.md) — routes, DTOs, codes HTTP et matrice d'accès
-- [TP4_LIBRE.md](TP4_LIBRE.md) — cahier des charges et règles métier de MakerShare
-- [ATLAS_SETUP.md](ATLAS_SETUP.md) — configuration du cluster MongoDB Atlas
-- [RAPPORT_IA_LIBRE.md](RAPPORT_IA_LIBRE.md) — rapport d'utilisation de l'IA pour MakerShare (TP4 à TP6)
-- [RAPPORT_IA_TP1_A_3.md](RAPPORT_IA_TP1_A_3.md) — rapport d'utilisation de l'IA pour les TP1 à TP3
-- [CREDITS.md](backend/scripts/seed-assets/CREDITS.md) — auteur et licence de chaque photo du jeu de démonstration
-
----
-
-## Licence et crédits
-
-Code réalisé dans le cadre du Master 1 MIAGE de l'Université Côte d'Azur (2026–2027), à partir du dépôt de départ du cours. Les photos du jeu de démonstration proviennent de Wikimedia Commons et restent sous la licence de leurs auteurs (domaine public, CC0, CC BY ou CC BY-SA), détaillée dans [CREDITS.md](backend/scripts/seed-assets/CREDITS.md). Les comptes et les textes de démonstration sont fictifs.
+Les photos du jeu de démonstration viennent de [Wikimedia Commons](https://commons.wikimedia.org) sous licence libre (domaine public, CC0, CC BY, CC BY-SA) ; auteur et licence de chacune dans [CREDITS.md](backend/scripts/seed-assets/CREDITS.md). Les comptes et textes de démonstration sont fictifs.
