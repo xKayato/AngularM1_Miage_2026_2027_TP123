@@ -37,8 +37,7 @@ https://github.com/user-attachments/assets/da447e78-1821-477e-822f-c43a050700b4
 
 **Présentation** — le projet en 5 minutes
 
-<!-- Remplacer LIEN_VIDEO_PRESENTATION par le lien YouTube / Drive de la vidéo de présentation. -->
-<a href="LIEN_VIDEO_PRESENTATION"><img src="docs/readme/video-presentation.svg" alt="Vidéo de présentation de MakerShare" width="60%"></a>
+<a href="https://youtu.be/eSHOxwIrkzk"><img src="docs/readme/video-presentation.svg" alt="Vidéo de présentation de MakerShare" width="60%"></a>
 
 ## 🚀 Essayer en 2 minutes
 
